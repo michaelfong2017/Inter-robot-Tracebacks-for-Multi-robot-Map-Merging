@@ -6,11 +6,13 @@
         "limitSymbolsToIncludedHeaders": false
       },
       "includePath": [
+        "/home/michael/catkin_ws/install/warehouse_ros_mongo/include/**",
         "/home/michael/catkin_ws/install/turtlebot3_gazebo/include/**",
         "/home/michael/catkin_ws/install/turtlebot3_fake_node/include/**",
         "/opt/ros/foxy/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_fake_node/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_gazebo/include/**",
+        "/home/michael/catkin_ws/src/warehouse_ros_mongo/include/**",
         "/usr/include/**"
       ],
       "name": "ROS",
