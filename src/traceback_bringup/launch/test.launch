@@ -1,8 +1,14 @@
 <launch>
 
     <include file="$(find turtlebot3_gazebo)/launch/turtlebot3_house.launch" />
+
     <include file="$(find turtlebot3_slam)/launch/turtlebot3_slam.launch">
         <arg name="slam_methods" value="karto" />
     </include>
+
+    <param name="/warehouse_port" type="int" value="27017" />
+    <node pkg="warehouse_ros_mongo" name="mongodb" type="mongo_wrapper_ros.py">
+        <param name="~db_path" type="str" value="~/catkin_ws/db" />
+    </node>
 
 </launch>
