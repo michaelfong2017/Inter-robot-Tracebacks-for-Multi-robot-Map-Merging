@@ -2,10 +2,6 @@
 	path = src/turtlebot3_simulations
 	url = https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
 	branch = noetic-devel
-[submodule "src/m-explore"]
-	path = src/m-explore
-	url = https://github.com/hrnr/m-explore.git
-	branch = noetic-devel
 [submodule "src/warehouse_ros_mongo"]
 	path = src/warehouse_ros_mongo
 	url = https://github.com/ros-planning/warehouse_ros_mongo.git
