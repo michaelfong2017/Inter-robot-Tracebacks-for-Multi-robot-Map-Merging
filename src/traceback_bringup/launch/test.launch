@@ -1,8 +1,4 @@
 <launch>
-
-    <!-- <include file="$(find turtlebot3_gazebo)/launch/multi_turtlebot3.launch" /> -->
-
-
     <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]" />
     <arg name="first_tb3" default="tb3_0" />
     <arg name="second_tb3" default="tb3_1" />
@@ -87,8 +83,7 @@
 
 
         <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg first_tb3)_$(arg first_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg first_tb3)/$(arg first_tb3)/map 50" />
-        <include file="$(find explore_lite)/launch/explore.launch">
-        </include>
+        <include file="$(find explore_lite)/launch/explore.launch"></include>
     </group>
 
     <group ns="$(arg second_tb3)">
@@ -102,8 +97,7 @@
         </include>
 
         <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg second_tb3)_$(arg second_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg second_tb3)/$(arg second_tb3)/map 50" />
-        <include file="$(find explore_lite)/launch/explore.launch">
-        </include>
+        <include file="$(find explore_lite)/launch/explore.launch"></include>
     </group>
 
     <group ns="$(arg third_tb3)">
@@ -117,25 +111,14 @@
         </include>
 
         <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg third_tb3)_$(arg third_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg third_tb3)/$(arg third_tb3)/map 50" />
-        <include file="$(find explore_lite)/launch/explore.launch">
-        </include>
+        <include file="$(find explore_lite)/launch/explore.launch"></include>
     </group>
 
 
-    <!-- <param name="tf_prefix" value="/" />
-    <include file="$(find traceback_bringup)/launch/modified_explore.launch">
-        <arg name="robot_name" value="$(arg first_tb3)" />
-    </include>
+    <include file="$(find traceback_bringup)/launch/modified_map_merge.launch" />
 
-    <include file="$(find traceback_bringup)/launch/modified_explore.launch">
-        <arg name="robot_name" value="$(arg second_tb3)" />
-    </include>
-
-    <include file="$(find traceback_bringup)/launch/modified_explore.launch">
-        <arg name="robot_name" value="$(arg third_tb3)" />
-    </include> -->
-
-    <!-- <include file="$(find turtlebot3_gazebo)/launch/multi_map_merge.launch"/> -->
+    <node pkg="rviz" type="rviz" name="rviz"
+        args="-d $(find traceback_bringup)/rviz/view_maps.rviz" />
 
 
     <param name="/warehouse_port" type="int" value="27017" />
