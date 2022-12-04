@@ -85,6 +85,8 @@
             <arg name="robot_name" value="$(arg first_tb3)" />
         </include>
 
+
+        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg first_tb3)_$(arg first_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg first_tb3)/$(arg first_tb3)/map 50" />
         <include file="$(find explore_lite)/launch/explore.launch">
         </include>
     </group>
@@ -99,6 +101,7 @@
             <arg name="robot_name" value="$(arg second_tb3)" />
         </include>
 
+        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg second_tb3)_$(arg second_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg second_tb3)/$(arg second_tb3)/map 50" />
         <include file="$(find explore_lite)/launch/explore.launch">
         </include>
     </group>
@@ -113,6 +116,7 @@
             <arg name="robot_name" value="$(arg third_tb3)" />
         </include>
 
+        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg third_tb3)_$(arg third_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg third_tb3)/$(arg third_tb3)/map 50" />
         <include file="$(find explore_lite)/launch/explore.launch">
         </include>
     </group>
