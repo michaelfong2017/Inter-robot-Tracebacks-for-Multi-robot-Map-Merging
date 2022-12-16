@@ -10,3 +10,7 @@
 	path = src/m-explore
 	url = https://github.com/michaelfong2017/m-explore.git
 	branch = noetic-devel
+[submodule "src/mongodb_store"]
+	path = src/mongodb_store
+	url = https://github.com/strands-project/mongodb_store.git
+	branch = noetic-devel

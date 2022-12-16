@@ -7,8 +7,11 @@
       },
       "includePath": [
         "/home/michael/catkin_ws/devel_isolated/warehouse_ros_mongo/include/**",
+        "/home/michael/catkin_ws/devel_isolated/mongodb_store/include/**",
+        "/home/michael/catkin_ws/devel_isolated/mongodb_store_msgs/include/**",
         "/opt/ros/noetic/include/**",
         "/home/michael/catkin_ws/src/m-explore/explore/include/**",
+        "/home/michael/catkin_ws/src/mongodb_store/mongodb_store/include/**",
         "/home/michael/catkin_ws/src/m-explore/map_merge/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_fake/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_gazebo/include/**",
