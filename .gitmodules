@@ -6,3 +6,7 @@
 	path = src/warehouse_ros_mongo
 	url = https://github.com/ros-planning/warehouse_ros_mongo.git
 	branch = noetic-devel
+[submodule "src/m-explore"]
+	path = src/m-explore
+	url = https://github.com/michaelfong2017/m-explore.git
+	branch = noetic-devel
