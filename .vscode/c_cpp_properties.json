@@ -6,9 +6,13 @@
         "limitSymbolsToIncludedHeaders": false
       },
       "includePath": [
+        "/home/michael/catkin_ws/devel_isolated/warehouse_ros_mongo/include/**",
         "/opt/ros/noetic/include/**",
+        "/home/michael/catkin_ws/src/m-explore/explore/include/**",
+        "/home/michael/catkin_ws/src/m-explore/map_merge/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_fake/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_gazebo/include/**",
+        "/home/michael/catkin_ws/src/warehouse_ros_mongo/include/**",
         "/usr/include/**"
       ],
       "name": "ROS",
