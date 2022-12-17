@@ -50,9 +50,9 @@
     <include file="$(find traceback_bringup)/launch/modified_map_merge.launch" />
 
 
-    <param name="/warehouse_port" type="int" value="27017" />
-    <node pkg="warehouse_ros_mongo" name="mongodb" type="mongo_wrapper_ros.py">
-        <param name="~db_path" type="str" value="~/catkin_ws/db" />
-    </node>
+    <include file="$(find mongodb_store)/launch/mongodb_store.launch">
+        <arg name="db_path" value="$(env HOME)/catkin_ws/db" />
+        <arg name="port" value="27017" />
+    </include>
 
 </launch>
