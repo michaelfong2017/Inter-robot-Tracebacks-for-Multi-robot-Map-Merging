@@ -6,7 +6,6 @@
         "limitSymbolsToIncludedHeaders": false
       },
       "includePath": [
-        "/home/michael/catkin_ws/devel_isolated/warehouse_ros_mongo/include/**",
         "/home/michael/catkin_ws/devel_isolated/mongodb_store/include/**",
         "/home/michael/catkin_ws/devel_isolated/mongodb_store_msgs/include/**",
         "/opt/ros/noetic/include/**",
