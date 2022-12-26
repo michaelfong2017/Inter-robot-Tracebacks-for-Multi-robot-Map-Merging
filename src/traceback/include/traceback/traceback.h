@@ -19,6 +19,7 @@ namespace traceback
     nav_msgs::OccupancyGrid::ConstPtr readonly_map;
     ros::Subscriber map_sub;
     ros::Subscriber map_updates_sub;
+    bool is_self;
   };
 
   class Traceback

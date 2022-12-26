@@ -95,6 +95,9 @@ namespace traceback
           {
             fullMapUpdate(msg, subscription);
           });
+      subscription.is_self = robot_name == ros::this_node::getNamespace();
+      ROS_INFO("subscription.is_self: %s", subscription.is_self ? "true" : "false");
+      
       // ROS_INFO("Subscribing to MAP updates topic: %s.",
       //          map_updates_topic.c_str());
       // subscription.map_updates_sub =
