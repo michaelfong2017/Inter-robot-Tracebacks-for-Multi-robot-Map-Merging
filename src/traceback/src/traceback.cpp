@@ -12,6 +12,7 @@ namespace traceback
 
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
+    private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
     private_nh.param<std::string>("robot_map_topic", robot_map_topic_, "map");
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
@@ -30,6 +31,10 @@ namespace traceback
         grids.push_back(subscription.readonly_map);
       }
     }
+
+    transform_estimator_.feed(grids.begin(), grids.end());
+    transform_estimator_.estimateTransforms(FeatureType::ORB,
+                                            confidence_threshold_);
   }
 
   void Traceback::fullMapUpdate(const nav_msgs::OccupancyGrid::ConstPtr &msg,
@@ -97,7 +102,7 @@ namespace traceback
           });
       subscription.is_self = robot_name == ros::this_node::getNamespace();
       ROS_INFO("subscription.is_self: %s", subscription.is_self ? "true" : "false");
-      
+
       // ROS_INFO("Subscribing to MAP updates topic: %s.",
       //          map_updates_topic.c_str());
       // subscription.map_updates_sub =

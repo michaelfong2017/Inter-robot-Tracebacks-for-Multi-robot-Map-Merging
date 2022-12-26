@@ -1,6 +1,8 @@
 #ifndef TRACEBACK_H_
 #define TRACEBACK_H_
 
+#include <traceback/transform_estimator.h>
+
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Transform.h>
 #include <map_msgs/OccupancyGridUpdate.h>
@@ -35,6 +37,7 @@ namespace traceback
     /* parameters */
     double discovery_rate_;
     double estimation_rate_;
+    double confidence_threshold_;
     std::string robot_map_topic_;
     std::string robot_map_updates_topic_;
     std::string robot_namespace_;
@@ -45,6 +48,8 @@ namespace traceback
     std::forward_list<MapSubscription> subscriptions_;
     size_t subscriptions_size_;
     boost::shared_mutex subscriptions_mutex_;
+
+    TransformEstimator transform_estimator_;
 
     void poseEstimation();
 
