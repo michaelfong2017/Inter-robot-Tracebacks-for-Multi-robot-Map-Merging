@@ -12,6 +12,7 @@
         "/home/michael/catkin_ws/src/m-explore/explore/include/**",
         "/home/michael/catkin_ws/src/mongodb_store/mongodb_store/include/**",
         "/home/michael/catkin_ws/src/m-explore/map_merge/include/**",
+        "/home/michael/catkin_ws/src/traceback/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_fake/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_gazebo/include/**",
         "/usr/include/**"

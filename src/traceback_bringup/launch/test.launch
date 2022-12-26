@@ -50,9 +50,16 @@
     <include file="$(find traceback_bringup)/launch/modified_map_merge.launch" />
 
 
-    <include file="$(find mongodb_store)/launch/mongodb_store.launch">
+    <!-- <include file="$(find mongodb_store)/launch/mongodb_store.launch">
         <arg name="db_path" value="$(env HOME)/catkin_ws/db" />
         <arg name="port" value="27017" />
-    </include>
+    </include> -->
 
+
+    <node pkg="traceback" type="traceback" respawn="false" name="traceback" output="screen">
+        <param name="robot_map_topic" value="map"/>
+        <param name="robot_namespace" value="tb3"/>
+        <param name="discovery_rate" value="0.05"/>
+        <param name="estimation_rate" value="0.1"/>
+    </node>
 </launch>
