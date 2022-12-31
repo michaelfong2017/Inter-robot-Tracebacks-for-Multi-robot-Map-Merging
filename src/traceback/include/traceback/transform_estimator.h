@@ -7,6 +7,7 @@
 #include <nav_msgs/OccupancyGrid.h>
 
 #include <opencv2/core/utility.hpp>
+#include <opencv2/stitching/detail/motion_estimators.hpp>
 
 namespace traceback
 {
@@ -26,9 +27,17 @@ namespace traceback
                                 double confidence = 1.0);
 
     private:
+        const float ZERO_ERROR = 0.0001f;
+
         std::vector<nav_msgs::OccupancyGrid::ConstPtr> grids_;
         std::vector<cv::Mat> images_;
-        std::vector<cv::Mat> transforms_;
+        // std::vector<cv::Mat> transforms_;
+        std::vector<std::vector<cv::Mat>> transforms_vectors_;
+
+        void toPairwiseTransforms(std::vector<cv::detail::CameraParams> transforms, std::vector<int> good_indices, size_t images_size, std::vector<std::vector<cv::Mat>> &transforms_vectors);
+        size_t findIdentityTransform(std::vector<cv::detail::CameraParams> transforms);
+
+        void printTransformsVectors(const std::vector<std::vector<cv::Mat>> transforms_vectors);
     };
 
     template <typename InputIt>

@@ -16,14 +16,6 @@
 
         <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg first_tb3)_$(arg first_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg first_tb3)/$(arg first_tb3)/map 50" />
         <include file="$(find explore_lite)/launch/explore.launch"></include>
-
-
-        <node pkg="traceback" type="traceback" respawn="false" name="traceback" output="screen">
-            <param name="robot_map_topic" value="map"/>
-            <param name="robot_namespace" value="tb3"/>
-            <param name="discovery_rate" value="0.05"/>
-            <param name="estimation_rate" value="0.1"/>
-        </node>
     </group>
 
     <group ns="$(arg second_tb3)">
@@ -38,14 +30,6 @@
 
         <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg second_tb3)_$(arg second_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg second_tb3)/$(arg second_tb3)/map 50" />
         <include file="$(find explore_lite)/launch/explore.launch"></include>
-    
-    
-        <!-- <node pkg="traceback" type="traceback" respawn="false" name="traceback" output="screen">
-            <param name="robot_map_topic" value="map"/>
-            <param name="robot_namespace" value="tb3"/>
-            <param name="discovery_rate" value="0.05"/>
-            <param name="estimation_rate" value="0.1"/>
-        </node> -->
     </group>
 
     <group ns="$(arg third_tb3)">
@@ -60,18 +44,19 @@
 
         <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg third_tb3)_$(arg third_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg third_tb3)/$(arg third_tb3)/map 50" />
         <include file="$(find explore_lite)/launch/explore.launch"></include>
-    
-    
-        <!-- <node pkg="traceback" type="traceback" respawn="false" name="traceback" output="screen">
-            <param name="robot_map_topic" value="map"/>
-            <param name="robot_namespace" value="tb3"/>
-            <param name="discovery_rate" value="0.05"/>
-            <param name="estimation_rate" value="0.1"/>
-        </node> -->
     </group>
 
 
     <include file="$(find traceback_bringup)/launch/modified_map_merge.launch" />
+
+
+    <node pkg="traceback" type="traceback" respawn="false" name="traceback" output="screen">
+        <param name="robot_map_topic" value="map"/>
+        <param name="robot_namespace" value="tb3"/>
+        <param name="discovery_rate" value="0.05"/>
+        <param name="estimation_rate" value="0.1"/>
+        <param name="estimation_confidence" value="0.5"/>
+    </node>
 
 
     <!-- <include file="$(find mongodb_store)/launch/mongodb_store.launch">

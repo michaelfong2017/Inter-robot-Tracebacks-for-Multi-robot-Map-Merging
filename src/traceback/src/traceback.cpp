@@ -8,7 +8,6 @@ namespace traceback
   {
     ros::NodeHandle private_nh("~");
     std::string frame_id;
-    std::string merged_map_topic;
 
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
@@ -17,6 +16,11 @@ namespace traceback
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
     private_nh.param<std::string>("robot_namespace", robot_namespace_, "");
+    // private_nh.param<std::string>("merged_map_topic", , "map");
+
+    /* publishing */
+    // target_position_publisher_ =
+    //     node_.advertise<geometry_msgs::Point>(merged_map_topic, 50, true);
   }
 
   void Traceback::poseEstimation()
@@ -26,9 +30,11 @@ namespace traceback
     grids.reserve(subscriptions_size_);
     {
       boost::shared_lock<boost::shared_mutex> lock(subscriptions_mutex_);
+      size_t i = 0;
       for (auto &subscription : subscriptions_)
       {
         grids.push_back(subscription.readonly_map);
+        transforms_indexes_.insert({i, subscription.robot_namespace});
       }
     }
 
@@ -100,8 +106,9 @@ namespace traceback
           {
             fullMapUpdate(msg, subscription);
           });
-      subscription.is_self = robot_name == ros::this_node::getNamespace();
-      ROS_INFO("subscription.is_self: %s", subscription.is_self ? "true" : "false");
+      // subscription.is_self = robot_name == ros::this_node::getNamespace();
+      // ROS_INFO("subscription.is_self: %s", subscription.is_self ? "true" : "false");
+      subscription.robot_namespace = robot_name;
 
       // ROS_INFO("Subscribing to MAP updates topic: %s.",
       //          map_updates_topic.c_str());

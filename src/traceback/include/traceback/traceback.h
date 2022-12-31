@@ -21,14 +21,14 @@ namespace traceback
     nav_msgs::OccupancyGrid::ConstPtr readonly_map;
     ros::Subscriber map_sub;
     ros::Subscriber map_updates_sub;
-    bool is_self;
+    std::string robot_namespace; // e.g /tb3_0
   };
 
   class Traceback
   {
   public:
     Traceback();
-    
+
     void spin();
 
   private:
@@ -42,6 +42,8 @@ namespace traceback
     std::string robot_map_updates_topic_;
     std::string robot_namespace_;
 
+    // publishing
+    ros::Publisher target_position_publisher_;
     // maps robots namespaces to maps. does not own
     std::unordered_map<std::string, MapSubscription *> robots_;
     // owns maps -- iterator safe
@@ -50,6 +52,8 @@ namespace traceback
     boost::shared_mutex subscriptions_mutex_;
 
     TransformEstimator transform_estimator_;
+    // maps transform indexes to robots namespaces
+    std::unordered_map<size_t, std::string> transforms_indexes_;
 
     void poseEstimation();
 
