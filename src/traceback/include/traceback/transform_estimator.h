@@ -34,6 +34,8 @@ namespace traceback
         // std::vector<cv::Mat> transforms_;
         std::vector<std::vector<cv::Mat>> transforms_vectors_;
 
+        void findContours(cv::Mat image, size_t image_index);
+
         void toPairwiseTransforms(std::vector<cv::detail::CameraParams> transforms, std::vector<int> good_indices, size_t images_size, std::vector<std::vector<cv::Mat>> &transforms_vectors);
         size_t findIdentityTransform(std::vector<cv::detail::CameraParams> transforms);
 

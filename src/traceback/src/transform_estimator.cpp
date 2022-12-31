@@ -4,6 +4,8 @@
 #include <ros/assert.h>
 #include <ros/console.h>
 #include <opencv2/stitching/detail/matchers.hpp>
+#include "opencv2/imgcodecs.hpp"
+#include <opencv2/imgproc.hpp>
 
 namespace traceback
 {
@@ -26,6 +28,13 @@ namespace traceback
         if (images_.empty())
         {
             return true;
+        }
+
+        /** Debug contours */
+        size_t i = 0;
+        for (const cv::Mat &image : images_) {
+            findContours(image, i);
+            ++i;
         }
 
         /* find features in images */
@@ -133,6 +142,24 @@ namespace traceback
         return true;
     }
 
+    void TransformEstimator::findContours(cv::Mat image, size_t image_index)
+    {
+        cv::blur(image, image, cv::Size(3, 3));
+        cv::Mat canny_output;
+        cv::Canny(image, canny_output, 100.0, 200.0);
+        std::vector<std::vector<cv::Point>> contours;
+        std::vector<cv::Vec4i> hierarchy;
+        cv::findContours(canny_output, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+        cv::Mat drawing = cv::Mat::zeros(canny_output.size(), CV_8UC3);
+        for (size_t i = 0; i < contours.size(); i++)
+        {
+            cv::Scalar color = cv::Scalar(0, 100, 100, 100);
+            drawContours(drawing, contours, (int)i, color, 2, cv::LINE_8, hierarchy, 0);
+        }
+        cv::imwrite(std::to_string(image_index) + "_contour.png",
+                    drawing);
+    }
+
     // Input .R should already be CV_32F.
     void TransformEstimator::toPairwiseTransforms(std::vector<cv::detail::CameraParams> transforms, std::vector<int> good_indices, size_t images_size, std::vector<std::vector<cv::Mat>> &transforms_vectors)
     {
@@ -161,14 +188,16 @@ namespace traceback
 
             cv::Mat temp;
             // Translation only, no rotation case
-            if (abs(transforms[i].R.at<float>(0, 0) - 0.0f) < ZERO_ERROR && abs(transforms[i].R.at<float>(0, 1) - 0.0f) < ZERO_ERROR && abs(transforms[i].R.at<float>(1, 0) - 0.0f) < ZERO_ERROR && abs(transforms[i].R.at<float>(1, 1) - 0.0f) < ZERO_ERROR) {
+            if (abs(transforms[i].R.at<float>(0, 0) - 0.0f) < ZERO_ERROR && abs(transforms[i].R.at<float>(0, 1) - 0.0f) < ZERO_ERROR && abs(transforms[i].R.at<float>(1, 0) - 0.0f) < ZERO_ERROR && abs(transforms[i].R.at<float>(1, 1) - 0.0f) < ZERO_ERROR)
+            {
                 temp = transforms[i].R;
                 float tx = transforms[i].R.at<float>(0, 2);
                 temp.at<float>(0, 2) = -1 * tx;
                 float ty = transforms[i].R.at<float>(1, 2);
                 temp.at<float>(1, 2) = -1 * ty;
             }
-            else {
+            else
+            {
                 temp = transforms[i].R.inv();
             }
 
@@ -188,9 +217,7 @@ namespace traceback
                     // set identity
                     transforms_vectors[i][j] = cv::Mat::eye(3, 3, CV_64F);
                 }
-                else if (std::find(good_indices.begin(), good_indices.end(), static_cast<int>(i)) != good_indices.end()
-                && std::find(good_indices.begin(), good_indices.end(), static_cast<int>(j)) != good_indices.end()
-                )
+                else if (std::find(good_indices.begin(), good_indices.end(), static_cast<int>(i)) != good_indices.end() && std::find(good_indices.begin(), good_indices.end(), static_cast<int>(j)) != good_indices.end())
                 {
                     cv::Mat temp = transforms_vectors[identity_index][j] * transforms_vectors[i][identity_index];
                     temp.convertTo(transforms_vectors[i][j], CV_64F);
