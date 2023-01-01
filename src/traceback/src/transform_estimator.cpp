@@ -147,6 +147,10 @@ namespace traceback
 
     void TransformEstimator::findWeightedCenterOfConvexHulls(cv::Mat image, size_t image_index)
     {
+        if (image.empty()) {
+            return;
+        }
+        
         cv::blur(image, image, cv::Size(3, 3));
         cv::Mat canny_output;
         cv::Canny(image, canny_output, 100.0, 200.0);
@@ -160,39 +164,10 @@ namespace traceback
             convexHull(contours[i], hulls[i]);
         }
 
-        std::vector<cv::Moments> mu(contours.size());
-        for (size_t i = 0; i < contours.size(); i++)
-        {
-            mu[i] = moments(hulls[i]);
-        }
-        std::vector<cv::Point2f> mc(contours.size());
-        for (size_t i = 0; i < contours.size(); i++)
-        {
-            // add 1e-5 to avoid division by zero
-            mc[i] = cv::Point2f(static_cast<float>(mu[i].m10 / (mu[i].m00 + 1e-5)),
-                                static_cast<float>(mu[i].m01 / (mu[i].m00 + 1e-5)));
-        }
+        cv::Point2f center_contours, center_hulls;
 
-        std::vector<double> perimeters(contours.size());
-        for (size_t i = 0; i < contours.size(); i++)
-        {
-            perimeters[i] = cv::arcLength(hulls[i], true);
-        }
-
-        double sum_x, sum_y = 0;
-        for (size_t i = 0; i < contours.size(); i++)
-        {
-            sum_x += mc[i].x * perimeters[i];
-            sum_y += mc[i].y * perimeters[i];
-        }
-        cv::Point2f sum = cv::Point2f(sum_x, sum_y);
-
-        double total_length = std::accumulate(
-            perimeters.begin(), perimeters.end(),    // Run from begin to end
-            0.0, // Initialize with a zero point
-            std::plus<double>() // Use addition for each point (default)
-        );
-        cv::Point2f mean_point(sum.x / total_length, sum.y / total_length);
+        findWeightedCenter(contours, center_contours);
+        findWeightedCenter(hulls, center_hulls);
 
         cv::Mat drawing = cv::Mat::zeros(canny_output.size(), CV_8UC3);
         for (size_t i = 0; i < contours.size(); i++)
@@ -201,10 +176,49 @@ namespace traceback
             drawContours(drawing, contours, (int)i, color, 2, cv::LINE_8, hierarchy, 0);
             drawContours(drawing, hulls, (int)i, cv::Scalar(100, 100, 0, 100), 2, cv::LINE_8, hierarchy, 0);
         }
-        circle(drawing, mean_point, 4, cv::Scalar(200, 200, 0, 200), -1);
+        circle(drawing, center_contours, 4, cv::Scalar(0, 200, 200, 200), -1);
+        circle(drawing, center_hulls, 4, cv::Scalar(200, 200, 0, 200), -1);
 
         cv::imwrite(std::to_string(image_index) + "_contour.png",
                     drawing);
+    }
+
+    void TransformEstimator::findWeightedCenter(std::vector<std::vector<cv::Point>> contoursOrHulls, cv::Point2f &center)
+    {
+        std::vector<cv::Moments> mu(contoursOrHulls.size());
+        for (size_t i = 0; i < contoursOrHulls.size(); i++)
+        {
+            mu[i] = moments(contoursOrHulls[i]);
+        }
+        std::vector<cv::Point2f> mc(contoursOrHulls.size());
+        for (size_t i = 0; i < contoursOrHulls.size(); i++)
+        {
+            // add 1e-5 to avoid division by zero
+            mc[i] = cv::Point2f(static_cast<float>(mu[i].m10 / (mu[i].m00 + 1e-5)),
+                                static_cast<float>(mu[i].m01 / (mu[i].m00 + 1e-5)));
+        }
+
+        std::vector<double> perimeters(contoursOrHulls.size());
+        for (size_t i = 0; i < contoursOrHulls.size(); i++)
+        {
+            perimeters[i] = cv::arcLength(contoursOrHulls[i], true);
+        }
+
+        double sum_x = 0;
+        double sum_y = 0;
+        for (size_t i = 0; i < contoursOrHulls.size(); i++)
+        {
+            sum_x += mc[i].x * perimeters[i];
+            sum_y += mc[i].y * perimeters[i];
+        }
+
+        double total_length = std::accumulate(
+            perimeters.begin(), perimeters.end(), // Run from begin to end
+            0.0,                                  // Initialize with a zero point
+            std::plus<double>()                   // Use addition for each point (default)
+        );
+
+        center = cv::Point2f(sum_x / total_length, sum_y / total_length);
     }
 
     // Input .R should already be CV_32F.

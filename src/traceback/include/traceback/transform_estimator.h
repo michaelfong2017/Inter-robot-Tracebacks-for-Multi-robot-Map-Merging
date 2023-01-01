@@ -35,6 +35,7 @@ namespace traceback
         std::vector<std::vector<cv::Mat>> transforms_vectors_;
 
         void findWeightedCenterOfConvexHulls(cv::Mat image, size_t image_index);
+        void findWeightedCenter(std::vector<std::vector<cv::Point>> contoursOrHulls, cv::Point2f &center);
 
         void toPairwiseTransforms(std::vector<cv::detail::CameraParams> transforms, std::vector<int> good_indices, size_t images_size, std::vector<std::vector<cv::Mat>> &transforms_vectors);
         size_t findIdentityTransform(std::vector<cv::detail::CameraParams> transforms);
