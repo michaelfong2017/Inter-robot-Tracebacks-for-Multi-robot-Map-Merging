@@ -5,10 +5,9 @@
 
 namespace traceback
 {
-  Traceback::Traceback() : subscriptions_size_(0)
+  Traceback::Traceback() : subscriptions_size_(0), tf_listener_(ros::Duration(10.0))
   {
     ros::NodeHandle private_nh("~");
-    std::string frame_id;
 
     private_nh.param("update_target_rate", update_target_rate_, 0.2);
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
@@ -18,6 +17,8 @@ namespace traceback
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
     private_nh.param<std::string>("robot_namespace", robot_namespace_, "");
+    // transform tolerance is used for all tf transforms here
+    private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
   }
 
   void Traceback::updateTargetPoses()
@@ -43,13 +44,79 @@ namespace traceback
       transform_estimator_.printConfidences(confidences);
     }
 
-    for (size_t i = 0; i < confidences.size(); ++i) {
-        auto it = max_element(confidences[i].begin(), confidences[i].end());
-        size_t position = it - confidences[i].begin();
-        double max_confidence = *it;
+    for (size_t i = 0; i < confidences.size(); ++i)
+    {
+      auto it = max_element(confidences[i].begin(), confidences[i].end());
+      size_t position = it - confidences[i].begin();
+      double max_confidence = *it;
 
-        ROS_INFO("confidences[%zu] (position, max_confidence) = (%zu, %f)", i, position, max_confidence);
+      ROS_INFO("confidences[%zu] (position, max_confidence) = (%zu, %f)", i, position, max_confidence);
+
+      // Transform current pose from src frame to dst frame
+      std::string global_frame = ros::names::append(ros::names::append(transforms_indexes_[i], transforms_indexes_[i]), "map");
+      std::string robot_base_frame = ros::names::append(transforms_indexes_[i], "base_link");
+
+      std::string tf_error;
+      tf_listener_.waitForTransform(global_frame, robot_base_frame, ros::Time(),
+                                    ros::Duration(0.1), ros::Duration(0.01),
+                                    &tf_error);
+
+      geometry_msgs::Pose pose = getRobotPose(global_frame, robot_base_frame, tf_listener_, transform_tolerance_);
+
+      ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", transforms_indexes_[i].c_str(), i, pose.position.x, pose.position.y);
     }
+  }
+
+  geometry_msgs::Pose Traceback::getRobotPose(const std::string &global_frame, const std::string &robot_base_frame, const tf::TransformListener &tf_listener, const double &transform_tolerance)
+  {
+    tf::Stamped<tf::Pose> global_pose;
+    global_pose.setIdentity();
+    tf::Stamped<tf::Pose> robot_pose;
+    robot_pose.setIdentity();
+    // /tb3_0/base_link
+    robot_pose.frame_id_ = robot_base_frame;
+    robot_pose.stamp_ = ros::Time();
+    ros::Time current_time =
+        ros::Time::now(); // save time for checking tf delay later
+
+    // get the global pose of the robot
+    try
+    {
+      tf_listener.transformPose(global_frame, robot_pose, global_pose);
+    }
+    catch (tf::LookupException &ex)
+    {
+      ROS_ERROR_THROTTLE(1.0, "No Transform available Error looking up robot "
+                              "pose: %s\n",
+                         ex.what());
+      return {};
+    }
+    catch (tf::ConnectivityException &ex)
+    {
+      ROS_ERROR_THROTTLE(1.0, "Connectivity Error looking up robot pose: %s\n",
+                         ex.what());
+      return {};
+    }
+    catch (tf::ExtrapolationException &ex)
+    {
+      ROS_ERROR_THROTTLE(1.0, "Extrapolation Error looking up robot pose: %s\n",
+                         ex.what());
+      return {};
+    }
+    // check global_pose timeout
+    if (current_time.toSec() - global_pose.stamp_.toSec() >
+        transform_tolerance)
+    {
+      ROS_WARN_THROTTLE(1.0, "Costmap2DClient transform timeout. Current time: "
+                             "%.4f, global_pose stamp: %.4f, tolerance: %.4f",
+                        current_time.toSec(), global_pose.stamp_.toSec(),
+                        transform_tolerance);
+      return {};
+    }
+
+    geometry_msgs::PoseStamped msg;
+    tf::poseStampedTFToMsg(global_pose, msg);
+    return msg.pose;
   }
 
   void Traceback::poseEstimation()
@@ -57,6 +124,7 @@ namespace traceback
     ROS_DEBUG("Grid pose estimation started.");
     std::vector<nav_msgs::OccupancyGridConstPtr> grids;
     grids.reserve(subscriptions_size_);
+    transforms_indexes_.clear();
     {
       boost::shared_lock<boost::shared_mutex> lock(subscriptions_mutex_);
       size_t i = 0;
@@ -64,6 +132,7 @@ namespace traceback
       {
         grids.push_back(subscription.readonly_map);
         transforms_indexes_.insert({i, subscription.robot_namespace});
+        ++i;
       }
     }
 
@@ -128,6 +197,9 @@ namespace traceback
       map_topic = ros::names::append(robot_name, robot_map_topic_);
       // map_updates_topic =
       //     ros::names::append(robot_name, robot_map_updates_topic_);
+
+      subscription.robot_namespace = robot_name;
+
       ROS_INFO("Subscribing to MAP topic: %s.", map_topic.c_str());
       subscription.map_sub = node_.subscribe<nav_msgs::OccupancyGrid>(
           map_topic, 50,
@@ -137,7 +209,6 @@ namespace traceback
           });
       // subscription.is_self = robot_name == ros::this_node::getNamespace();
       // ROS_INFO("subscription.is_self: %s", subscription.is_self ? "true" : "false");
-      subscription.robot_namespace = robot_name;
 
       // ROS_INFO("Subscribing to MAP updates topic: %s.",
       //          map_updates_topic.c_str());

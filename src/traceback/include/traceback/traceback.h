@@ -43,6 +43,9 @@ namespace traceback
     std::string robot_map_updates_topic_;
     std::string robot_namespace_;
 
+    const tf::TransformListener tf_listener_; ///< @brief Used for transforming
+    double transform_tolerance_;            ///< timeout before transform errors
+
     // maps robots namespaces to maps. does not own
     std::unordered_map<std::string, MapSubscription *> robots_;
     // owns maps -- iterator safe
@@ -55,6 +58,8 @@ namespace traceback
     std::unordered_map<size_t, std::string> transforms_indexes_;
 
     void updateTargetPoses();
+
+    geometry_msgs::Pose getRobotPose(const std::string &global_frame, const std::string &robot_base_frame, const tf::TransformListener &tf_listener, const double &transform_tolerance);
 
     void poseEstimation();
 
