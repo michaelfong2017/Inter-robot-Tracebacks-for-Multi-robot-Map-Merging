@@ -9,6 +9,7 @@ namespace traceback
     ros::NodeHandle private_nh("~");
     std::string frame_id;
 
+    private_nh.param("update_target_rate", update_target_rate_, 0.2);
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
@@ -16,11 +17,27 @@ namespace traceback
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
     private_nh.param<std::string>("robot_namespace", robot_namespace_, "");
-    // private_nh.param<std::string>("merged_map_topic", , "map");
+  }
 
-    /* publishing */
-    // target_position_publisher_ =
-    //     node_.advertise<geometry_msgs::Point>(merged_map_topic, 50, true);
+  void Traceback::updateTargetPoses()
+  {
+    ROS_DEBUG("Update target poses started.");
+
+    // Ensure consistency of transforms_vectors_, centers_ and confidences_
+    {
+      boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
+      std::vector<std::vector<cv::Mat>> transforms_vectors = transform_estimator_.getTransformsVectors();
+      transform_estimator_.printTransformsVectors(transforms_vectors);
+
+      std::vector<cv::Point2f> centers = transform_estimator_.getCenters();
+      for (auto &p : centers)
+      {
+        ROS_INFO("center = (%f, %f)", p.x, p.y);
+      }
+
+      std::vector<std::vector<double>> confidences = transform_estimator_.getConfidences();
+      transform_estimator_.printConfidences(confidences);
+    }
   }
 
   void Traceback::poseEstimation()
@@ -144,7 +161,17 @@ namespace traceback
     return is_occupancy_grid && contains_robot_namespace && is_map_topic;
   }
 
-  void Traceback::executetopicSubscribing()
+  void Traceback::executeUpdateTargetPoses()
+  {
+    ros::Rate r(update_target_rate_);
+    while (node_.ok())
+    {
+      updateTargetPoses();
+      r.sleep();
+    }
+  }
+
+  void Traceback::executeTopicSubscribing()
   {
     ros::Rate r(discovery_rate_);
     while (node_.ok())
@@ -154,7 +181,7 @@ namespace traceback
     }
   }
 
-  void Traceback::executeposeEstimation()
+  void Traceback::executePoseEstimation()
   {
     ros::Rate r(estimation_rate_);
     while (node_.ok())
@@ -171,10 +198,13 @@ namespace traceback
   {
     ros::spinOnce();
     std::thread subscribing_thr([this]()
-                                { executetopicSubscribing(); });
+                                { executeTopicSubscribing(); });
     std::thread estimation_thr([this]()
-                               { executeposeEstimation(); });
+                               { executePoseEstimation(); });
+    std::thread update_target_thr([this]()
+                                  { executeUpdateTargetPoses(); });
     ros::spin();
+    update_target_thr.join();
     estimation_thr.join();
     subscribing_thr.join();
   }

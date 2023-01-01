@@ -35,6 +35,7 @@ namespace traceback
     ros::NodeHandle node_;
 
     /* parameters */
+    double update_target_rate_;
     double discovery_rate_;
     double estimation_rate_;
     double confidence_threshold_;
@@ -42,8 +43,6 @@ namespace traceback
     std::string robot_map_updates_topic_;
     std::string robot_namespace_;
 
-    // publishing
-    ros::Publisher target_position_publisher_;
     // maps robots namespaces to maps. does not own
     std::unordered_map<std::string, MapSubscription *> robots_;
     // owns maps -- iterator safe
@@ -55,6 +54,8 @@ namespace traceback
     // maps transform indexes to robots namespaces
     std::unordered_map<size_t, std::string> transforms_indexes_;
 
+    void updateTargetPoses();
+
     void poseEstimation();
 
     void fullMapUpdate(const nav_msgs::OccupancyGrid::ConstPtr &msg,
@@ -65,8 +66,9 @@ namespace traceback
     std::string robotNameFromTopic(const std::string &topic);
     bool isRobotMapTopic(const ros::master::TopicInfo &topic);
 
-    void executetopicSubscribing();
-    void executeposeEstimation();
+    void executeUpdateTargetPoses();
+    void executeTopicSubscribing();
+    void executePoseEstimation();
   };
 } // namespace traceback
 #endif

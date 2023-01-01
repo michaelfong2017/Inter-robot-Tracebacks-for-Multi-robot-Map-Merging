@@ -2,6 +2,7 @@
 #define TRANSFORM_ESTIMATOR_H_
 
 #include <vector>
+#include <boost/thread.hpp>
 
 #include <geometry_msgs/Transform.h>
 #include <nav_msgs/OccupancyGrid.h>
@@ -21,26 +22,35 @@ namespace traceback
     class TransformEstimator
     {
     public:
+        boost::shared_mutex updates_mutex_;
+
         template <typename InputIt>
         void feed(InputIt grids_begin, InputIt grids_end);
         bool estimateTransforms(FeatureType feature = FeatureType::ORB,
                                 double confidence = 1.0);
+        std::vector<std::vector<cv::Mat>> getTransformsVectors();
+        std::vector<cv::Point2f> getCenters();
+        std::vector<std::vector<double>> getConfidences();
+
+        void printConfidences(const std::vector<std::vector<double>> confidences);
+        void printTransformsVectors(const std::vector<std::vector<cv::Mat>> transforms_vectors);
 
     private:
         const float ZERO_ERROR = 0.0001f;
 
         std::vector<nav_msgs::OccupancyGrid::ConstPtr> grids_;
         std::vector<cv::Mat> images_;
-        // std::vector<cv::Mat> transforms_;
-        std::vector<std::vector<cv::Mat>> transforms_vectors_;
 
-        void findWeightedCenterOfConvexHulls(cv::Mat image, size_t image_index);
+        std::vector<std::vector<cv::Mat>> transforms_vectors_;
+        std::vector<cv::Point2f> centers_;
+        std::vector<std::vector<double>> confidences_;
+
+        cv::Point2f findWeightedCenterOfConvexHulls(cv::Mat image, size_t image_index);
         void findWeightedCenter(std::vector<std::vector<cv::Point>> contoursOrHulls, cv::Point2f &center);
 
+        void findPairwiseConfidences(std::vector<cv::detail::MatchesInfo> pairwise_matches, std::vector<int> good_indices, size_t images_size, std::vector<std::vector<double>> &confidences);
         void toPairwiseTransforms(std::vector<cv::detail::CameraParams> transforms, std::vector<int> good_indices, size_t images_size, std::vector<std::vector<cv::Mat>> &transforms_vectors);
         size_t findIdentityTransform(std::vector<cv::detail::CameraParams> transforms);
-
-        void printTransformsVectors(const std::vector<std::vector<cv::Mat>> transforms_vectors);
     };
 
     template <typename InputIt>

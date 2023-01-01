@@ -4,7 +4,7 @@
 #include <ros/assert.h>
 #include <ros/console.h>
 #include <opencv2/stitching/detail/matchers.hpp>
-#include "opencv2/imgcodecs.hpp"
+#include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
 #include <numeric>
@@ -33,12 +33,12 @@ namespace traceback
         }
 
         /** Debug contours */
-        size_t i = 0;
-        for (const cv::Mat &image : images_)
-        {
-            findWeightedCenterOfConvexHulls(image, i);
-            ++i;
-        }
+        // size_t i = 0;
+        // for (const cv::Mat &image : images_)
+        // {
+        //     findWeightedCenterOfConvexHulls(image, i);
+        //     ++i;
+        // }
 
         /* find features in images */
         ROS_DEBUG("computing features");
@@ -113,44 +113,36 @@ namespace traceback
             return false;
         }
 
-        // transforms_.clear();
-        // transforms_.resize(images_.size());
-        // size_t i = 0;
-        // for (auto &j : good_indices)
-        // {
-        //     // we want to work with transforms as doubles
-        //     transforms[i].R.convertTo(transforms_[static_cast<size_t>(j)], CV_64F);
-        //     ++i;
-        // }
+        // Ensure consistency of transforms_vectors_, centers_ and confidences_
+        {
+            boost::shared_lock<boost::shared_mutex> lock(updates_mutex_);
+            toPairwiseTransforms(transforms, good_indices, images_.size(), transforms_vectors_);
+            // printTransformsVectors(transforms_vectors_);
 
-        toPairwiseTransforms(transforms, good_indices, images_.size(), transforms_vectors_);
+            centers_.clear();
+            centers_.resize(images_.size());
+            size_t i = 0;
+            for (const cv::Mat &image : images_)
+            {
+                centers_[i] = findWeightedCenterOfConvexHulls(image, i);
+                ++i;
+            }
 
-        printTransformsVectors(transforms_vectors_);
-
-        // for (size_t k = 0; k < transforms_.size(); ++k)
-        // {
-        //     int width = transforms_[k].cols;
-        //     int height = transforms_[k].rows;
-        //     for (int y = 0; y < height; y++)
-        //     {
-        //         for (int x = 0; x < width; x++)
-        //         {
-        //             double val = transforms_[k].at<double>(y, x);
-        //             // do whatever you want with your value
-        //             ROS_INFO("transform[%zu]<%d, %d> = %f", k, y, x, val);
-        //         }
-        //     }
-        // }
+            findPairwiseConfidences(pairwise_matches, good_indices, images_.size(), confidences_);
+        }
 
         return true;
     }
 
-    void TransformEstimator::findWeightedCenterOfConvexHulls(cv::Mat image, size_t image_index)
+    cv::Point2f TransformEstimator::findWeightedCenterOfConvexHulls(cv::Mat image, size_t image_index)
     {
-        if (image.empty()) {
-            return;
+        if (image.empty())
+        {
+            ROS_INFO("[findWeightedCenterOfConvexHulls] image is empty, image_index: %zu", image_index);
+            cv::Point2f p;
+            return p;
         }
-        
+
         cv::blur(image, image, cv::Size(3, 3));
         cv::Mat canny_output;
         cv::Canny(image, canny_output, 100.0, 200.0);
@@ -181,6 +173,8 @@ namespace traceback
 
         cv::imwrite(std::to_string(image_index) + "_contour.png",
                     drawing);
+
+        return center_hulls;
     }
 
     void TransformEstimator::findWeightedCenter(std::vector<std::vector<cv::Point>> contoursOrHulls, cv::Point2f &center)
@@ -221,12 +215,40 @@ namespace traceback
         center = cv::Point2f(sum_x / total_length, sum_y / total_length);
     }
 
+    void TransformEstimator::findPairwiseConfidences(std::vector<cv::detail::MatchesInfo> pairwise_matches, std::vector<int> good_indices, size_t images_size, std::vector<std::vector<double>> &confidences)
+    {
+        confidences.clear();
+        confidences.resize(images_size);
+
+        for (auto &confi : confidences)
+        {
+            confi.resize(images_size);
+        }
+
+        for (auto &match_info : pairwise_matches)
+        {
+            // Filter out (src_img_idx, dst_img_idx) == (-1, -1)
+            if (match_info.H.empty() ||
+                match_info.src_img_idx == match_info.dst_img_idx)
+            {
+                continue;
+            }
+
+            confidences[good_indices[match_info.src_img_idx]][good_indices[match_info.dst_img_idx]] = match_info.confidence;
+        }
+
+        // Set confidences of all self-transforms to -1
+        for (size_t i = 0; i < images_size; ++i)
+        {
+            confidences[i][i] = -1.0;
+        }
+
+        // Confidences not explicitly set should be zeroes
+    }
+
     // Input .R should already be CV_32F.
     void TransformEstimator::toPairwiseTransforms(std::vector<cv::detail::CameraParams> transforms, std::vector<int> good_indices, size_t images_size, std::vector<std::vector<cv::Mat>> &transforms_vectors)
     {
-        // e.g. good_indices is [1, 2] and if transforms[1] is the identity transform, image 2 will then be the reference image with identity transform.
-        size_t identity_index = good_indices[findIdentityTransform(transforms)];
-
         transforms_vectors.clear();
         transforms_vectors.resize(images_size);
 
@@ -234,6 +256,9 @@ namespace traceback
         {
             trans.resize(images_size);
         }
+
+        // e.g. good_indices is [1, 2] and if transforms[1] is the identity transform, image 2 will then be the reference image with identity transform.
+        size_t identity_index = good_indices[findIdentityTransform(transforms)];
 
         // e.g. 20, 21, 22
         for (size_t j = 0; j < transforms.size(); ++j)
@@ -287,6 +312,19 @@ namespace traceback
         }
     }
 
+    void TransformEstimator::printConfidences(const std::vector<std::vector<double>> confidences)
+    {
+       for (size_t i = 0; i < confidences.size(); ++i)
+        {
+            ROS_INFO("confidences[%zu].size = %zu", i, confidences[i].size());
+
+            for (size_t j = 0; j < confidences[i].size(); ++j)
+            {
+                ROS_INFO("confidences[%zu][%zu] = %f", i, j, confidences[i][j]);
+            }
+        }
+    }
+
     size_t TransformEstimator::findIdentityTransform(std::vector<cv::detail::CameraParams> transforms)
     {
         for (size_t k = 0; k < transforms.size(); ++k)
@@ -304,11 +342,11 @@ namespace traceback
     {
         for (size_t i = 0; i < transforms_vectors.size(); ++i)
         {
-            ROS_INFO("transform[%zu].size = %zu", i, transforms_vectors[i].size());
+            ROS_INFO("transforms[%zu].size = %zu", i, transforms_vectors[i].size());
 
             for (size_t j = 0; j < transforms_vectors[i].size(); ++j)
             {
-                ROS_INFO("transform[%zu][%zu] (width, height) = (%d, %d)", i, j, transforms_vectors[i][j].cols, transforms_vectors[i][j].rows);
+                ROS_INFO("transforms[%zu][%zu] (width, height) = (%d, %d)", i, j, transforms_vectors[i][j].cols, transforms_vectors[i][j].rows);
 
                 int width = transforms_vectors[i][j].cols;
                 int height = transforms_vectors[i][j].rows;
@@ -331,5 +369,20 @@ namespace traceback
                 ROS_INFO("matrix:\n%s", s.c_str());
             }
         }
+    }
+
+    std::vector<std::vector<cv::Mat>> TransformEstimator::getTransformsVectors()
+    {
+        return transforms_vectors_;
+    }
+
+    std::vector<cv::Point2f> TransformEstimator::getCenters()
+    {
+        return centers_;
+    }
+
+    std::vector<std::vector<double>> TransformEstimator::getConfidences()
+    {
+        return confidences_;
     }
 }
