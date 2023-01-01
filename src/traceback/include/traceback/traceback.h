@@ -56,6 +56,7 @@ namespace traceback
     TransformEstimator transform_estimator_;
     // maps transform indexes to robots namespaces
     std::unordered_map<size_t, std::string> transforms_indexes_;
+    std::vector<float> resolutions_; // e.g. ~0.05
 
     void updateTargetPoses();
 

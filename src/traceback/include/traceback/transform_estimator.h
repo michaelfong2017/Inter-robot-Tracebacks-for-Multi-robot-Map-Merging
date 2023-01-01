@@ -22,6 +22,8 @@ namespace traceback
     class TransformEstimator
     {
     public:
+        const float ZERO_ERROR = 0.0001f;
+
         boost::shared_mutex updates_mutex_;
 
         template <typename InputIt>
@@ -36,8 +38,6 @@ namespace traceback
         void printTransformsVectors(const std::vector<std::vector<cv::Mat>> transforms_vectors);
 
     private:
-        const float ZERO_ERROR = 0.0001f;
-
         std::vector<nav_msgs::OccupancyGrid::ConstPtr> grids_;
         std::vector<cv::Mat> images_;
 

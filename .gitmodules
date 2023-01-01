@@ -10,3 +10,15 @@
 	path = src/mongodb_store
 	url = https://github.com/michaelfong2017/mongodb_store.git
 	branch = noetic-devel
+[submodule "src/aws_robomaker_small_warehouse_world"]
+	path = src/aws_robomaker_small_warehouse_world
+	url = https://github.com/michaelfong2017/aws-robomaker-small-warehouse-world.git
+	branch = ros1
+[submodule "src/aws_robomaker_bookstore_world"]
+	path = src/aws_robomaker_bookstore_world
+	url = https://github.com/michaelfong2017/aws-robomaker-bookstore-world.git
+	branch = ros1
+[submodule "src/aws_robomaker_small_house_world"]
+	path = src/aws_robomaker_small_house_world
+	url = https://github.com/michaelfong2017/aws-robomaker-small-house-world.git
+	branch = ros1

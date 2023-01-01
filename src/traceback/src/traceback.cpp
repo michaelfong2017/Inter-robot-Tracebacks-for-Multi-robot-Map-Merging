@@ -47,12 +47,18 @@ namespace traceback
     for (size_t i = 0; i < confidences.size(); ++i)
     {
       auto it = max_element(confidences[i].begin(), confidences[i].end());
-      size_t position = it - confidences[i].begin();
+      size_t max_position = it - confidences[i].begin();
       double max_confidence = *it;
 
-      ROS_INFO("confidences[%zu] (position, max_confidence) = (%zu, %f)", i, position, max_confidence);
+      ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
 
-      // Transform current pose from src frame to dst frame
+      // No transform that passes confidence_threshold_ exists
+      if (abs(max_confidence - 0.0) < transform_estimator_.ZERO_ERROR)
+      {
+        continue;
+      }
+
+      // Get current pose
       std::string global_frame = ros::names::append(ros::names::append(transforms_indexes_[i], transforms_indexes_[i]), "map");
       std::string robot_base_frame = ros::names::append(transforms_indexes_[i], "base_link");
 
@@ -64,6 +70,18 @@ namespace traceback
       geometry_msgs::Pose pose = getRobotPose(global_frame, robot_base_frame, tf_listener_, transform_tolerance_);
 
       ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", transforms_indexes_[i].c_str(), i, pose.position.x, pose.position.y);
+
+      // Transform current pose from src frame to dst frame
+      cv::Mat pose_src(3, 1, CV_64F);
+      pose_src.at<double>(0, 0) = pose.position.x / resolutions_[i];
+      pose_src.at<double>(1, 0) = pose.position.y / resolutions_[i];
+      pose_src.at<double>(2, 0) = 1.0;
+
+      cv::Mat pose_dst = transforms_vectors[max_position][i] * pose_src;
+      pose_dst.at<double>(0, 0) *= resolutions_[max_position];
+      pose_dst.at<double>(1, 0) *= resolutions_[max_position];
+
+      ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
     }
   }
 
@@ -125,13 +143,22 @@ namespace traceback
     std::vector<nav_msgs::OccupancyGridConstPtr> grids;
     grids.reserve(subscriptions_size_);
     transforms_indexes_.clear();
+    resolutions_.clear();
     {
       boost::shared_lock<boost::shared_mutex> lock(subscriptions_mutex_);
       size_t i = 0;
       for (auto &subscription : subscriptions_)
       {
+        // In case the map topic is just subscribed and pose estimation is started before
+        // receiving the first map update from that topic, this subscription should
+        // be skipped to prevent error.
+        if (!subscription.readonly_map) {
+          ++i;
+          continue;
+        }
         grids.push_back(subscription.readonly_map);
         transforms_indexes_.insert({i, subscription.robot_namespace});
+        resolutions_.emplace_back(subscription.readonly_map->info.resolution);
         ++i;
       }
     }

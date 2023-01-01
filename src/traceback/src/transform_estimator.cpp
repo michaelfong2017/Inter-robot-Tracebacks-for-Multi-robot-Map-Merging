@@ -136,13 +136,6 @@ namespace traceback
 
     cv::Point2f TransformEstimator::findWeightedCenterOfConvexHulls(cv::Mat image, size_t image_index)
     {
-        if (image.empty())
-        {
-            ROS_INFO("[findWeightedCenterOfConvexHulls] image is empty, image_index: %zu", image_index);
-            cv::Point2f p;
-            return p;
-        }
-
         cv::blur(image, image, cv::Size(3, 3));
         cv::Mat canny_output;
         cv::Canny(image, canny_output, 100.0, 200.0);
