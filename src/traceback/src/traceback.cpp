@@ -1,6 +1,7 @@
 #include <traceback/traceback.h>
 
 #include <thread>
+#include <algorithm>
 
 namespace traceback
 {
@@ -23,20 +24,31 @@ namespace traceback
   {
     ROS_DEBUG("Update target poses started.");
 
+    std::vector<std::vector<cv::Mat>> transforms_vectors;
+    std::vector<cv::Point2f> centers;
+    std::vector<std::vector<double>> confidences;
     // Ensure consistency of transforms_vectors_, centers_ and confidences_
     {
       boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
-      std::vector<std::vector<cv::Mat>> transforms_vectors = transform_estimator_.getTransformsVectors();
-      transform_estimator_.printTransformsVectors(transforms_vectors);
+      transforms_vectors = transform_estimator_.getTransformsVectors();
+      // transform_estimator_.printTransformsVectors(transforms_vectors);
 
-      std::vector<cv::Point2f> centers = transform_estimator_.getCenters();
+      centers = transform_estimator_.getCenters();
       for (auto &p : centers)
       {
         ROS_INFO("center = (%f, %f)", p.x, p.y);
       }
 
-      std::vector<std::vector<double>> confidences = transform_estimator_.getConfidences();
+      confidences = transform_estimator_.getConfidences();
       transform_estimator_.printConfidences(confidences);
+    }
+
+    for (size_t i = 0; i < confidences.size(); ++i) {
+        auto it = max_element(confidences[i].begin(), confidences[i].end());
+        size_t position = it - confidences[i].begin();
+        double max_confidence = *it;
+
+        ROS_INFO("confidences[%zu] (position, max_confidence) = (%zu, %f)", i, position, max_confidence);
     }
   }
 
