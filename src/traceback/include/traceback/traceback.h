@@ -2,6 +2,7 @@
 #define TRACEBACK_H_
 
 #include <traceback/transform_estimator.h>
+#include <traceback/camera_image_processor.h>
 
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Transform.h>
@@ -73,6 +74,8 @@ namespace traceback
     // maps transform indexes to robots namespaces
     std::unordered_map<size_t, std::string> transforms_indexes_;
     std::vector<float> resolutions_; // e.g. ~0.05
+
+    CameraImageProcessor camera_image_processor_;
 
     void updateTargetPoses();
 

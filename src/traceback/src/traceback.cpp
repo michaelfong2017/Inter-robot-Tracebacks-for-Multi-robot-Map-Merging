@@ -185,6 +185,7 @@ namespace traceback
   void Traceback::CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg, CameraSubscription &subscription)
   {
     // ROS_DEBUG("received camera image update");
+    // ROS_DEBUG("from robot %s", subscription.robot_namespace.c_str());
     cv_bridge::CvImageConstPtr cv_ptr;
     try
     {

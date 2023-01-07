@@ -85,6 +85,7 @@ include_directories(
 add_executable(traceback
   src/traceback.cpp
   src/transform_estimator.cpp
+  src/camera_image_processor.cpp
 )
 add_dependencies(traceback ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(traceback ${catkin_LIBRARIES})
