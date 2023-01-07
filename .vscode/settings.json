@@ -74,7 +74,8 @@
         "variant": "cpp",
         "bit": "cpp",
         "*.ipp": "cpp",
-        "core": "cpp"
+        "core": "cpp",
+        "regex": "cpp"
     },
     "python.analysis.extraPaths": [
         "/home/michael/catkin_ws/devel_isolated/mongodb_store/lib/python3/dist-packages",

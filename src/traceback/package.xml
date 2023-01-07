@@ -54,6 +54,7 @@
   <depend>actionlib</depend>
   <depend>actionlib_msgs</depend>
   <depend>costmap_2d</depend>
+  <depend>cv_bridge</depend>
   <depend>geometry_msgs</depend>
   <depend>map_msgs</depend>
   <depend>move_base_msgs</depend>

@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   actionlib_msgs
   costmap_2d
+  cv_bridge
   geometry_msgs
   image_geometry
   map_msgs
@@ -43,6 +44,7 @@ catkin_package(
     actionlib
     actionlib_msgs
     costmap_2d
+    cv_bridge
     geometry_msgs
     map_msgs
     move_base_msgs
