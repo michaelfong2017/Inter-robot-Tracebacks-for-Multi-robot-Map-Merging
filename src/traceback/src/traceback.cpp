@@ -67,15 +67,7 @@ namespace traceback
       }
 
       // Get current pose
-      std::string global_frame = ros::names::append(ros::names::append(transforms_indexes_[i], transforms_indexes_[i]), "map");
-      std::string robot_base_frame = ros::names::append(transforms_indexes_[i], "base_link");
-
-      std::string tf_error;
-      tf_listener_.waitForTransform(global_frame, robot_base_frame, ros::Time(),
-                                    ros::Duration(0.1), ros::Duration(0.01),
-                                    &tf_error);
-
-      geometry_msgs::Pose pose = getRobotPose(global_frame, robot_base_frame, tf_listener_, transform_tolerance_);
+      geometry_msgs::Pose pose = getRobotPose(transforms_indexes_[i]);
 
       ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", transforms_indexes_[i].c_str(), i, pose.position.x, pose.position.y);
 
@@ -91,6 +83,19 @@ namespace traceback
 
       ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
     }
+  }
+
+  geometry_msgs::Pose Traceback::getRobotPose(const std::string robot_name)
+  {
+    std::string global_frame = ros::names::append(ros::names::append(robot_name, robot_name), "map");
+    std::string robot_base_frame = ros::names::append(robot_name, "base_link");
+
+    std::string tf_error;
+    tf_listener_.waitForTransform(global_frame, robot_base_frame, ros::Time(),
+                                  ros::Duration(0.1), ros::Duration(0.01),
+                                  &tf_error);
+
+    return getRobotPose(global_frame, robot_base_frame, tf_listener_, this->transform_tolerance_);
   }
 
   geometry_msgs::Pose Traceback::getRobotPose(const std::string &global_frame, const std::string &robot_base_frame, const tf::TransformListener &tf_listener, const double &transform_tolerance)
@@ -148,6 +153,27 @@ namespace traceback
   void Traceback::receiveUpdatedCameraImage()
   {
     ROS_DEBUG("Receive updated camera image started.");
+    for (auto current : camera_image_processor_.robots_to_current_image_)
+    {
+      std::string robot_name = current.first;
+      geometry_msgs::Pose pose = getRobotPose(robot_name);
+      PoseImagePair pose_image_pair;
+      pose_image_pair.pose = pose;
+      pose_image_pair.image = current.second;
+      pose_image_pair.stamp = ros::Time().now();
+
+      auto all = camera_image_processor_.robots_to_all_images_.find(current.first);
+      if (all != camera_image_processor_.robots_to_all_images_.end())
+      {
+        all->second.emplace_back(pose_image_pair);
+        PoseImagePair latestPair = *std::max_element(camera_image_processor_.robots_to_all_images_[current.first].begin(), camera_image_processor_.robots_to_all_images_[current.first].end());
+        ROS_INFO("latestPair.stamp.toSec(): %f", latestPair.stamp.toSec());
+      }
+      else
+      {
+        camera_image_processor_.robots_to_all_images_.insert({current.first, {pose_image_pair}});
+      }
+    }
   }
 
   void Traceback::poseEstimation()
@@ -202,6 +228,8 @@ namespace traceback
 
     // Process cv_ptr->image using OpenCV
     // ROS_INFO("Process cv_ptr->image using OpenCV");
+    // Insert if not exists, update if exists.
+    camera_image_processor_.robots_to_current_image_[subscription.robot_namespace] = cv_ptr->image;
   }
 
   void Traceback::fullMapUpdate(const nav_msgs::OccupancyGrid::ConstPtr &msg,

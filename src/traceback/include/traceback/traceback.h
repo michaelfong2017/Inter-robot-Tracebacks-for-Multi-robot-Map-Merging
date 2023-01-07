@@ -79,6 +79,7 @@ namespace traceback
 
     void updateTargetPoses();
 
+    geometry_msgs::Pose getRobotPose(const std::string robot_name);
     geometry_msgs::Pose getRobotPose(const std::string &global_frame, const std::string &robot_base_frame, const tf::TransformListener &tf_listener, const double &transform_tolerance);
 
     void receiveUpdatedCameraImage();
