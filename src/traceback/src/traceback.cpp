@@ -82,6 +82,38 @@ namespace traceback
       pose_dst.at<double>(1, 0) *= resolutions_[max_position];
 
       ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
+
+      std::string robot_name_dst = transforms_indexes_[max_position];
+      double min_distance = DBL_MAX;
+      size_t min_index = -1;
+      size_t index = 0;
+      for (auto pair : camera_image_processor_.robots_to_all_images_[robot_name_dst])
+      {
+        double dst_x = pair.pose.position.x;
+        double dst_y = pair.pose.position.y;
+        double src_x = pose_dst.at<double>(0, 0);
+        double src_y = pose_dst.at<double>(1, 0);
+        double distance = sqrt(pow(dst_x - src_x, 2) + pow(dst_y - src_y, 2));
+        if (distance < min_distance)
+        {
+          min_distance = distance;
+          min_index = index;
+        }
+        ++index;
+      }
+
+      geometry_msgs::Point target_position;
+      target_position.x = camera_image_processor_.robots_to_all_images_[robot_name_dst][min_index].pose.position.x;
+      target_position.y = camera_image_processor_.robots_to_all_images_[robot_name_dst][min_index].pose.position.y;
+      target_position.z = 0.0f;
+
+      move_base_msgs::MoveBaseGoal goal;
+      goal.target_pose.pose.position = target_position;
+      goal.target_pose.pose.orientation.w = 1.;
+      goal.target_pose.header.frame_id = robot_name_dst + robot_name_dst + "/map";
+      goal.target_pose.header.stamp = ros::Time::now();
+
+      robots_to_goal_publisher_[robot_name_dst].publish(goal);
     }
   }
 
@@ -335,12 +367,23 @@ namespace traceback
         subscription.robot_namespace = robot_name;
 
         ROS_INFO("Subscribing to CAMERA topic: %s.", camera_topic.c_str());
+
+        // Insert empty std::vector to the map to prevent future error when accessing the map by robot name.
+        auto it = camera_image_processor_.robots_to_all_images_.find(subscription.robot_namespace);
+        if (it == camera_image_processor_.robots_to_all_images_.end())
+        {
+          camera_image_processor_.robots_to_all_images_.insert({subscription.robot_namespace, {}});
+        }
+
         subscription.camera_sub = node_.subscribe<sensor_msgs::Image>(
             camera_topic, 50,
             [this, &subscription](const sensor_msgs::ImageConstPtr &msg)
             {
               CameraImageUpdate(msg, subscription);
             });
+
+        // Create goal publisher for this robot
+        robots_to_goal_publisher_.emplace(robot_name, node_.advertise<move_base_msgs::MoveBaseGoal>(ros::names::append(robot_name, traceback_goal_topic_), 10));
       }
     }
   }

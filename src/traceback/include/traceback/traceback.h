@@ -4,6 +4,8 @@
 #include <traceback/transform_estimator.h>
 #include <traceback/camera_image_processor.h>
 
+#include <move_base_msgs/MoveBaseAction.h>
+
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Transform.h>
 #include <sensor_msgs/Image.h>
@@ -76,6 +78,9 @@ namespace traceback
     std::vector<float> resolutions_; // e.g. ~0.05
 
     CameraImageProcessor camera_image_processor_;
+
+    std::unordered_map<std::string, ros::Publisher> robots_to_goal_publisher_;
+    std::string traceback_goal_topic_ = "traceback/goal";
 
     void updateTargetPoses();
 
