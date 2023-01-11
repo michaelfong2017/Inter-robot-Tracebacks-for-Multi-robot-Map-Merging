@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   visualization_msgs
   tf2_geometry_msgs
+  traceback_msgs
 )
 
 find_package(Boost REQUIRED COMPONENTS thread)

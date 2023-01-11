@@ -1,0 +1,2 @@
+sensor_msgs/Image tracer_image
+sensor_msgs/Image traced_image

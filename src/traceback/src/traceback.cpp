@@ -29,6 +29,11 @@ namespace traceback
     private_nh.param("camera_image_update_rate", camera_image_update_rate_, 0.1);
   }
 
+  void Traceback::tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg)
+  {
+    ROS_INFO("tracebackImageAndImageUpdate");
+  }
+
   void Traceback::updateTargetPoses()
   {
     ROS_DEBUG("Update target poses started.");
@@ -67,9 +72,10 @@ namespace traceback
       }
 
       // Get current pose
-      geometry_msgs::Pose pose = getRobotPose(transforms_indexes_[i]);
+      std::string robot_name_src = transforms_indexes_[i];
+      geometry_msgs::Pose pose = getRobotPose(robot_name_src);
 
-      ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", transforms_indexes_[i].c_str(), i, pose.position.x, pose.position.y);
+      ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
 
       // Transform current pose from src frame to dst frame
       cv::Mat pose_src(3, 1, CV_64F);
@@ -87,7 +93,7 @@ namespace traceback
       double min_distance = DBL_MAX;
       size_t min_index = -1;
       size_t index = 0;
-      for (auto pair : camera_image_processor_.robots_to_all_images_[robot_name_dst])
+      for (auto pair : camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst])
       {
         double dst_x = pair.pose.position.x;
         double dst_y = pair.pose.position.y;
@@ -102,18 +108,36 @@ namespace traceback
         ++index;
       }
 
+      double goal_x = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].pose.position.x;
+      double goal_y = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].pose.position.y;
+
+      // Transform goal from dst frame to src (robot i) frame
+      cv::Mat goal_dst(3, 1, CV_64F);
+      goal_dst.at<double>(0, 0) = goal_x / resolutions_[max_position];
+      goal_dst.at<double>(1, 0) = goal_y / resolutions_[max_position];
+      goal_dst.at<double>(2, 0) = 1.0;
+
+      cv::Mat goal_src = transforms_vectors[i][max_position] * goal_dst;
+      goal_src.at<double>(0, 0) *= resolutions_[i];
+      goal_src.at<double>(1, 0) *= resolutions_[i];
+
+      ROS_INFO("transformed goal_src (x, y) = (%f, %f)", goal_src.at<double>(0, 0), goal_src.at<double>(1, 0));
+
       geometry_msgs::Point target_position;
-      target_position.x = camera_image_processor_.robots_to_all_images_[robot_name_dst][min_index].pose.position.x;
-      target_position.y = camera_image_processor_.robots_to_all_images_[robot_name_dst][min_index].pose.position.y;
+      target_position.x = goal_src.at<double>(0, 0);
+      target_position.y = goal_src.at<double>(1, 0);
       target_position.z = 0.0f;
 
       move_base_msgs::MoveBaseGoal goal;
       goal.target_pose.pose.position = target_position;
       goal.target_pose.pose.orientation.w = 1.;
-      goal.target_pose.header.frame_id = robot_name_dst + robot_name_dst + "/map";
+      goal.target_pose.header.frame_id = robot_name_src + robot_name_src + "/map";
       goal.target_pose.header.stamp = ros::Time::now();
 
-      robots_to_goal_publisher_[robot_name_dst].publish(goal);
+      traceback_msgs::GoalAndImage goal_and_image;
+      goal_and_image.goal = goal;
+      goal_and_image.image = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].image;
+      robots_to_goal_and_image_publisher_[robot_name_src].publish(goal_and_image);
     }
   }
 
@@ -194,16 +218,16 @@ namespace traceback
       pose_image_pair.image = current.second;
       pose_image_pair.stamp = ros::Time().now();
 
-      auto all = camera_image_processor_.robots_to_all_images_.find(current.first);
-      if (all != camera_image_processor_.robots_to_all_images_.end())
+      auto all = camera_image_processor_.robots_to_all_pose_image_pairs_.find(current.first);
+      if (all != camera_image_processor_.robots_to_all_pose_image_pairs_.end())
       {
         all->second.emplace_back(pose_image_pair);
-        PoseImagePair latestPair = *std::max_element(camera_image_processor_.robots_to_all_images_[current.first].begin(), camera_image_processor_.robots_to_all_images_[current.first].end());
+        PoseImagePair latestPair = *std::max_element(camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].begin(), camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].end());
         ROS_INFO("latestPair.stamp.toSec(): %f", latestPair.stamp.toSec());
       }
       else
       {
-        camera_image_processor_.robots_to_all_images_.insert({current.first, {pose_image_pair}});
+        camera_image_processor_.robots_to_all_pose_image_pairs_.insert({current.first, {pose_image_pair}});
       }
     }
   }
@@ -244,24 +268,24 @@ namespace traceback
   {
     // ROS_DEBUG("received camera image update");
     // ROS_DEBUG("from robot %s", subscription.robot_namespace.c_str());
-    cv_bridge::CvImageConstPtr cv_ptr;
-    try
-    {
-      if (sensor_msgs::image_encodings::isColor(msg->encoding))
-        cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8);
-      else
-        cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::MONO8);
-    }
-    catch (cv_bridge::Exception &e)
-    {
-      ROS_ERROR("cv_bridge exception: %s", e.what());
-      return;
-    }
+    // cv_bridge::CvImageConstPtr cv_ptr;
+    // try
+    // {
+    //   if (sensor_msgs::image_encodings::isColor(msg->encoding))
+    //     cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8);
+    //   else
+    //     cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::MONO8);
+    // }
+    // catch (cv_bridge::Exception &e)
+    // {
+    //   ROS_ERROR("cv_bridge exception: %s", e.what());
+    //   return;
+    // }
 
     // Process cv_ptr->image using OpenCV
     // ROS_INFO("Process cv_ptr->image using OpenCV");
     // Insert if not exists, update if exists.
-    camera_image_processor_.robots_to_current_image_[subscription.robot_namespace] = cv_ptr->image;
+    camera_image_processor_.robots_to_current_image_[subscription.robot_namespace] = *msg;
   }
 
   void Traceback::fullMapUpdate(const nav_msgs::OccupancyGrid::ConstPtr &msg,
@@ -369,10 +393,10 @@ namespace traceback
         ROS_INFO("Subscribing to CAMERA topic: %s.", camera_topic.c_str());
 
         // Insert empty std::vector to the map to prevent future error when accessing the map by robot name.
-        auto it = camera_image_processor_.robots_to_all_images_.find(subscription.robot_namespace);
-        if (it == camera_image_processor_.robots_to_all_images_.end())
+        auto it = camera_image_processor_.robots_to_all_pose_image_pairs_.find(subscription.robot_namespace);
+        if (it == camera_image_processor_.robots_to_all_pose_image_pairs_.end())
         {
-          camera_image_processor_.robots_to_all_images_.insert({subscription.robot_namespace, {}});
+          camera_image_processor_.robots_to_all_pose_image_pairs_.insert({subscription.robot_namespace, {}});
         }
 
         subscription.camera_sub = node_.subscribe<sensor_msgs::Image>(
@@ -383,7 +407,14 @@ namespace traceback
             });
 
         // Create goal publisher for this robot
-        robots_to_goal_publisher_.emplace(robot_name, node_.advertise<move_base_msgs::MoveBaseGoal>(ros::names::append(robot_name, traceback_goal_topic_), 10));
+        robots_to_goal_and_image_publisher_.emplace(robot_name, node_.advertise<traceback_msgs::GoalAndImage>(ros::names::append(robot_name, traceback_goal_and_image_topic_), 10));
+
+        robots_to_image_and_image_subscriber_.emplace(robot_name, node_.subscribe<traceback_msgs::ImageAndImage>(
+                                                                      ros::names::append(robot_name, traceback_image_and_image_topic_), 10,
+                                                                      [this](const traceback_msgs::ImageAndImage::ConstPtr &msg)
+                                                                      {
+                                                                        tracebackImageAndImageUpdate(msg);
+                                                                      }));
       }
     }
   }

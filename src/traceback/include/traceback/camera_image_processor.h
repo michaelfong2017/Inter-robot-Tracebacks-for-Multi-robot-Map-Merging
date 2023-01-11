@@ -6,6 +6,7 @@
 #include <boost/thread.hpp>
 
 #include <geometry_msgs/Pose.h>
+#include <sensor_msgs/Image.h>
 #include <opencv2/core/utility.hpp>
 
 namespace traceback
@@ -13,7 +14,7 @@ namespace traceback
     struct PoseImagePair
     {
         geometry_msgs::Pose pose;
-        cv::Mat image;
+        sensor_msgs::Image image;
         ros::Time stamp;
         bool operator<(const PoseImagePair &rhs) const
         {
@@ -27,8 +28,8 @@ namespace traceback
         friend class Traceback;
 
     private:
-        std::unordered_map<std::string, cv::Mat> robots_to_current_image_;
-        std::unordered_map<std::string, std::vector<PoseImagePair>> robots_to_all_images_;
+        std::unordered_map<std::string, sensor_msgs::Image> robots_to_current_image_;
+        std::unordered_map<std::string, std::vector<PoseImagePair>> robots_to_all_pose_image_pairs_;
     };
 }
 #endif

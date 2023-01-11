@@ -1,6 +1,9 @@
 #ifndef TRACEBACK_H_
 #define TRACEBACK_H_
 
+#include <traceback_msgs/GoalAndImage.h>
+#include <traceback_msgs/ImageAndImage.h>
+
 #include <traceback/transform_estimator.h>
 #include <traceback/camera_image_processor.h>
 
@@ -79,8 +82,12 @@ namespace traceback
 
     CameraImageProcessor camera_image_processor_;
 
-    std::unordered_map<std::string, ros::Publisher> robots_to_goal_publisher_;
-    std::string traceback_goal_topic_ = "traceback/goal";
+    std::unordered_map<std::string, ros::Publisher> robots_to_goal_and_image_publisher_;
+    std::string traceback_goal_and_image_topic_ = "traceback/goal_and_image";
+    std::unordered_map<std::string, ros::Subscriber> robots_to_image_and_image_subscriber_;
+    std::string traceback_image_and_image_topic_ = "traceback/image_and_image";
+
+    void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
 
     void updateTargetPoses();
 
