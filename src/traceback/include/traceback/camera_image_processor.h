@@ -29,6 +29,7 @@ namespace traceback
 
     private:
         std::unordered_map<std::string, sensor_msgs::Image> robots_to_current_image_;
+        std::unordered_map<std::string, geometry_msgs::Pose> robots_to_current_pose_;
         std::unordered_map<std::string, std::vector<PoseImagePair>> robots_to_all_pose_image_pairs_;
     };
 }

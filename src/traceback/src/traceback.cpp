@@ -6,6 +6,8 @@
 
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
+#include <opencv2/imgcodecs.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <sensor_msgs/image_encodings.h>
 
 namespace traceback
@@ -32,6 +34,48 @@ namespace traceback
   void Traceback::tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg)
   {
     ROS_INFO("tracebackImageAndImageUpdate");
+
+    std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+
+    cv_bridge::CvImageConstPtr cv_ptr_tracer;
+    try
+    {
+      if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
+        cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
+      else
+        cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
+    }
+    catch (cv_bridge::Exception &e)
+    {
+      ROS_ERROR("cv_bridge exception: %s", e.what());
+      return;
+    }
+
+    // Process cv_ptr->image using OpenCV
+    ROS_INFO("Process cv_ptr->image using OpenCV");
+    cv::imwrite(current_time + "_tracer.png",
+                cv_ptr_tracer->image);
+
+    //
+    //
+    cv_bridge::CvImageConstPtr cv_ptr_traced;
+    try
+    {
+      if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
+        cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
+      else
+        cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
+    }
+    catch (cv_bridge::Exception &e)
+    {
+      ROS_ERROR("cv_bridge exception: %s", e.what());
+      return;
+    }
+
+    // Process cv_ptr->image using OpenCV
+    ROS_INFO("Process cv_ptr->image using OpenCV");
+    cv::imwrite(current_time + "_traced.png",
+                cv_ptr_traced->image);
   }
 
   void Traceback::updateTargetPoses()
@@ -128,15 +172,53 @@ namespace traceback
       target_position.y = goal_src.at<double>(1, 0);
       target_position.z = 0.0f;
 
+      // Transform rotation
+      // Note that due to scaling, the "rotation matrix" values can exceed 1, and therefore need to normalize it.
+      geometry_msgs::Quaternion goal_q = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].pose.orientation;
+      geometry_msgs::Quaternion transform_q;
+      cv::Mat transform = transforms_vectors[i][max_position];
+      double a = transform.at<double>(0, 0);
+      double b = transform.at<double>(1, 0);
+      double mag = sqrt(a * a + b * b);
+      a /= mag;
+      b /= mag;
+      transform_q.w = std::sqrt(2. + 2. * a) * 0.5;
+      transform_q.x = 0.;
+      transform_q.y = 0.;
+      transform_q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
+      tf2::Quaternion tf2_goal_q;
+      tf2_goal_q.setW(goal_q.w);
+      tf2_goal_q.setX(goal_q.x);
+      tf2_goal_q.setY(goal_q.y);
+      tf2_goal_q.setZ(goal_q.z);
+      tf2::Quaternion tf2_transform_q;
+      tf2_transform_q.setW(transform_q.w);
+      tf2_transform_q.setX(transform_q.x);
+      tf2_transform_q.setY(transform_q.y);
+      tf2_transform_q.setZ(transform_q.z);
+      tf2::Quaternion tf2_new_q = tf2_transform_q * tf2_goal_q;
+
+      ROS_INFO("goal_q (x, y, z, w) = (%f, %f, %f, %f)", goal_q.x, goal_q.y, goal_q.z, goal_q.w);
+      ROS_INFO("transform_q (x, y, z, w) = (%f, %f, %f, %f)", transform_q.x, transform_q.y, transform_q.z, transform_q.w);
+      ROS_INFO("tf2_new_q (x, y, z, w) = (%f, %f, %f, %f)", tf2_new_q.x(), tf2_new_q.y(), tf2_new_q.z(), tf2_new_q.w());
+
+      geometry_msgs::Quaternion new_q;
+      new_q.w = tf2_new_q.w();
+      new_q.x = tf2_new_q.x();
+      new_q.y = tf2_new_q.y();
+      new_q.z = tf2_new_q.z();
+      // Transform rotation END
+
       move_base_msgs::MoveBaseGoal goal;
       goal.target_pose.pose.position = target_position;
-      goal.target_pose.pose.orientation.w = 1.;
+      goal.target_pose.pose.orientation = new_q;
       goal.target_pose.header.frame_id = robot_name_src + robot_name_src + "/map";
       goal.target_pose.header.stamp = ros::Time::now();
 
       traceback_msgs::GoalAndImage goal_and_image;
       goal_and_image.goal = goal;
       goal_and_image.image = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].image;
+      ROS_DEBUG("Goal and image to be sent");
       robots_to_goal_and_image_publisher_[robot_name_src].publish(goal_and_image);
     }
   }
@@ -212,7 +294,7 @@ namespace traceback
     for (auto current : camera_image_processor_.robots_to_current_image_)
     {
       std::string robot_name = current.first;
-      geometry_msgs::Pose pose = getRobotPose(robot_name);
+      geometry_msgs::Pose pose = camera_image_processor_.robots_to_current_pose_[current.first];
       PoseImagePair pose_image_pair;
       pose_image_pair.pose = pose;
       pose_image_pair.image = current.second;
@@ -286,6 +368,7 @@ namespace traceback
     // ROS_INFO("Process cv_ptr->image using OpenCV");
     // Insert if not exists, update if exists.
     camera_image_processor_.robots_to_current_image_[subscription.robot_namespace] = *msg;
+    camera_image_processor_.robots_to_current_pose_[subscription.robot_namespace] = getRobotPose(subscription.robot_namespace);
   }
 
   void Traceback::fullMapUpdate(const nav_msgs::OccupancyGrid::ConstPtr &msg,
