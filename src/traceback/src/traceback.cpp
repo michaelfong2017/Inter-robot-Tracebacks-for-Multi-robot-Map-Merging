@@ -246,6 +246,7 @@ namespace traceback
       traceback_msgs::GoalAndImage goal_and_image;
       goal_and_image.goal = goal;
       goal_and_image.image = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].image;
+      goal_and_image.traced_robot = robot_name_dst;
       goal_and_image.stamp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].stamp;
       ROS_DEBUG("Goal and image to be sent");
       robots_to_goal_and_image_publisher_[robot_name_src].publish(goal_and_image);
