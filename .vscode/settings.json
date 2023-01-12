@@ -83,5 +83,6 @@
         "/home/michael/catkin_ws/devel_isolated/mongodb_store_msgs/lib/python3/dist-packages",
         "/opt/ros/noetic/lib/python3/dist-packages"
     ],
-    "C_Cpp.errorSquiggles": "enabled"
+    "C_Cpp.errorSquiggles": "enabled",
+    "cmake.sourceDirectory": "${workspaceFolder}/src/traceback_bringup/models/grass_plane/materials"
 }

@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <boost/thread.hpp>
 
 #include <geometry_msgs/Pose.h>
@@ -15,7 +16,7 @@ namespace traceback
     {
         geometry_msgs::Pose pose;
         sensor_msgs::Image image;
-        ros::Time stamp;
+        int64_t stamp;
         bool operator<(const PoseImagePair &rhs) const
         {
             return stamp < rhs.stamp;
@@ -31,6 +32,7 @@ namespace traceback
         std::unordered_map<std::string, sensor_msgs::Image> robots_to_current_image_;
         std::unordered_map<std::string, geometry_msgs::Pose> robots_to_current_pose_;
         std::unordered_map<std::string, std::vector<PoseImagePair>> robots_to_all_pose_image_pairs_;
+        std::unordered_map<std::string, std::unordered_set<size_t>> robots_to_all_visited_pose_image_pair_indexes_;
     };
 }
 #endif

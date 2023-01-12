@@ -35,6 +35,17 @@ namespace traceback
   {
     ROS_INFO("tracebackImageAndImageUpdate");
 
+    // Mark this min_index as visited so that it will not be repeatedly visited again and again.
+    auto all = camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.find(msg->robot_name);
+    if (all != camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.end())
+    {
+      all->second.emplace(msg->stamp);
+    }
+    else
+    {
+      camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.insert({msg->robot_name, {}});
+    }
+
     std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
     cv_bridge::CvImageConstPtr cv_ptr_tracer;
@@ -139,6 +150,12 @@ namespace traceback
       size_t index = 0;
       for (auto pair : camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst])
       {
+        if (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(pair.stamp))
+        {
+          ++index;
+          continue;
+        }
+
         double dst_x = pair.pose.position.x;
         double dst_y = pair.pose.position.y;
         double src_x = pose_dst.at<double>(0, 0);
@@ -180,8 +197,19 @@ namespace traceback
       double a = transform.at<double>(0, 0);
       double b = transform.at<double>(1, 0);
       double mag = sqrt(a * a + b * b);
-      a /= mag;
-      b /= mag;
+      if (mag != 0)
+      {
+        a /= mag;
+        b /= mag;
+      }
+      if (a > 1)
+        a == 0.9999;
+      if (a < -0.9999)
+        a == -1;
+      if (b > 1)
+        b == 0.9999;
+      if (b < -1)
+        b == -0.9999;
       transform_q.w = std::sqrt(2. + 2. * a) * 0.5;
       transform_q.x = 0.;
       transform_q.y = 0.;
@@ -218,6 +246,7 @@ namespace traceback
       traceback_msgs::GoalAndImage goal_and_image;
       goal_and_image.goal = goal;
       goal_and_image.image = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].image;
+      goal_and_image.stamp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].stamp;
       ROS_DEBUG("Goal and image to be sent");
       robots_to_goal_and_image_publisher_[robot_name_src].publish(goal_and_image);
     }
@@ -298,14 +327,14 @@ namespace traceback
       PoseImagePair pose_image_pair;
       pose_image_pair.pose = pose;
       pose_image_pair.image = current.second;
-      pose_image_pair.stamp = ros::Time().now();
+      pose_image_pair.stamp = ros::Time::now().toNSec();
 
       auto all = camera_image_processor_.robots_to_all_pose_image_pairs_.find(current.first);
       if (all != camera_image_processor_.robots_to_all_pose_image_pairs_.end())
       {
         all->second.emplace_back(pose_image_pair);
         PoseImagePair latestPair = *std::max_element(camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].begin(), camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].end());
-        ROS_INFO("latestPair.stamp.toSec(): %f", latestPair.stamp.toSec());
+        ROS_INFO("latestPair.stamp: %ld", latestPair.stamp);
       }
       else
       {
