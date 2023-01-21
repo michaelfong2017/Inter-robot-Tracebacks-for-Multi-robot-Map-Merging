@@ -53,6 +53,7 @@ namespace traceback
     double discovery_rate_;
     double estimation_rate_;
     double confidence_threshold_;
+    double essential_mat_confidence_threshold_;
     std::string robot_map_topic_;
     std::string robot_map_updates_topic_;
     std::string robot_namespace_;
@@ -87,11 +88,22 @@ namespace traceback
     std::unordered_map<std::string, ros::Subscriber> robots_to_image_and_image_subscriber_;
     std::string traceback_image_and_image_topic_ = "traceback/image_and_image";
 
+    std::unordered_map<std::string, bool> robots_to_in_traceback;
+    std::unordered_map<std::string, std::list<PoseImagePair>::iterator> robots_to_current_it;
+
+    std::unordered_map<std::string, std::vector<std::vector<cv::Mat>>> robots_src_to_current_transforms_vectors_;
+
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
 
     void updateTargetPoses();
 
-    geometry_msgs::Pose getRobotPose(const std::string robot_name);
+    void startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst);
+
+    std::unordered_map<std::string, ros::Publisher> robots_to_visualize_marker_publisher_;
+    std::string visualize_goal_topic_ = "traceback/visualize/goal";
+    void visualizeGoal(geometry_msgs::PoseStamped pose_stamped, std::string robot_name); // robot_name is e.g. /tb3_0
+
+    geometry_msgs::Pose getRobotPose(std::string robot_name);
     geometry_msgs::Pose getRobotPose(const std::string &global_frame, const std::string &robot_base_frame, const tf::TransformListener &tf_listener, const double &transform_tolerance);
 
     void receiveUpdatedCameraImage();

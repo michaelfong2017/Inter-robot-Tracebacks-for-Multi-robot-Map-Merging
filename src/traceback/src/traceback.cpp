@@ -9,6 +9,8 @@
 #include <opencv2/imgcodecs.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <sensor_msgs/image_encodings.h>
+#include <std_msgs/ColorRGBA.h>
+#include <visualization_msgs/Marker.h>
 
 namespace traceback
 {
@@ -20,6 +22,7 @@ namespace traceback
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
+    private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
     private_nh.param<std::string>("robot_map_topic", robot_map_topic_, "map");
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
@@ -28,22 +31,36 @@ namespace traceback
     private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
 
     private_nh.param<std::string>("camera_image_topic", robot_camera_image_topic_, "camera/rgb/image_raw"); // Don't use image_raw
-    private_nh.param("camera_image_update_rate", camera_image_update_rate_, 0.1);
+    private_nh.param("camera_image_update_rate", camera_image_update_rate_, 2.0);
   }
 
   void Traceback::tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg)
   {
     ROS_INFO("tracebackImageAndImageUpdate");
 
+    std::string tracer_robot = msg->tracer_robot;
+    std::string traced_robot = msg->traced_robot;
+
     // Mark this min_index as visited so that it will not be repeatedly visited again and again.
-    auto all = camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.find(msg->robot_name);
+    // Also valid for aborted goal
+    auto all = camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.find(traced_robot);
     if (all != camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.end())
     {
       all->second.emplace(msg->stamp);
     }
     else
     {
-      camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.insert({msg->robot_name, {}});
+      camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.insert({traced_robot, {}});
+      camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[traced_robot].emplace(msg->stamp);
+    }
+    // END
+
+    if (msg->aborted)
+    {
+      // TODO different cases: continue traceback, accept, reject
+      // assume continue traceback now
+      robots_to_in_traceback[tracer_robot] = false;
+      return;
     }
 
     std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
@@ -64,7 +81,7 @@ namespace traceback
 
     // Process cv_ptr->image using OpenCV
     ROS_INFO("Process cv_ptr->image using OpenCV");
-    cv::imwrite(current_time + "_tracer.png",
+    cv::imwrite(current_time + "_" + tracer_robot.substr(1) + "_tracer.png",
                 cv_ptr_tracer->image);
 
     //
@@ -85,8 +102,55 @@ namespace traceback
 
     // Process cv_ptr->image using OpenCV
     ROS_INFO("Process cv_ptr->image using OpenCV");
-    cv::imwrite(current_time + "_traced.png",
+    cv::imwrite(current_time + "_" + traced_robot.substr(1) + "_traced.png",
                 cv_ptr_traced->image);
+
+    camera_image_processor_.findEssentialMatrix(cv_ptr_traced->image, cv_ptr_tracer->image, FeatureType::ORB,
+                                                essential_mat_confidence_threshold_);
+
+    // TODO different cases: continue traceback, accept, reject
+    // assume continue traceback now
+    // Assume does not have to pop_front the list first
+    std::string robot_name_src = tracer_robot;
+    std::string robot_name_dst = traced_robot;
+    ROS_INFO("Continue traceback process for robot %s", robot_name_src.c_str());
+
+    std::list<PoseImagePair>::iterator temp = robots_to_current_it[robot_name_src];
+
+    bool whole_list_visited = false;
+    bool pass_end = false;
+    ROS_DEBUG("Stamp is %ld", temp->stamp);
+    // ++temp;
+    // if (temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end())
+    // {
+    //   temp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
+    //   pass_end = true;
+    // }
+    while (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(temp->stamp))
+    {
+      ++temp;
+      if (temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end())
+      {
+        temp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
+
+        if (pass_end)
+        { // Pass the end() the second time
+          whole_list_visited = true;
+          break;
+        }
+        else
+        { // Pass the end() the first time
+          pass_end = true;
+        }
+      }
+    }
+
+    robots_to_current_it[robot_name_src] = temp;
+
+    startOrContinueTraceback(robot_name_src, robot_name_dst);
+
+    // TODO determine when to end traceback
+    // robots_to_in_traceback[tracer_robot] = false;
   }
 
   void Traceback::updateTargetPoses()
@@ -144,119 +208,215 @@ namespace traceback
 
       ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
-      std::string robot_name_dst = transforms_indexes_[max_position];
-      double min_distance = DBL_MAX;
-      size_t min_index = -1;
-      size_t index = 0;
-      for (auto pair : camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst])
+      if (robots_to_in_traceback[robot_name_src])
       {
-        if (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(pair.stamp))
+        continue; // continue to next robot since the current robot is currently in traceback process
+      }
+      else
+      {
+        robots_to_in_traceback[robot_name_src] = true;
+      }
+      ROS_INFO("Start traceback process for robot %s", robot_name_src.c_str());
+      robots_src_to_current_transforms_vectors_[robot_name_src] = transforms_vectors;
+
+      std::string robot_name_dst = transforms_indexes_[max_position];
+
+      /** just for finding min_it */
+      double min_distance = DBL_MAX;
+      std::list<PoseImagePair>::iterator min_it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
+
+      for (auto it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin(); it != camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end(); ++it)
+      {
+        if (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(it->stamp))
         {
-          ++index;
           continue;
         }
 
-        double dst_x = pair.pose.position.x;
-        double dst_y = pair.pose.position.y;
+        double dst_x = it->pose.position.x;
+        double dst_y = it->pose.position.y;
         double src_x = pose_dst.at<double>(0, 0);
         double src_y = pose_dst.at<double>(1, 0);
         double distance = sqrt(pow(dst_x - src_x, 2) + pow(dst_y - src_y, 2));
         if (distance < min_distance)
         {
           min_distance = distance;
-          min_index = index;
+          min_it = it;
         }
-        ++index;
       }
 
-      double goal_x = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].pose.position.x;
-      double goal_y = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].pose.position.y;
+      robots_to_current_it[robot_name_src] = min_it;
+      /** just for finding min_it END */
 
-      // Transform goal from dst frame to src (robot i) frame
-      cv::Mat goal_dst(3, 1, CV_64F);
-      goal_dst.at<double>(0, 0) = goal_x / resolutions_[max_position];
-      goal_dst.at<double>(1, 0) = goal_y / resolutions_[max_position];
-      goal_dst.at<double>(2, 0) = 1.0;
-
-      cv::Mat goal_src = transforms_vectors[i][max_position] * goal_dst;
-      goal_src.at<double>(0, 0) *= resolutions_[i];
-      goal_src.at<double>(1, 0) *= resolutions_[i];
-
-      ROS_INFO("transformed goal_src (x, y) = (%f, %f)", goal_src.at<double>(0, 0), goal_src.at<double>(1, 0));
-
-      geometry_msgs::Point target_position;
-      target_position.x = goal_src.at<double>(0, 0);
-      target_position.y = goal_src.at<double>(1, 0);
-      target_position.z = 0.0f;
-
-      // Transform rotation
-      // Note that due to scaling, the "rotation matrix" values can exceed 1, and therefore need to normalize it.
-      geometry_msgs::Quaternion goal_q = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].pose.orientation;
-      geometry_msgs::Quaternion transform_q;
-      cv::Mat transform = transforms_vectors[i][max_position];
-      double a = transform.at<double>(0, 0);
-      double b = transform.at<double>(1, 0);
-      double mag = sqrt(a * a + b * b);
-      if (mag != 0)
-      {
-        a /= mag;
-        b /= mag;
-      }
-      if (a > 1)
-        a == 0.9999;
-      if (a < -0.9999)
-        a == -1;
-      if (b > 1)
-        b == 0.9999;
-      if (b < -1)
-        b == -0.9999;
-      transform_q.w = std::sqrt(2. + 2. * a) * 0.5;
-      transform_q.x = 0.;
-      transform_q.y = 0.;
-      transform_q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
-      tf2::Quaternion tf2_goal_q;
-      tf2_goal_q.setW(goal_q.w);
-      tf2_goal_q.setX(goal_q.x);
-      tf2_goal_q.setY(goal_q.y);
-      tf2_goal_q.setZ(goal_q.z);
-      tf2::Quaternion tf2_transform_q;
-      tf2_transform_q.setW(transform_q.w);
-      tf2_transform_q.setX(transform_q.x);
-      tf2_transform_q.setY(transform_q.y);
-      tf2_transform_q.setZ(transform_q.z);
-      tf2::Quaternion tf2_new_q = tf2_transform_q * tf2_goal_q;
-
-      ROS_INFO("goal_q (x, y, z, w) = (%f, %f, %f, %f)", goal_q.x, goal_q.y, goal_q.z, goal_q.w);
-      ROS_INFO("transform_q (x, y, z, w) = (%f, %f, %f, %f)", transform_q.x, transform_q.y, transform_q.z, transform_q.w);
-      ROS_INFO("tf2_new_q (x, y, z, w) = (%f, %f, %f, %f)", tf2_new_q.x(), tf2_new_q.y(), tf2_new_q.z(), tf2_new_q.w());
-
-      geometry_msgs::Quaternion new_q;
-      new_q.w = tf2_new_q.w();
-      new_q.x = tf2_new_q.x();
-      new_q.y = tf2_new_q.y();
-      new_q.z = tf2_new_q.z();
-      // Transform rotation END
-
-      move_base_msgs::MoveBaseGoal goal;
-      goal.target_pose.pose.position = target_position;
-      goal.target_pose.pose.orientation = new_q;
-      goal.target_pose.header.frame_id = robot_name_src + robot_name_src + "/map";
-      goal.target_pose.header.stamp = ros::Time::now();
-
-      traceback_msgs::GoalAndImage goal_and_image;
-      goal_and_image.goal = goal;
-      goal_and_image.image = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].image;
-      goal_and_image.traced_robot = robot_name_dst;
-      goal_and_image.stamp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][min_index].stamp;
-      ROS_DEBUG("Goal and image to be sent");
-      robots_to_goal_and_image_publisher_[robot_name_src].publish(goal_and_image);
+      startOrContinueTraceback(robot_name_src, robot_name_dst);
     }
   }
 
-  geometry_msgs::Pose Traceback::getRobotPose(const std::string robot_name)
+  void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst)
   {
-    std::string global_frame = ros::names::append(ros::names::append(robot_name, robot_name), "map");
-    std::string robot_base_frame = ros::names::append(robot_name, "base_link");
+    /** Get parameters other than robot names */
+    size_t i;
+    for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+    {
+      if (it->second == robot_name_src)
+        i = it->first;
+    }
+
+    size_t max_position;
+    for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+    {
+      if (it->second == robot_name_dst)
+        max_position = it->first;
+    }
+
+    ROS_DEBUG("startOrContinueTraceback i = %zu", i);
+    ROS_DEBUG("startOrContinueTraceback max_position = %zu", max_position);
+
+    std::vector<std::vector<cv::Mat>> transforms_vectors = robots_src_to_current_transforms_vectors_[robot_name_src];
+    /** Get parameters other than robot names END */
+
+    std::list<PoseImagePair>::iterator current_it = robots_to_current_it[robot_name_src];
+
+    double goal_x = current_it->pose.position.x;
+    double goal_y = current_it->pose.position.y;
+
+    // Transform goal from dst frame to src (robot i) frame
+    cv::Mat goal_dst(3, 1, CV_64F);
+    goal_dst.at<double>(0, 0) = goal_x / resolutions_[max_position];
+    goal_dst.at<double>(1, 0) = goal_y / resolutions_[max_position];
+    goal_dst.at<double>(2, 0) = 1.0;
+
+    cv::Mat goal_src = transforms_vectors[i][max_position] * goal_dst;
+    goal_src.at<double>(0, 0) *= resolutions_[i];
+    goal_src.at<double>(1, 0) *= resolutions_[i];
+
+    ROS_INFO("transformed goal_src (x, y) = (%f, %f)", goal_src.at<double>(0, 0), goal_src.at<double>(1, 0));
+
+    geometry_msgs::Point target_position;
+    target_position.x = goal_src.at<double>(0, 0);
+    target_position.y = goal_src.at<double>(1, 0);
+    target_position.z = 0.0f;
+
+    // Transform rotation
+    // Note that due to scaling, the "rotation matrix" values can exceed 1, and therefore need to normalize it.
+    geometry_msgs::Quaternion goal_q = current_it->pose.orientation;
+    geometry_msgs::Quaternion transform_q;
+    cv::Mat transform = transforms_vectors[i][max_position];
+    double a = transform.at<double>(0, 0);
+    double b = transform.at<double>(1, 0);
+    double mag = sqrt(a * a + b * b);
+    if (mag != 0)
+    {
+      a /= mag;
+      b /= mag;
+    }
+    if (a > 1)
+      a == 0.9999;
+    if (a < -0.9999)
+      a == -1;
+    if (b > 1)
+      b == 0.9999;
+    if (b < -1)
+      b == -0.9999;
+    transform_q.w = std::sqrt(2. + 2. * a) * 0.5;
+    transform_q.x = 0.;
+    transform_q.y = 0.;
+    transform_q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
+    tf2::Quaternion tf2_goal_q;
+    tf2_goal_q.setW(goal_q.w);
+    tf2_goal_q.setX(goal_q.x);
+    tf2_goal_q.setY(goal_q.y);
+    tf2_goal_q.setZ(goal_q.z);
+    tf2::Quaternion tf2_transform_q;
+    tf2_transform_q.setW(transform_q.w);
+    tf2_transform_q.setX(transform_q.x);
+    tf2_transform_q.setY(transform_q.y);
+    tf2_transform_q.setZ(transform_q.z);
+    tf2::Quaternion tf2_new_q = tf2_transform_q * tf2_goal_q;
+
+    ROS_INFO("goal_q (x, y, z, w) = (%f, %f, %f, %f)", goal_q.x, goal_q.y, goal_q.z, goal_q.w);
+    ROS_INFO("transform_q (x, y, z, w) = (%f, %f, %f, %f)", transform_q.x, transform_q.y, transform_q.z, transform_q.w);
+    ROS_INFO("tf2_new_q (x, y, z, w) = (%f, %f, %f, %f)", tf2_new_q.x(), tf2_new_q.y(), tf2_new_q.z(), tf2_new_q.w());
+
+    geometry_msgs::Quaternion new_q;
+    new_q.w = tf2_new_q.w();
+    new_q.x = tf2_new_q.x();
+    new_q.y = tf2_new_q.y();
+    new_q.z = tf2_new_q.z();
+    // Transform rotation END
+
+    move_base_msgs::MoveBaseGoal goal;
+    goal.target_pose.pose.position = target_position;
+    goal.target_pose.pose.orientation = new_q;
+    goal.target_pose.header.frame_id = robot_name_src.substr(1) + robot_name_src + "/map";
+    goal.target_pose.header.stamp = ros::Time::now();
+
+    traceback_msgs::GoalAndImage goal_and_image;
+    goal_and_image.goal = goal;
+    goal_and_image.image = current_it->image;
+    goal_and_image.tracer_robot = robot_name_src;
+    goal_and_image.traced_robot = robot_name_dst;
+    goal_and_image.stamp = current_it->stamp;
+    ROS_DEBUG("Goal and image to be sent");
+
+    /** Visualize goal in src robot frame */
+    visualizeGoal(goal.target_pose, robot_name_src);
+    /** Visualize goal in src robot frame END */
+    robots_to_goal_and_image_publisher_[robot_name_src].publish(goal_and_image);
+  }
+
+  void Traceback::visualizeGoal(geometry_msgs::PoseStamped pose_stamped, std::string robot_name)
+  {
+    std_msgs::ColorRGBA blue;
+    blue.r = 0;
+    blue.g = 0;
+    blue.b = 1.0;
+    blue.a = 1.0;
+    std_msgs::ColorRGBA red;
+    red.r = 1.0;
+    red.g = 0;
+    red.b = 0;
+    red.a = 1.0;
+    std_msgs::ColorRGBA green;
+    green.r = 0;
+    green.g = 1.0;
+    green.b = 0;
+    green.a = 1.0;
+
+    visualization_msgs::Marker m;
+
+    m.header.frame_id = pose_stamped.header.frame_id;
+    m.header.stamp = pose_stamped.header.stamp;
+    m.ns = "traceback_goal";
+    m.scale.x = 0.2;
+    m.scale.y = 0.2;
+    m.scale.z = 0.2;
+    // lives forever
+    m.lifetime = ros::Duration(0);
+    m.frame_locked = true;
+
+    m.action = visualization_msgs::Marker::ADD;
+    m.type = visualization_msgs::Marker::ARROW;
+    size_t id = 0;
+    m.id = int(id);
+    m.color = red;
+    m.pose.position = pose_stamped.pose.position;
+    m.pose.orientation = pose_stamped.pose.orientation;
+    // delete previous markers, which are now unused
+    // m.action = visualization_msgs::Marker::DELETE;
+    // for (; id < last_markers_count_; ++id)
+    // {
+    //   m.id = int(id);
+    //   markers.push_back(m);
+    // }
+
+    // last_markers_count_ = current_markers_count;
+    robots_to_visualize_marker_publisher_[robot_name].publish(m);
+  }
+
+  geometry_msgs::Pose Traceback::getRobotPose(std::string robot_name)
+  {
+    std::string global_frame = ros::names::append(ros::names::append(robot_name.substr(1), robot_name), "map");
+    std::string robot_base_frame = ros::names::append(robot_name.substr(1), "base_link");
 
     std::string tf_error;
     tf_listener_.waitForTransform(global_frame, robot_base_frame, ros::Time(),
@@ -528,6 +688,10 @@ namespace traceback
                                                                       {
                                                                         tracebackImageAndImageUpdate(msg);
                                                                       }));
+        robots_to_visualize_marker_publisher_.emplace(robot_name, node_.advertise<visualization_msgs::Marker>(ros::names::append(robot_name, visualize_goal_topic_), 10));
+
+        robots_to_in_traceback.emplace(robot_name, false);
+        robots_to_current_it.emplace(robot_name, nullptr);
       }
     }
   }

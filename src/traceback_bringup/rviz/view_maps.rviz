@@ -91,6 +91,30 @@ Visualization Manager:
       Unreliable: false
       Use Timestamp: false
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /tb3_0/traceback/visualize/goal
+      Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /tb3_1/traceback/visualize/goal
+      Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /tb3_2/traceback/visualize/goal
+      Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -155,5 +179,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: -4
-  Y: -4
+  X: 23
+  Y: -28

@@ -63,7 +63,7 @@ namespace traceback
         matcher = {};
 
         // #ifndef NDEBUG
-        internal::writeDebugMatchingInfo(images_, image_features, pairwise_matches);
+        // internal::writeDebugMatchingInfo(images_, image_features, pairwise_matches);
         // #endif
 
         /* use only matches that has enough confidence. leave out matches that are not
