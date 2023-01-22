@@ -169,11 +169,11 @@ namespace traceback
       centers = transform_estimator_.getCenters();
       for (auto &p : centers)
       {
-        ROS_INFO("center = (%f, %f)", p.x, p.y);
+        // ROS_INFO("center = (%f, %f)", p.x, p.y);
       }
 
       confidences = transform_estimator_.getConfidences();
-      transform_estimator_.printConfidences(confidences);
+      // transform_estimator_.printConfidences(confidences);
     }
 
     for (size_t i = 0; i < confidences.size(); ++i)
@@ -182,7 +182,7 @@ namespace traceback
       size_t max_position = it - confidences[i].begin();
       double max_confidence = *it;
 
-      ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
+      // ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
 
       // No transform that passes confidence_threshold_ exists
       if (abs(max_confidence - 0.0) < transform_estimator_.ZERO_ERROR)
@@ -194,7 +194,7 @@ namespace traceback
       std::string robot_name_src = transforms_indexes_[i];
       geometry_msgs::Pose pose = getRobotPose(robot_name_src);
 
-      ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
+      // ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
 
       // Transform current pose from src frame to dst frame
       cv::Mat pose_src(3, 1, CV_64F);
@@ -206,7 +206,7 @@ namespace traceback
       pose_dst.at<double>(0, 0) *= resolutions_[max_position];
       pose_dst.at<double>(1, 0) *= resolutions_[max_position];
 
-      ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
+      // ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
       if (robots_to_in_traceback[robot_name_src])
       {
@@ -217,6 +217,32 @@ namespace traceback
         robots_to_in_traceback[robot_name_src] = true;
       }
       ROS_INFO("Start traceback process for robot %s", robot_name_src.c_str());
+      ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
+      ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
+
+      ROS_INFO("transforms[%zu][%zu] (width, height) = (%d, %d)", max_position, i, transforms_vectors[max_position][i].cols, transforms_vectors[max_position][i].rows);
+
+      int width = transforms_vectors[max_position][i].cols;
+      int height = transforms_vectors[max_position][i].rows;
+      std::string s = "";
+      for (int y = 0; y < height; y++)
+      {
+        for (int x = 0; x < width; x++)
+        {
+          double val = transforms_vectors[max_position][i].at<double>(y, x);
+          if (x == width - 1)
+          {
+            s += std::to_string(val) + "\n";
+          }
+          else
+          {
+            s += std::to_string(val) + ", ";
+          }
+        }
+      }
+      ROS_INFO("matrix:\n%s", s.c_str());
+      ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
+
       robots_src_to_current_transforms_vectors_[robot_name_src] = transforms_vectors;
 
       std::string robot_name_dst = transforms_indexes_[max_position];
@@ -495,7 +521,7 @@ namespace traceback
       {
         all->second.emplace_back(pose_image_pair);
         PoseImagePair latestPair = *std::max_element(camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].begin(), camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].end());
-        ROS_INFO("latestPair.stamp: %ld", latestPair.stamp);
+        // ROS_INFO("latestPair.stamp: %ld", latestPair.stamp);
       }
       else
       {
