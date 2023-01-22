@@ -31,7 +31,7 @@ namespace traceback
     private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
 
     private_nh.param<std::string>("camera_image_topic", robot_camera_image_topic_, "camera/rgb/image_raw"); // Don't use image_raw
-    private_nh.param("camera_image_update_rate", camera_image_update_rate_, 2.0);
+    private_nh.param("camera_image_update_rate", camera_image_update_rate_, 0.2); // Too high update rate can result in "continue traceback looping"
   }
 
   void Traceback::tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg)
