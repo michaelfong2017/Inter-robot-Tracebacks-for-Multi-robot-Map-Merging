@@ -11,8 +11,8 @@
 
 namespace traceback
 {
-    bool CameraImageProcessor::findEssentialMatrix(const cv::Mat &traced_robot_image, const cv::Mat &tracer_robot_image, FeatureType feature_type,
-                                                   double confidence, std::string traced_robot, std::string tracer_robot, std::string current_time)
+    bool CameraImageProcessor::findFurtherTransformNeeded(const cv::Mat &traced_robot_image, const cv::Mat &tracer_robot_image, FeatureType feature_type,
+                                                          double confidence, TransformNeeded &transform_needed, std::string traced_robot, std::string tracer_robot, std::string current_time)
     {
         const std::vector<cv::Mat> &images = {traced_robot_image, tracer_robot_image};
         std::vector<cv::detail::ImageFeatures> image_features;
@@ -27,10 +27,10 @@ namespace traceback
         if (traced_robot_image.empty() || tracer_robot_image.empty())
         {
             ROS_ERROR("Either traced robot image or tracer robot image is empty, which should not be the case!");
-            return true;
+            return false;
         }
 
-        ROS_DEBUG("findEssentialMatrix computing features");
+        ROS_DEBUG("findFurtherTransformNeeded computing features");
         image_features.reserve(images.size());
         for (const cv::Mat &image : images)
         {
@@ -67,7 +67,7 @@ namespace traceback
         // no match found
         if (good_indices.size() == 1)
         {
-            return true;
+            return false;
         }
 
         for (auto &match_info : pairwise_matches)
@@ -149,11 +149,14 @@ namespace traceback
         cv::Mat transform_R, transform_t;
         int number_of_inliers = cv::recoverPose(essential_mat, points1, points2, camera_K, transform_R, transform_t);
 
+        cv::Vec3d rot = rotationMatrixToEulerAngles(transform_R);
+
         {
             std::ofstream fw(current_time + "_" + traced_robot.substr(1) + "_traced_robot_" + tracer_robot.substr(1) + "_tracer_robot" + "_transform_R.txt", std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "Number of inliers: " << number_of_inliers << std::endl;
+                fw << "XYZ rotation is: " << rot << std::endl;
                 fw << "Rotation matrix R:" << std::endl;
                 fw << transform_R.at<double>(0, 0) << "\t" << transform_R.at<double>(0, 1) << "\t" << transform_R.at<double>(0, 2) << std::endl;
                 fw << transform_R.at<double>(1, 0) << "\t" << transform_R.at<double>(1, 1) << "\t" << transform_R.at<double>(1, 2) << std::endl;
@@ -176,6 +179,11 @@ namespace traceback
             }
         }
 
+        // Read the above comment to understand these calculations.
+        transform_needed.tx = transform_t.at<double>(2, 0);
+        transform_needed.ty = -1 * transform_t.at<double>(0, 0);
+        transform_needed.r = -1 * rot[1];
+
         ROS_INFO("Debug");
 
         return true;
@@ -184,13 +192,13 @@ namespace traceback
     // Calculates rotation matrix to euler angles
     // The result is the same as MATLAB except the order
     // of the euler angles ( x and z are swapped ).
-    cv::Vec3f CameraImageProcessor::rotationMatrixToEulerAngles(cv::Mat &R)
+    cv::Vec3d CameraImageProcessor::rotationMatrixToEulerAngles(cv::Mat &R)
     {
-        float sy = sqrt(R.at<double>(0, 0) * R.at<double>(0, 0) + R.at<double>(1, 0) * R.at<double>(1, 0));
+        double sy = sqrt(R.at<double>(0, 0) * R.at<double>(0, 0) + R.at<double>(1, 0) * R.at<double>(1, 0));
 
         bool singular = sy < 1e-6; // If
 
-        float x, y, z;
+        double x, y, z;
         if (!singular)
         {
             x = atan2(R.at<double>(2, 1), R.at<double>(2, 2));
@@ -203,6 +211,6 @@ namespace traceback
             y = atan2(-R.at<double>(2, 0), sy);
             z = 0;
         }
-        return cv::Vec3f(x, y, z);
+        return cv::Vec3d(x, y, z);
     }
 }

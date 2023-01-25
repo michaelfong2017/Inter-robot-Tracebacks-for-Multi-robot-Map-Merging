@@ -27,12 +27,25 @@ namespace traceback
         }
     };
 
+    // In robot world coordinates
+    // tx and ty are in meters, r is in radian
+    struct TransformNeeded
+    {
+        double tx;
+        double ty;
+        double r;
+    };
+
     class CameraImageProcessor
     {
     public:
         friend class Traceback;
 
         /*
+        Return whether traced image matches tracer image, depending on the confidence.
+
+        If match, output to transform_needed.
+
         header:
         seq: 15307
         stamp:
@@ -55,8 +68,8 @@ namespace traceback
         width: 0
         do_rectify: False
         */
-        bool findEssentialMatrix(const cv::Mat &traced_robot_image, const cv::Mat &tracer_robot_image, FeatureType feature_type,
-                                 double confidence, std::string traced_robot = "", std::string tracer_robot = "", std::string current_time = "");
+        bool findFurtherTransformNeeded(const cv::Mat &traced_robot_image, const cv::Mat &tracer_robot_image, FeatureType feature_type,
+                                        double confidence, TransformNeeded &transform_needed, std::string traced_robot = "", std::string tracer_robot = "", std::string current_time = "");
 
     private:
         std::unordered_map<std::string, sensor_msgs::Image> robots_to_current_image_;
@@ -64,8 +77,7 @@ namespace traceback
         std::unordered_map<std::string, std::list<PoseImagePair>> robots_to_all_pose_image_pairs_;
         std::unordered_map<std::string, std::unordered_set<size_t>> robots_to_all_visited_pose_image_pair_indexes_;
 
-        cv::Vec3f rotationMatrixToEulerAngles(cv::Mat &R);
-
+        cv::Vec3d rotationMatrixToEulerAngles(cv::Mat &R);
     };
 }
 #endif

@@ -1,0 +1,42 @@
+transform_needed is (tx, ty, r) = (-0.627248, -0.776802, -0.196371)
+Restart another traceback
+Restart another traceback
+Restart another traceback
+Restart another traceback
+transform_needed is (tx, ty, r) = (-0.964209, 0.239827, 0.204664)
+transform_needed is (tx, ty, r) = (-0.003976, -0.980480, 0.377267)
+transform_needed is (tx, ty, r) = (-0.968239, 0.249146, 0.122906)
+transform_needed is (tx, ty, r) = (-0.038036, 0.995794, 0.157762)
+transform_needed is (tx, ty, r) = (0.408564, -0.912716, 0.262020)
+transform_needed is (tx, ty, r) = (-0.532250, 0.841358, 0.059533)
+transform_needed is (tx, ty, r) = (-0.898324, -0.437392, 0.273731)
+Restart another traceback
+transform_needed is (tx, ty, r) = (-0.885984, -0.367770, 0.073850)
+Restart another traceback
+Restart another traceback
+transform_needed is (tx, ty, r) = (-0.999741, -0.020460, -0.079930)
+Restart another traceback
+Restart another traceback
+Restart another traceback
+transform_needed is (tx, ty, r) = (0.998285, -0.058023, 0.252785)
+transform_needed is (tx, ty, r) = (-0.758063, 0.652181, -0.117690)
+Restart another traceback
+Restart another traceback
+transform_needed is (tx, ty, r) = (0.210331, -0.976532, 0.636813)
+Restart another traceback
+Restart another traceback
+Restart another traceback
+transform_needed is (tx, ty, r) = (0.988035, 0.105876, 0.417250)
+Restart another traceback
+Restart another traceback
+Restart another traceback
+Restart another traceback
+transform_needed is (tx, ty, r) = (-0.913476, 0.406451, -0.178917)
+Restart another traceback
+Restart another traceback
+Restart another traceback
+Restart another traceback
+Restart another traceback
+transform_needed is (tx, ty, r) = (0.509983, -0.835494, 0.460635)
+Restart another traceback
+Restart another traceback
