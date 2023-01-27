@@ -90,7 +90,7 @@ namespace traceback
         // Allow more time for normal exploration to prevent being stuck at local optimums
         pairwise_paused_[tracer_robot][traced_robot] = true;
         pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-            ros::Duration(30, 0),
+            ros::Duration(90, 0),
             [this, tracer_robot, traced_robot](const ros::TimerEvent &)
             { pairwise_paused_[tracer_robot][traced_robot] = false; },
             true);
@@ -213,10 +213,11 @@ namespace traceback
             geometry_msgs::Vector3 original_t;
             geometry_msgs::Transform transform;
 
-            if (mat_transforms[i].empty())
+            // For testing, set other transforms to far awaytraced_robot_index
+            if ((i != tracer_robot_index && i != traced_robot_index) || mat_transforms[i].empty())
             {
-              original_t.x = 0.0;
-              original_t.y = 0.0;
+              original_t.x = 300.0;
+              original_t.y = 500.0;
               original_t.z = 0.0;
               original_q.w = 1.0;
               original_q.x = 0.0;
