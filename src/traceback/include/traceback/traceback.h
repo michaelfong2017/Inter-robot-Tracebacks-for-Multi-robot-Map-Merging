@@ -39,6 +39,13 @@ namespace traceback
     std::string robot_namespace; // e.g /tb3_0
   };
 
+  struct AcceptRejectStatus
+  {
+    int accept_count;
+    int reject_count;
+    bool accepted;
+  };
+
   class Traceback
   {
   public:
@@ -55,6 +62,9 @@ namespace traceback
     double estimation_rate_;
     double confidence_threshold_;
     double essential_mat_confidence_threshold_;
+    int accept_count_needed_;
+    int reject_count_needed_;
+    int consecutive_abort_count_needed_;
     std::string robot_map_topic_;
     std::string robot_map_updates_topic_;
     std::string robot_namespace_;
@@ -96,6 +106,14 @@ namespace traceback
 
     ros::Publisher traceback_transforms_publisher_;
     std::string traceback_transforms_topic_ = "/traceback/traceback_transforms";
+
+    // map[tracer_robot][traced_robot]
+    // Ordered, meaning that map["/tb3_0"]["/tb3_1"] and map["/tb3_1"]["/tb3_0"] are recorded differently.
+    std::unordered_map<std::string, std::unordered_map<std::string, AcceptRejectStatus>> pairwise_accept_reject_status_;
+    // Pause aborted ordered pair of traceback to prevent being stuck in local optimums
+    std::unordered_map<std::string, std::unordered_map<std::string, int>> pairwise_abort_;
+    std::unordered_map<std::string, std::unordered_map<std::string, bool>> pairwise_paused_;
+    std::unordered_map<std::string, std::unordered_map<std::string, ros::Timer>> pairwise_resume_timer_;
 
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
 

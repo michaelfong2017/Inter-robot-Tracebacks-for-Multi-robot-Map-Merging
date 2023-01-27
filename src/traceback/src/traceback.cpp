@@ -24,6 +24,9 @@ namespace traceback
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
     private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
+    private_nh.param("accept_count_needed", accept_count_needed_, 8);
+    private_nh.param("reject_count_needed", reject_count_needed_, 2);
+    private_nh.param("consecutive_abort_count_needed", consecutive_abort_count_needed_, 3);
     private_nh.param<std::string>("robot_map_topic", robot_map_topic_, "map");
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
@@ -57,10 +60,53 @@ namespace traceback
     // END
 
     // Abort is based on the fact that the location cannot be reached
-    // not because of two location do not match.
-    // Therefore, the image matching should be skipped and traceback is continued in abort case.
-    if (!msg->aborted)
+    // Assume that this means the locations do not match
+    if (msg->aborted)
     {
+      ROS_INFO("tracebackImageAndImageUpdate aborted +1");
+      {
+        std::ofstream fw("transform_needed.txt", std::ofstream::app);
+        if (fw.is_open())
+        {
+          fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+             << "Count of abort +1" << std::endl;
+          fw.close();
+        }
+      }
+      if (++pairwise_abort_[tracer_robot][traced_robot] >= consecutive_abort_count_needed_)
+      {
+        pairwise_abort_[tracer_robot][traced_robot] = 0;
+
+        {
+          std::ofstream fw("transform_needed.txt", std::ofstream::app);
+          if (fw.is_open())
+          {
+            fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+               << "Aborted" << std::endl;
+            fw.close();
+          }
+        }
+
+        // Allow more time for normal exploration to prevent being stuck at local optimums
+        pairwise_paused_[tracer_robot][traced_robot] = true;
+        pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
+            ros::Duration(180, 0),
+            [this, tracer_robot, traced_robot](const ros::TimerEvent &)
+            { pairwise_paused_[tracer_robot][traced_robot] = false; },
+            true);
+
+        robots_to_in_traceback[tracer_robot] = false;
+        return;
+      }
+      else
+      {
+        // Empty in order to directly continue traceback
+      }
+    }
+    else
+    {
+      pairwise_abort_[tracer_robot][traced_robot] = 0;
+
       std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
       cv_bridge::CvImageConstPtr cv_ptr_tracer;
@@ -115,106 +161,124 @@ namespace traceback
           std::ofstream fw("transform_needed.txt", std::ofstream::app);
           if (fw.is_open())
           {
-            fw << "transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
+            fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+               << "Match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
             fw.close();
           }
         }
-        // TEST HARDCODE sending traceback transforms
-        // std::vector<geometry_msgs::Transform> transforms;
-        // {
-        //   geometry_msgs::Transform transform;
-        //   transform.translation.x = -7.0;
-        //   transform.translation.y = -1.0;
-        //   transform.translation.z = 0.0;
-        //   tf2::Quaternion q;
-        //   q.setEuler(0., 0., 0.0);
-        //   transform.rotation = toMsg(q);
-        //   transforms.push_back(transform);
-        // }
-        // {
-        //   geometry_msgs::Transform transform;
-        //   transform.translation.x = 7.0;
-        //   transform.translation.y = -1.0;
-        //   transform.translation.z = 0.0;
-        //   tf2::Quaternion q;
-        //   q.setEuler(0., 0., 0.0);
-        //   transform.rotation = toMsg(q);
-        //   transforms.push_back(transform);
-        // }
-        // {
-        //   geometry_msgs::Transform transform;
-        //   transform.translation.x = 0.5;
-        //   transform.translation.y = 3.0;
-        //   transform.translation.z = 0.0;
-        //   tf2::Quaternion q;
-        //   q.setEuler(0., 0., 0.785);
-        //   transform.rotation = toMsg(q);
-        //   transforms.push_back(transform);
-        // }
 
-        // traceback_transforms.robot_names = {"/tb3_0", "/tb3_1", "/tb3_2"};
-        // traceback_transforms.transforms = transforms;
-
-        size_t tracer_robot_index;
-        size_t traced_robot_index;
-        for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+        // Update AcceptRejectStatus
+        // If accepted, no further traceback is needed for this ordered pair,
+        // but remember to enable other tracebacks for the same tracer
+        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count >= accept_count_needed_)
         {
-          if (it->second == tracer_robot)
-          {
-            tracer_robot_index = it->first;
-          }
-          else if (it->second == traced_robot)
-          {
-            traced_robot_index = it->first;
-          }
-        }
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
 
-        std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-
-        std::vector<std::string> robot_names;
-        std::vector<geometry_msgs::Transform> transforms;
-        size_t i = 0;
-        for (auto &subscription : map_subscriptions_)
-        {
-          robot_names.push_back(subscription.robot_namespace);
-          geometry_msgs::Quaternion original_q;
-          matToQuaternion(mat_transforms[i], original_q);
-          geometry_msgs::Vector3 original_t;
-          original_t.x = mat_transforms[i].at<double>(2, 0);
-          original_t.y = mat_transforms[i].at<double>(2, 1);
-          original_t.z = 0.0;
-
-          geometry_msgs::Transform transform;
-          transform.translation = original_t;
-          transform.rotation = original_q;
-          transforms.push_back(transform);
-          ++i;
-        }
-
-        traceback_msgs::TracebackTransforms traceback_transforms;
-        traceback_transforms.robot_names = robot_names;
-        traceback_transforms.transforms = transforms;
-
-        traceback_transforms_publisher_.publish(traceback_transforms);
-        // TEST HARDCODE sending traceback transforms END
-      }
-      else
-      {
-        ROS_INFO("findFurtherTransformNeeded does not match");
-        robots_to_in_traceback[tracer_robot] = false;
-        {
-          ROS_INFO("findFurtherTransformNeeded matches");
-          ROS_INFO("transform_needed is (tx, ty, r) = (%f, %f, %f)", transform_needed.tx, transform_needed.ty, transform_needed.r);
           {
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
             if (fw.is_open())
             {
-              fw << "Restart another traceback" << std::endl;
+              fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << "ACCEPT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
               fw.close();
             }
           }
+
+          // TEST HARDCODE sending traceback transforms
+          size_t tracer_robot_index;
+          size_t traced_robot_index;
+          for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+          {
+            if (it->second == tracer_robot)
+            {
+              tracer_robot_index = it->first;
+            }
+            else if (it->second == traced_robot)
+            {
+              traced_robot_index = it->first;
+            }
+          }
+
+          std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
+
+          std::vector<std::string> robot_names;
+          std::vector<geometry_msgs::Transform> transforms;
+          size_t i = 0;
+          for (auto &subscription : map_subscriptions_)
+          {
+            robot_names.push_back(subscription.robot_namespace);
+            geometry_msgs::Quaternion original_q;
+            geometry_msgs::Vector3 original_t;
+            geometry_msgs::Transform transform;
+
+            if (mat_transforms[i].empty())
+            {
+              original_t.x = 0.0;
+              original_t.y = 0.0;
+              original_t.z = 0.0;
+              original_q.w = 1.0;
+              original_q.x = 0.0;
+              original_q.y = 0.0;
+              original_q.z = 0.0;
+            }
+            else
+            {
+              matToQuaternion(mat_transforms[i], original_q);
+              original_t.x = mat_transforms[i].at<double>(2, 0);
+              original_t.y = mat_transforms[i].at<double>(2, 1);
+              original_t.z = 0.0;
+            }
+            transform.translation = original_t;
+            transform.rotation = original_q;
+            transforms.push_back(transform);
+            ++i;
+          }
+
+          traceback_msgs::TracebackTransforms traceback_transforms;
+          traceback_transforms.robot_names = robot_names;
+          traceback_transforms.transforms = transforms;
+
+          traceback_transforms_publisher_.publish(traceback_transforms);
+          // TEST HARDCODE sending traceback transforms END
+
+          robots_to_in_traceback[tracer_robot] = false;
+          return;
         }
-        return;
+        // Update AcceptRejectStatus END
+      }
+      else
+      {
+        ROS_INFO("findFurtherTransformNeeded does not match");
+        ROS_INFO("findFurtherTransformNeeded matches");
+        ROS_INFO("transform_needed is (tx, ty, r) = (%f, %f, %f)", transform_needed.tx, transform_needed.ty, transform_needed.r);
+        {
+          std::ofstream fw("transform_needed.txt", std::ofstream::app);
+          if (fw.is_open())
+          {
+            fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+               << "Does not match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
+            fw.close();
+          }
+        }
+
+        // Update AcceptRejectStatus
+        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_)
+        {
+          {
+            std::ofstream fw("transform_needed.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+              fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << "REJECT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
+              fw.close();
+            }
+          }
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
+          robots_to_in_traceback[tracer_robot] = false;
+          return;
+        }
+        // Update AcceptRejectStatus END
       }
     }
 
@@ -288,9 +352,34 @@ namespace traceback
 
     for (size_t i = 0; i < confidences.size(); ++i)
     {
-      auto it = max_element(confidences[i].begin(), confidences[i].end());
-      size_t max_position = it - confidences[i].begin();
+      std::string robot_name_src = transforms_indexes_[i];
+      // Find it, filtering accepted tracebacks
+      // auto it = max_element(confidences[i].begin(), confidences[i].end());
+      std::vector<double>::iterator it = confidences[i].begin();
       double max_confidence = *it;
+      size_t dst = 0;
+      for (auto itt = confidences[i].begin(); itt != confidences[i].end(); ++itt)
+      {
+        if (pairwise_accept_reject_status_[robot_name_src][transforms_indexes_[dst]].accepted)
+        {
+          ++dst;
+          continue;
+        }
+        if (pairwise_paused_[robot_name_src][transforms_indexes_[dst]])
+        {
+          ++dst;
+          continue;
+        }
+        if (*itt > max_confidence)
+        {
+          it = itt;
+          max_confidence = *itt;
+        }
+        ++dst;
+      }
+
+      // Find it END
+      size_t max_position = it - confidences[i].begin();
 
       // ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
 
@@ -301,7 +390,6 @@ namespace traceback
       }
 
       // Get current pose
-      std::string robot_name_src = transforms_indexes_[i];
       geometry_msgs::Pose pose = getRobotPose(robot_name_src);
 
       // ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
@@ -326,6 +414,7 @@ namespace traceback
       {
         robots_to_in_traceback[robot_name_src] = true;
       }
+
       ROS_INFO("Start traceback process for robot %s", robot_name_src.c_str());
       ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
       ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
@@ -353,6 +442,7 @@ namespace traceback
       ROS_INFO("matrix:\n%s", s.c_str());
       ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
+      // This is only updated here (start/restart traceback)
       robots_src_to_current_transforms_vectors_[robot_name_src] = transforms_vectors;
 
       std::string robot_name_dst = transforms_indexes_[max_position];
@@ -812,6 +902,20 @@ namespace traceback
         robots_to_current_it.emplace(robot_name, nullptr);
 
         traceback_transforms_publisher_ = node_.advertise<traceback_msgs::TracebackTransforms>(traceback_transforms_topic_, 10);
+
+        for (auto it = robots_to_camera_subscriptions_.begin(); it != robots_to_camera_subscriptions_.end(); ++it)
+        {
+          AcceptRejectStatus status;
+          status.accept_count = 0;
+          status.reject_count = 0;
+          status.accepted = false;
+          pairwise_accept_reject_status_[it->first][robot_name] = status;
+          pairwise_accept_reject_status_[robot_name][it->first] = status;
+          pairwise_abort_[it->first][robot_name] = 0;
+          pairwise_abort_[robot_name][it->first] = 0;
+          pairwise_paused_[it->first][robot_name] = false;
+          pairwise_paused_[robot_name][it->first] = false;
+        }
       }
     }
   }
