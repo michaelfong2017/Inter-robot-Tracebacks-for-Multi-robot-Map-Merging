@@ -3,6 +3,7 @@
 
 #include <traceback_msgs/GoalAndImage.h>
 #include <traceback_msgs/ImageAndImage.h>
+#include <traceback_msgs/TracebackTransforms.h>
 
 #include <traceback/transform_estimator.h>
 #include <traceback/camera_image_processor.h>
@@ -93,6 +94,9 @@ namespace traceback
 
     std::unordered_map<std::string, std::vector<std::vector<cv::Mat>>> robots_src_to_current_transforms_vectors_;
 
+    ros::Publisher traceback_transforms_publisher_;
+    std::string traceback_transforms_topic_ = "/traceback/traceback_transforms";
+
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
 
     void updateTargetPoses();
@@ -116,6 +120,8 @@ namespace traceback
                        MapSubscription &subscription);
 
     void topicSubscribing();
+
+    void matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q);
 
     std::string robotNameFromTopic(const std::string &topic);
     bool isRobotMapTopic(const ros::master::TopicInfo &topic);

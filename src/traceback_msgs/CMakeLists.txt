@@ -8,6 +8,7 @@ project(traceback_msgs)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  geometry_msgs
   message_generation
   move_base_msgs
   roscpp
@@ -53,6 +54,7 @@ add_message_files(
   FILES
   GoalAndImage.msg
   ImageAndImage.msg
+  TracebackTransforms.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -72,6 +74,7 @@ add_message_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
+  geometry_msgs
   move_base_msgs
   sensor_msgs
   std_msgs

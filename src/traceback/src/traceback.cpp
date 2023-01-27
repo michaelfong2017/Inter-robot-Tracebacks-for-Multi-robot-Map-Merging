@@ -119,6 +119,84 @@ namespace traceback
             fw.close();
           }
         }
+        // TEST HARDCODE sending traceback transforms
+        // std::vector<geometry_msgs::Transform> transforms;
+        // {
+        //   geometry_msgs::Transform transform;
+        //   transform.translation.x = -7.0;
+        //   transform.translation.y = -1.0;
+        //   transform.translation.z = 0.0;
+        //   tf2::Quaternion q;
+        //   q.setEuler(0., 0., 0.0);
+        //   transform.rotation = toMsg(q);
+        //   transforms.push_back(transform);
+        // }
+        // {
+        //   geometry_msgs::Transform transform;
+        //   transform.translation.x = 7.0;
+        //   transform.translation.y = -1.0;
+        //   transform.translation.z = 0.0;
+        //   tf2::Quaternion q;
+        //   q.setEuler(0., 0., 0.0);
+        //   transform.rotation = toMsg(q);
+        //   transforms.push_back(transform);
+        // }
+        // {
+        //   geometry_msgs::Transform transform;
+        //   transform.translation.x = 0.5;
+        //   transform.translation.y = 3.0;
+        //   transform.translation.z = 0.0;
+        //   tf2::Quaternion q;
+        //   q.setEuler(0., 0., 0.785);
+        //   transform.rotation = toMsg(q);
+        //   transforms.push_back(transform);
+        // }
+
+        // traceback_transforms.robot_names = {"/tb3_0", "/tb3_1", "/tb3_2"};
+        // traceback_transforms.transforms = transforms;
+
+        size_t tracer_robot_index;
+        size_t traced_robot_index;
+        for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+        {
+          if (it->second == tracer_robot)
+          {
+            tracer_robot_index = it->first;
+          }
+          else if (it->second == traced_robot)
+          {
+            traced_robot_index = it->first;
+          }
+        }
+
+        std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
+
+        std::vector<std::string> robot_names;
+        std::vector<geometry_msgs::Transform> transforms;
+        size_t i = 0;
+        for (auto &subscription : map_subscriptions_)
+        {
+          robot_names.push_back(subscription.robot_namespace);
+          geometry_msgs::Quaternion original_q;
+          matToQuaternion(mat_transforms[i], original_q);
+          geometry_msgs::Vector3 original_t;
+          original_t.x = mat_transforms[i].at<double>(2, 0);
+          original_t.y = mat_transforms[i].at<double>(2, 1);
+          original_t.z = 0.0;
+
+          geometry_msgs::Transform transform;
+          transform.translation = original_t;
+          transform.rotation = original_q;
+          transforms.push_back(transform);
+          ++i;
+        }
+
+        traceback_msgs::TracebackTransforms traceback_transforms;
+        traceback_transforms.robot_names = robot_names;
+        traceback_transforms.transforms = transforms;
+
+        traceback_transforms_publisher_.publish(traceback_transforms);
+        // TEST HARDCODE sending traceback transforms END
       }
       else
       {
@@ -359,26 +437,7 @@ namespace traceback
     geometry_msgs::Quaternion goal_q = current_it->pose.orientation;
     geometry_msgs::Quaternion transform_q;
     cv::Mat transform = transforms_vectors[i][max_position];
-    double a = transform.at<double>(0, 0);
-    double b = transform.at<double>(1, 0);
-    double mag = sqrt(a * a + b * b);
-    if (mag != 0)
-    {
-      a /= mag;
-      b /= mag;
-    }
-    if (a > 1)
-      a == 0.9999;
-    if (a < -0.9999)
-      a == -1;
-    if (b > 1)
-      b == 0.9999;
-    if (b < -1)
-      b == -0.9999;
-    transform_q.w = std::sqrt(2. + 2. * a) * 0.5;
-    transform_q.x = 0.;
-    transform_q.y = 0.;
-    transform_q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
+    matToQuaternion(transform, transform_q);
     tf2::Quaternion tf2_goal_q;
     tf2_goal_q.setW(goal_q.w);
     tf2_goal_q.setX(goal_q.x);
@@ -567,6 +626,7 @@ namespace traceback
     ROS_DEBUG("Grid pose estimation started.");
     std::vector<nav_msgs::OccupancyGridConstPtr> grids;
     grids.reserve(map_subscriptions_size_);
+    // TODO transforms_indexes_ can have concurrency problem
     transforms_indexes_.clear();
     resolutions_.clear();
     {
@@ -750,8 +810,34 @@ namespace traceback
 
         robots_to_in_traceback.emplace(robot_name, false);
         robots_to_current_it.emplace(robot_name, nullptr);
+
+        traceback_transforms_publisher_ = node_.advertise<traceback_msgs::TracebackTransforms>(traceback_transforms_topic_, 10);
       }
     }
+  }
+
+  void Traceback::matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q)
+  {
+    double a = mat.at<double>(0, 0);
+    double b = mat.at<double>(1, 0);
+    double mag = sqrt(a * a + b * b);
+    if (mag != 0)
+    {
+      a /= mag;
+      b /= mag;
+    }
+    if (a > 1)
+      a == 0.9999;
+    if (a < -0.9999)
+      a == -1;
+    if (b > 1)
+      b == 0.9999;
+    if (b < -1)
+      b == -0.9999;
+    q.w = std::sqrt(2. + 2. * a) * 0.5;
+    q.x = 0.;
+    q.y = 0.;
+    q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
   }
 
   // Return /tb3_0 for cases such as /tb3_0/map, /tb3_0/camera/rgb/image_raw and /tb3_0/tb3_0/map (this case is not used).
