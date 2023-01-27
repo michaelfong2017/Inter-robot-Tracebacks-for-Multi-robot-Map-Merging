@@ -90,11 +90,13 @@ namespace traceback
         // Allow more time for normal exploration to prevent being stuck at local optimums
         pairwise_paused_[tracer_robot][traced_robot] = true;
         pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-            ros::Duration(180, 0),
+            ros::Duration(30, 0),
             [this, tracer_robot, traced_robot](const ros::TimerEvent &)
             { pairwise_paused_[tracer_robot][traced_robot] = false; },
             true);
 
+        pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
+        pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
         robots_to_in_traceback[tracer_robot] = false;
         return;
       }
@@ -356,26 +358,35 @@ namespace traceback
       // Find it, filtering accepted tracebacks
       // auto it = max_element(confidences[i].begin(), confidences[i].end());
       std::vector<double>::iterator it = confidences[i].begin();
-      double max_confidence = *it;
+      bool found = false;
+      double max_confidence = -1.0;
       size_t dst = 0;
       for (auto itt = confidences[i].begin(); itt != confidences[i].end(); ++itt)
       {
         if (pairwise_accept_reject_status_[robot_name_src][transforms_indexes_[dst]].accepted)
         {
           ++dst;
+          ROS_INFO("Already accepted.");
           continue;
         }
         if (pairwise_paused_[robot_name_src][transforms_indexes_[dst]])
         {
           ++dst;
+          ROS_INFO("Being paused.");
           continue;
         }
         if (*itt > max_confidence)
         {
           it = itt;
           max_confidence = *itt;
+          found = true;
         }
         ++dst;
+      }
+
+      if (!found)
+      {
+        continue;
       }
 
       // Find it END
