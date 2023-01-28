@@ -305,9 +305,93 @@ namespace traceback
         }
     }
 
+    void TransformEstimator::updateBestTransforms(cv::Mat tracer_to_traced, std::string tracer, std::string traced, std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> &best_transforms,
+                                                  std::unordered_set<std::string> &has_best_transforms)
+    {
+        // TODO, Skip for now
+        if (has_best_transforms.count(tracer) && has_best_transforms.count(traced))
+        {
+            return;
+        }
+        if (best_transforms[tracer][traced].empty())
+        {
+            best_transforms[tracer][traced] = tracer_to_traced;
+        }
+        // 2
+        if (best_transforms[traced][tracer].empty())
+        {
+            // Translation only, no rotation case
+            if (abs(tracer_to_traced.at<double>(0, 0) - 0.0f) < ZERO_ERROR && abs(tracer_to_traced.at<double>(0, 1) - 0.0f) < ZERO_ERROR && abs(tracer_to_traced.at<double>(1, 0) - 0.0f) < ZERO_ERROR && abs(tracer_to_traced.at<double>(1, 1) - 0.0f) < ZERO_ERROR)
+            {
+                best_transforms[traced][tracer] = tracer_to_traced;
+                double tx = tracer_to_traced.at<double>(0, 2);
+                best_transforms[traced][tracer].at<double>(0, 2) = -1 * tx;
+                double ty = tracer_to_traced.at<double>(1, 2);
+                best_transforms[traced][tracer].at<double>(1, 2) = -1 * ty;
+            }
+            else
+            {
+                best_transforms[traced][tracer] = tracer_to_traced.inv();
+            }
+        }
+        // 3
+        if (!has_best_transforms.count(tracer) && !has_best_transforms.count(traced))
+        {
+            best_transforms[tracer][tracer] = cv::Mat::eye(3, 3, CV_64F);
+            best_transforms[traced][traced] = cv::Mat::eye(3, 3, CV_64F);
+            has_best_transforms.insert(tracer);
+            has_best_transforms.insert(traced);
+            return;
+        }
+        // Update traced->1, traced->2, 1->traced, 2->traced, etc, if tracer->1, tracer->2, etc exists
+        // e.g. traced->1 = tracer->1 * traced->tracer
+        // e.g. 1->traced = tracer->traced * 1->tracer
+        else if (has_best_transforms.count(tracer) && !has_best_transforms.count(traced))
+        {
+            best_transforms[traced][traced] = cv::Mat::eye(3, 3, CV_64F);
+
+            for (auto it = has_best_transforms.begin(); it != has_best_transforms.end(); ++it)
+            {
+                std::string k = *it;
+                if (!best_transforms[tracer][k].empty())
+                {
+                    best_transforms[traced][k] = best_transforms[tracer][k] * best_transforms[traced][tracer];
+                }
+                if (!best_transforms[k][tracer].empty())
+                {
+                    best_transforms[k][traced] = best_transforms[tracer][traced] * best_transforms[k][tracer];
+                }
+            }
+
+            has_best_transforms.insert(traced);
+        }
+        // Update tracer->1, tracer->2, 1->tracer, 2->tracer, etc, if traced->1, traced->2, etc exists
+        // e.g. tracer->1 = traced->1 * tracer->traced
+        // e.g. 1->tracer = traced->tracer * 1->traced
+        else if (has_best_transforms.count(traced) && !has_best_transforms.count(tracer))
+        {
+            best_transforms[tracer][tracer] = cv::Mat::eye(3, 3, CV_64F);
+
+            for (auto it = has_best_transforms.begin(); it != has_best_transforms.end(); ++it)
+            {
+                std::string k = *it;
+                if (!best_transforms[traced][k].empty())
+                {
+                    best_transforms[tracer][k] = best_transforms[traced][k] * best_transforms[tracer][traced];
+                }
+                if (!best_transforms[k][traced].empty())
+                {
+                    best_transforms[k][tracer] = best_transforms[traced][tracer] * best_transforms[k][traced];
+                }
+            }
+
+            has_best_transforms.insert(tracer);
+        }
+    }
+
     void TransformEstimator::printConfidences(const std::vector<std::vector<double>> confidences)
     {
-       for (size_t i = 0; i < confidences.size(); ++i)
+        for (size_t i = 0; i < confidences.size(); ++i)
         {
             ROS_INFO("confidences[%zu].size = %zu", i, confidences[i].size());
 

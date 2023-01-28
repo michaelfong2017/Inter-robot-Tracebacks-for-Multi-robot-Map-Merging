@@ -115,6 +115,9 @@ namespace traceback
     std::unordered_map<std::string, std::unordered_map<std::string, bool>> pairwise_paused_;
     std::unordered_map<std::string, std::unordered_map<std::string, ros::Timer>> pairwise_resume_timer_;
 
+    std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> best_transforms_;
+    std::unordered_set<std::string> has_best_transforms_;
+
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
 
     void updateTargetPoses();

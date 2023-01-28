@@ -2,6 +2,8 @@
 #define TRANSFORM_ESTIMATOR_H_
 
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 #include <boost/thread.hpp>
 
 #include <geometry_msgs/Transform.h>
@@ -33,6 +35,9 @@ namespace traceback
         std::vector<std::vector<cv::Mat>> getTransformsVectors();
         std::vector<cv::Point2f> getCenters();
         std::vector<std::vector<double>> getConfidences();
+
+        void updateBestTransforms(cv::Mat tracer_to_traced, std::string tracer, std::string traced, std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> &best_transforms,
+                                  std::unordered_set<std::string> &has_best_transforms);
 
         void printConfidences(const std::vector<std::vector<double>> confidences);
         void printTransformsVectors(const std::vector<std::vector<cv::Mat>> transforms_vectors);

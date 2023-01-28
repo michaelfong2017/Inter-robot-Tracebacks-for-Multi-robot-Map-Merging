@@ -90,7 +90,7 @@ namespace traceback
         // Allow more time for normal exploration to prevent being stuck at local optimums
         pairwise_paused_[tracer_robot][traced_robot] = true;
         pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-            ros::Duration(90, 0),
+            ros::Duration(60, 0),
             [this, tracer_robot, traced_robot](const ros::TimerEvent &)
             { pairwise_paused_[tracer_robot][traced_robot] = false; },
             true);
@@ -203,51 +203,51 @@ namespace traceback
 
           std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
 
-          std::vector<std::string> robot_names;
-          std::vector<geometry_msgs::Transform> transforms;
-          size_t i = 0;
-          for (auto &subscription : map_subscriptions_)
+          //
+          transform_estimator_.updateBestTransforms(mat_transforms[traced_robot_index], tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
+          //
+
+          if (has_best_transforms_.size() == resolutions_.size())
           {
-            robot_names.push_back(subscription.robot_namespace);
-            geometry_msgs::Quaternion original_q;
-            geometry_msgs::Vector3 original_t;
-            geometry_msgs::Transform transform;
+            std::vector<std::string> robot_names;
+            std::vector<geometry_msgs::Transform> transforms;
+            for (auto it = best_transforms_[tracer_robot].begin(); it != best_transforms_[tracer_robot].end(); ++it)
+            {
+              std::string dst_robot = it->first;
+              cv::Mat dst_transform = it->second;
+              robot_names.push_back(dst_robot);
+              geometry_msgs::Quaternion q;
+              geometry_msgs::Vector3 t;
+              geometry_msgs::Transform transform;
 
-            // For testing, set other transforms to far awaytraced_robot_index
-            if ((i != tracer_robot_index && i != traced_robot_index) || mat_transforms[i].empty())
-            {
-              original_t.x = 300.0;
-              original_t.y = 500.0;
-              original_t.z = 0.0;
-              original_q.w = 1.0;
-              original_q.x = 0.0;
-              original_q.y = 0.0;
-              original_q.z = 0.0;
+              matToQuaternion(dst_transform, q);
+              t.x = dst_transform.at<double>(2, 0);
+              t.y = dst_transform.at<double>(2, 1);
+              t.z = 0.0;
+
+              transform.translation = t;
+              transform.rotation = q;
+              transforms.push_back(transform);
             }
-            else
-            {
-              matToQuaternion(mat_transforms[i], original_q);
-              original_t.x = mat_transforms[i].at<double>(2, 0);
-              original_t.y = mat_transforms[i].at<double>(2, 1);
-              original_t.z = 0.0;
-            }
-            transform.translation = original_t;
-            transform.rotation = original_q;
-            transforms.push_back(transform);
-            ++i;
+
+            traceback_msgs::TracebackTransforms traceback_transforms;
+            traceback_transforms.robot_names = robot_names;
+            traceback_transforms.transforms = transforms;
+
+            traceback_transforms_publisher_.publish(traceback_transforms);
           }
-
-          traceback_msgs::TracebackTransforms traceback_transforms;
-          traceback_transforms.robot_names = robot_names;
-          traceback_transforms.transforms = transforms;
-
-          traceback_transforms_publisher_.publish(traceback_transforms);
           // TEST HARDCODE sending traceback transforms END
 
           robots_to_in_traceback[tracer_robot] = false;
           return;
         }
         // Update AcceptRejectStatus END
+        // TODO after each match, navigate to a nearby location in order to
+        // estimate the absolute scale
+        // For simplicity, only do if it is not yet accepted
+        else
+        {
+        }
       }
       else
       {
