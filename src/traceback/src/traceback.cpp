@@ -249,7 +249,7 @@ namespace traceback
               geometry_msgs::Vector3 t;
               geometry_msgs::Transform transform;
 
-              matToQuaternion(dst_transform, q, false);
+              matToQuaternion(dst_transform, q);
               t.x = dst_transform.at<double>(2, 0);
               t.y = dst_transform.at<double>(2, 1);
               t.z = 0.0;
@@ -294,8 +294,8 @@ namespace traceback
         }
 
         // Update AcceptRejectStatus
-        // Reject when reject count is at least reject_count_needed_ and reject count is larger than accept count
-        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count > pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+        // Reject when reject count is at least reject_count_needed_ and reject count is at least two times accept count
+        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 2 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
         {
           {
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
@@ -599,7 +599,7 @@ namespace traceback
     geometry_msgs::Quaternion goal_q = current_it->pose.orientation;
     geometry_msgs::Quaternion transform_q;
     cv::Mat transform = transforms_vectors[i][max_position];
-    matToQuaternion(transform, transform_q, true);
+    matToQuaternion(transform, transform_q);
     tf2::Quaternion tf2_goal_q;
     tf2_goal_q.setW(goal_q.w);
     tf2_goal_q.setX(goal_q.x);
@@ -992,9 +992,7 @@ namespace traceback
     }
   }
 
-  // Invert is sometimes needed because the x-y coordinates of gazebo world are different
-  // from that of an OpenCV image, causing the rotation to be inverted.
-  void Traceback::matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q, bool invert)
+  void Traceback::matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q)
   {
     double a = mat.at<double>(0, 0);
     double b = mat.at<double>(1, 0);
@@ -1015,14 +1013,7 @@ namespace traceback
     q.w = std::sqrt(2. + 2. * a) * 0.5;
     q.x = 0.;
     q.y = 0.;
-    if (invert)
-    {
-      q.z = -1 * std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
-    }
-    else
-    {
-      q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
-    }
+    q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
   }
 
   // Return /tb3_0 for cases such as /tb3_0/map, /tb3_0/camera/rgb/image_raw and /tb3_0/tb3_0/map (this case is not used).

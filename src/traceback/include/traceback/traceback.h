@@ -144,7 +144,7 @@ namespace traceback
 
     void topicSubscribing();
 
-    void matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q, bool invert);
+    void matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q);
 
     std::string robotNameFromTopic(const std::string &topic);
     bool isRobotMapTopic(const ros::master::TopicInfo &topic);
