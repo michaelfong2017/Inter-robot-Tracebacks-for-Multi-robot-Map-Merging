@@ -169,6 +169,8 @@ namespace traceback
           }
         }
 
+        pairwise_transform_needed_history_[tracer_robot][traced_robot].push_back(transform_needed);
+
         // Update AcceptRejectStatus
         // If accepted, no further traceback is needed for this ordered pair,
         // but remember to enable other tracebacks for the same tracer
@@ -182,6 +184,33 @@ namespace traceback
             {
               fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
                  << "ACCEPT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
+              fw.close();
+            }
+          }
+
+          double average_tx = 0.0;
+          double average_ty = 0.0;
+          double average_r = 0.0;
+          size_t history_size = pairwise_transform_needed_history_[tracer_robot][traced_robot].size();
+          for (size_t i = 0; i < history_size; ++i)
+          {
+            average_tx += pairwise_transform_needed_history_[tracer_robot][traced_robot][i].tx;
+            average_ty += pairwise_transform_needed_history_[tracer_robot][traced_robot][i].ty;
+            average_r += pairwise_transform_needed_history_[tracer_robot][traced_robot][i].r;
+          }
+          if (history_size != 0)
+          {
+            average_tx /= history_size;
+            average_ty /= history_size;
+            average_r /= history_size;
+          }
+
+          {
+            std::ofstream fw("transform_needed.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+              fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
               fw.close();
             }
           }
@@ -220,7 +249,7 @@ namespace traceback
               geometry_msgs::Vector3 t;
               geometry_msgs::Transform transform;
 
-              matToQuaternion(dst_transform, q);
+              matToQuaternion(dst_transform, q, false);
               t.x = dst_transform.at<double>(2, 0);
               t.y = dst_transform.at<double>(2, 1);
               t.z = 0.0;
@@ -265,7 +294,8 @@ namespace traceback
         }
 
         // Update AcceptRejectStatus
-        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_)
+        // Reject when reject count is at least reject_count_needed_ and reject count is larger than accept count
+        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count > pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
         {
           {
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
@@ -276,6 +306,34 @@ namespace traceback
               fw.close();
             }
           }
+
+          double average_tx = 0.0;
+          double average_ty = 0.0;
+          double average_r = 0.0;
+          size_t history_size = pairwise_transform_needed_history_[tracer_robot][traced_robot].size();
+          for (size_t i = 0; i < history_size; ++i)
+          {
+            average_tx += pairwise_transform_needed_history_[tracer_robot][traced_robot][i].tx;
+            average_ty += pairwise_transform_needed_history_[tracer_robot][traced_robot][i].ty;
+            average_r += pairwise_transform_needed_history_[tracer_robot][traced_robot][i].r;
+          }
+          if (history_size != 0)
+          {
+            average_tx /= history_size;
+            average_ty /= history_size;
+            average_r /= history_size;
+          }
+
+          {
+            std::ofstream fw("transform_needed.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+              fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
+              fw.close();
+            }
+          }
+
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
           pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
           robots_to_in_traceback[tracer_robot] = false;
@@ -459,6 +517,8 @@ namespace traceback
 
       std::string robot_name_dst = transforms_indexes_[max_position];
 
+      pairwise_transform_needed_history_[robot_name_src][robot_name_dst].clear();
+
       /** just for finding min_it */
       double min_distance = DBL_MAX;
       std::list<PoseImagePair>::iterator min_it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
@@ -539,7 +599,7 @@ namespace traceback
     geometry_msgs::Quaternion goal_q = current_it->pose.orientation;
     geometry_msgs::Quaternion transform_q;
     cv::Mat transform = transforms_vectors[i][max_position];
-    matToQuaternion(transform, transform_q);
+    matToQuaternion(transform, transform_q, true);
     tf2::Quaternion tf2_goal_q;
     tf2_goal_q.setW(goal_q.w);
     tf2_goal_q.setX(goal_q.x);
@@ -932,7 +992,9 @@ namespace traceback
     }
   }
 
-  void Traceback::matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q)
+  // Invert is sometimes needed because the x-y coordinates of gazebo world are different
+  // from that of an OpenCV image, causing the rotation to be inverted.
+  void Traceback::matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q, bool invert)
   {
     double a = mat.at<double>(0, 0);
     double b = mat.at<double>(1, 0);
@@ -953,7 +1015,14 @@ namespace traceback
     q.w = std::sqrt(2. + 2. * a) * 0.5;
     q.x = 0.;
     q.y = 0.;
-    q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
+    if (invert)
+    {
+      q.z = -1 * std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
+    }
+    else
+    {
+      q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
+    }
   }
 
   // Return /tb3_0 for cases such as /tb3_0/map, /tb3_0/camera/rgb/image_raw and /tb3_0/tb3_0/map (this case is not used).

@@ -115,6 +115,8 @@ namespace traceback
     std::unordered_map<std::string, std::unordered_map<std::string, bool>> pairwise_paused_;
     std::unordered_map<std::string, std::unordered_map<std::string, ros::Timer>> pairwise_resume_timer_;
 
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<TransformNeeded>>> pairwise_transform_needed_history_;
+
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> best_transforms_;
     std::unordered_set<std::string> has_best_transforms_;
 
@@ -142,7 +144,7 @@ namespace traceback
 
     void topicSubscribing();
 
-    void matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q);
+    void matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q, bool invert);
 
     std::string robotNameFromTopic(const std::string &topic);
     bool isRobotMapTopic(const ros::master::TopicInfo &topic);
