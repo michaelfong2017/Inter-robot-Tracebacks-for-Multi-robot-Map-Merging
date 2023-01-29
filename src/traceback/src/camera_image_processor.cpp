@@ -12,7 +12,7 @@
 namespace traceback
 {
     bool CameraImageProcessor::findFurtherTransformNeeded(const cv::Mat &traced_robot_image, const cv::Mat &tracer_robot_image, FeatureType feature_type,
-                                                          double confidence, TransformNeeded &transform_needed, std::string traced_robot, std::string tracer_robot, std::string current_time)
+                                                          double confidence, double yaw, TransformNeeded &transform_needed, std::string traced_robot, std::string tracer_robot, std::string current_time)
     {
         const std::vector<cv::Mat> &images = {traced_robot_image, tracer_robot_image};
         std::vector<cv::detail::ImageFeatures> image_features;
@@ -139,6 +139,11 @@ namespace traceback
         The more positive the t.x is, the more the tracer is to the left of the goal, the more negative y translation is needed
         in the final transformation.
 
+        When computing transform_t, must consider the current orientation.
+        The goal is already in the tracer's coordinate frame, and the essential matrix
+        is actually to rotate from traced to tracer, then translate from traced to tracer.
+        Therefore, the orientation after this rotation is the same as the tracer's orientation.
+
         transform_t probably needs to be scaled (element-wise multiplication) before it can be used.
 
         For transform_R, only consider the y-axis rotation since this y-axis rotation is the z-axis rotation in the robot world.
@@ -180,8 +185,10 @@ namespace traceback
         }
 
         // Read the above comment to understand these calculations.
-        transform_needed.tx = transform_t.at<double>(2, 0);
-        transform_needed.ty = -1 * transform_t.at<double>(0, 0);
+        // Note the sign of the effect of transform_t.at<double>(0, 0) and transform_t.at<double>(2, 0).
+        // It's quite complicated to figure it out.
+        transform_needed.tx = transform_t.at<double>(2, 0) * cos(yaw) + transform_t.at<double>(0, 0) * sin(yaw);
+        transform_needed.ty = (-1 * transform_t.at<double>(0, 0) * cos(yaw)) + transform_t.at<double>(2, 0) * sin(yaw);
         transform_needed.r = -1 * rot[1];
 
         ROS_INFO("Debug");

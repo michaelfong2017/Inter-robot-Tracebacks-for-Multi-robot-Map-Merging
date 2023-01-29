@@ -151,9 +151,21 @@ namespace traceback
       cv::imwrite(current_time + "_" + traced_robot.substr(1) + "_traced.png",
                   cv_ptr_traced->image);
 
+      double goal_x = msg->goal.target_pose.pose.position.x;
+      double goal_y = msg->goal.target_pose.pose.position.y;
+      geometry_msgs::Quaternion goal_q = msg->goal.target_pose.pose.orientation;
+      tf2::Quaternion tf_q;
+      tf_q.setW(goal_q.w);
+      tf_q.setX(goal_q.x);
+      tf_q.setY(goal_q.y);
+      tf_q.setZ(goal_q.z);
+      tf2::Matrix3x3 m(tf_q);
+      double roll, pitch, yaw;
+      m.getRPY(roll, pitch, yaw);
+
       TransformNeeded transform_needed;
       bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_traced->image, cv_ptr_tracer->image, FeatureType::ORB,
-                                                                         essential_mat_confidence_threshold_, transform_needed, traced_robot, tracer_robot, current_time);
+                                                                         essential_mat_confidence_threshold_, yaw, transform_needed, traced_robot, tracer_robot, current_time);
 
       if (is_match)
       {
