@@ -62,7 +62,7 @@
         <param name="essential_mat_confidence" value="0.35"/>
         <param name="accept_count_needed" value="20"/>
         <param name="reject_count_needed" value="3"/>
-        <param name="consecutive_abort_count_needed" value="3" />
+        <param name="consecutive_abort_count_needed" value="4" />
     </node>
 
 

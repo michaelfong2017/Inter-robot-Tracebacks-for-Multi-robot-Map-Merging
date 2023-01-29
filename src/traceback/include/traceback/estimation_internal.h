@@ -95,7 +95,7 @@ namespace traceback
                         images[size_t(match_info.dst_img_idx)],
                         image_features[size_t(match_info.dst_img_idx)].keypoints,
                         match_info.matches, img);
-        cv::imwrite(current_time + "_" + traced_robot.substr(1) + "_traced_robot_" + tracer_robot.substr(1) + "_tracer_robot" + "_matches.png",
+        cv::imwrite(current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_matches.png",
                     img);
         // draw inliers only
         cv::drawMatches(
@@ -105,7 +105,7 @@ namespace traceback
             image_features[size_t(match_info.dst_img_idx)].keypoints,
             match_info.matches, img, cv::Scalar::all(-1), cv::Scalar::all(-1),
             *reinterpret_cast<const std::vector<char> *>(&match_info.inliers_mask));
-        cv::imwrite(current_time + "_" + traced_robot.substr(1) + "_traced_robot_" + tracer_robot.substr(1) + "_tracer_robot" + "_matches_inliers.png",
+        cv::imwrite(current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_matches_inliers.png",
                     img);
         // cv::imwrite(std::to_string(match_info.src_img_idx) + "_" +
         //                 std::to_string(match_info.dst_img_idx) +

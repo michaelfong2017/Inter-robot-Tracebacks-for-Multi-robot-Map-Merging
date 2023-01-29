@@ -11,10 +11,10 @@
 
 namespace traceback
 {
-    bool CameraImageProcessor::findFurtherTransformNeeded(const cv::Mat &traced_robot_image, const cv::Mat &tracer_robot_image, FeatureType feature_type,
-                                                          double confidence, double yaw, TransformNeeded &transform_needed, std::string traced_robot, std::string tracer_robot, std::string current_time)
+    bool CameraImageProcessor::findFurtherTransformNeeded(const cv::Mat &tracer_robot_image, const cv::Mat &traced_robot_image, FeatureType feature_type,
+                                                          double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {
-        const std::vector<cv::Mat> &images = {traced_robot_image, tracer_robot_image};
+        const std::vector<cv::Mat> &images = {tracer_robot_image, traced_robot_image};
         std::vector<cv::detail::ImageFeatures> image_features;
         std::vector<cv::detail::MatchesInfo> pairwise_matches;
         std::vector<cv::detail::CameraParams> transforms;
@@ -24,7 +24,7 @@ namespace traceback
         cv::Ptr<cv::detail::FeaturesMatcher> matcher =
             cv::makePtr<cv::detail::AffineBestOf2NearestMatcher>();
 
-        if (traced_robot_image.empty() || tracer_robot_image.empty())
+        if (tracer_robot_image.empty() || traced_robot_image.empty())
         {
             ROS_ERROR("Either traced robot image or tracer robot image is empty, which should not be the case!");
             return false;
@@ -118,7 +118,7 @@ namespace traceback
         cv::Mat essential_mat = cv::findEssentialMat(points1, points2, camera_K, cv::RANSAC);
 
         {
-            std::ofstream fw(current_time + "_" + traced_robot.substr(1) + "_traced_robot_" + tracer_robot.substr(1) + "_tracer_robot" + "_essential_mat.txt", std::ofstream::out);
+            std::ofstream fw(current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_essential_mat.txt", std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "Essential matrix E:" << std::endl;
@@ -130,24 +130,23 @@ namespace traceback
         }
 
         /*
-        Bear in mind that traced is the src image and tracer is the dst image.
+        Bear in mind that tracer is the src image and traced is the dst image.
 
         transform_t is of the form (x, y, z)
         t.y should be considered 0.
-        The more positive the t.z is, the more the tracer is behind from the goal, the more positive x translation is needed
+        The more positive the t.z is, the more the traced is behind from the goal, the more negative x translation is needed
         in the final transformation.
-        The more positive the t.x is, the more the tracer is to the left of the goal, the more negative y translation is needed
+        The more positive the t.x is, the more the traced is to the left of the goal, the more positive y translation is needed
         in the final transformation.
 
         When computing transform_t, must consider the current orientation.
         The goal is already in the tracer's coordinate frame, and the essential matrix
-        is actually to rotate from traced to tracer, then translate from traced to tracer.
-        Therefore, the orientation after this rotation is the same as the tracer's orientation.
+        is actually to rotate, then translate from tracer to traced, in the tracer's coordinate frame.
 
         transform_t probably needs to be scaled (element-wise multiplication) before it can be used.
 
         For transform_R, only consider the y-axis rotation since this y-axis rotation is the z-axis rotation in the robot world.
-        The more positive this rotation, the more negative z-axis rotation is needed in the robot world.
+        The more positive this rotation, the more positive z-axis rotation is needed in the robot world.
 
         transform_R can be directly used.
         */
@@ -157,7 +156,7 @@ namespace traceback
         cv::Vec3d rot = rotationMatrixToEulerAngles(transform_R);
 
         {
-            std::ofstream fw(current_time + "_" + traced_robot.substr(1) + "_traced_robot_" + tracer_robot.substr(1) + "_tracer_robot" + "_transform_R.txt", std::ofstream::out);
+            std::ofstream fw(current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_R.txt", std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "Number of inliers: " << number_of_inliers << std::endl;
@@ -172,7 +171,7 @@ namespace traceback
         }
 
         {
-            std::ofstream fw(current_time + "_" + traced_robot.substr(1) + "_traced_robot_" + tracer_robot.substr(1) + "_tracer_robot" + "_transform_t.txt", std::ofstream::out);
+            std::ofstream fw(current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_t.txt", std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "Number of inliers: " << number_of_inliers << std::endl;
@@ -187,9 +186,9 @@ namespace traceback
         // Read the above comment to understand these calculations.
         // Note the sign of the effect of transform_t.at<double>(0, 0) and transform_t.at<double>(2, 0).
         // It's quite complicated to figure it out.
-        transform_needed.tx = transform_t.at<double>(2, 0) * cos(yaw) + transform_t.at<double>(0, 0) * sin(yaw);
-        transform_needed.ty = (-1 * transform_t.at<double>(0, 0) * cos(yaw)) + transform_t.at<double>(2, 0) * sin(yaw);
-        transform_needed.r = -1 * rot[1];
+        transform_needed.tx = (-1 * transform_t.at<double>(2, 0) * cos(yaw)) + transform_t.at<double>(0, 0) * sin(yaw);
+        transform_needed.ty = transform_t.at<double>(0, 0) * cos(yaw) + transform_t.at<double>(2, 0) * sin(yaw);
+        transform_needed.r = rot[1];
 
         ROS_INFO("Debug");
 

@@ -164,8 +164,8 @@ namespace traceback
       m.getRPY(roll, pitch, yaw);
 
       TransformNeeded transform_needed;
-      bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_traced->image, cv_ptr_tracer->image, FeatureType::ORB,
-                                                                         essential_mat_confidence_threshold_, yaw, transform_needed, traced_robot, tracer_robot, current_time);
+      bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::ORB,
+                                                                         essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
 
       if (is_match)
       {
@@ -175,8 +175,8 @@ namespace traceback
           std::ofstream fw("transform_needed.txt", std::ofstream::app);
           if (fw.is_open())
           {
-            fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-               << "Match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
+            fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+               << current_time << " - " << "Match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
             fw.close();
           }
         }
@@ -194,8 +194,8 @@ namespace traceback
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
             if (fw.is_open())
             {
-              fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << "ACCEPT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
+              fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << current_time << " - " << "ACCEPT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
               fw.close();
             }
           }
@@ -221,8 +221,8 @@ namespace traceback
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
             if (fw.is_open())
             {
-              fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
+              fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << current_time << " - " << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
               fw.close();
             }
           }
@@ -299,8 +299,8 @@ namespace traceback
           std::ofstream fw("transform_needed.txt", std::ofstream::app);
           if (fw.is_open())
           {
-            fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-               << "Does not match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
+            fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+               << current_time << " - " << "Does not match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
             fw.close();
           }
         }
@@ -313,8 +313,8 @@ namespace traceback
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
             if (fw.is_open())
             {
-              fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << "REJECT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
+              fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << current_time << " - " << "REJECT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
               fw.close();
             }
           }
@@ -340,8 +340,8 @@ namespace traceback
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
             if (fw.is_open())
             {
-              fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
+              fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << current_time << " - " << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
               fw.close();
             }
           }
