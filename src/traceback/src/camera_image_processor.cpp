@@ -134,10 +134,10 @@ namespace traceback
 
         transform_t is of the form (x, y, z)
         t.y should be considered 0.
-        The more positive the t.z is, the more the traced is behind from the goal, the more negative x translation is needed
-        in the final transformation.
-        The more positive the t.x is, the more the traced is to the left of the goal, the more positive y translation is needed
-        in the final transformation.
+        If yaw=0, the more positive the t.z is, the more the goal (traced) is behind from the tracer, the more negative x translation is needed
+        to translate from tracer to traced.
+        If yaw=0, the more positive the t.x is, the more the goal (traced) is to the left of the tracer, the more positive y translation is needed
+        to translate from tracer to traced.
 
         When computing transform_t, must consider the current orientation.
         The goal is already in the tracer's coordinate frame, and the essential matrix
@@ -186,8 +186,8 @@ namespace traceback
         // Read the above comment to understand these calculations.
         // Note the sign of the effect of transform_t.at<double>(0, 0) and transform_t.at<double>(2, 0).
         // It's quite complicated to figure it out.
-        transform_needed.tx = (-1 * transform_t.at<double>(2, 0) * cos(yaw)) + transform_t.at<double>(0, 0) * sin(yaw);
-        transform_needed.ty = transform_t.at<double>(0, 0) * cos(yaw) + transform_t.at<double>(2, 0) * sin(yaw);
+        transform_needed.tx = (-1 * transform_t.at<double>(2, 0) * cos(yaw)) + (-1 * transform_t.at<double>(0, 0) * sin(yaw));
+        transform_needed.ty = transform_t.at<double>(0, 0) * cos(yaw) + (-1 * transform_t.at<double>(2, 0) * sin(yaw));
         transform_needed.r = rot[1];
 
         ROS_INFO("Debug");

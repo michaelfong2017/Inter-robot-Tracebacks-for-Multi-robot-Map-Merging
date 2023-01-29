@@ -164,7 +164,7 @@ namespace traceback
       m.getRPY(roll, pitch, yaw);
 
       TransformNeeded transform_needed;
-      bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::ORB,
+      bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::AKAZE,
                                                                          essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
 
       if (is_match)
