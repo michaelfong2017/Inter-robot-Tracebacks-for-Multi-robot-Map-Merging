@@ -19,6 +19,21 @@
     <arg name="third_tb3_z_pos" default=" 0.0" />
     <arg name="third_tb3_yaw" default=" 0.785" />
 
+    <arg name="neg_first_tb3_x_pos" default="$(eval -1 * first_tb3_x_pos)" />
+    <arg name="neg_first_tb3_y_pos" default="$(eval -1 * first_tb3_y_pos)" />
+    <arg name="neg_first_tb3_z_pos" default="$(eval -1 * first_tb3_z_pos)" />
+    <arg name="neg_first_tb3_yaw" default="$(eval -1 * first_tb3_yaw)" />
+
+    <arg name="neg_second_tb3_x_pos" default="$(eval -1 * second_tb3_x_pos)" />
+    <arg name="neg_second_tb3_y_pos" default="$(eval -1 * second_tb3_y_pos)" />
+    <arg name="neg_second_tb3_z_pos" default="$(eval -1 * second_tb3_z_pos)" />
+    <arg name="neg_second_tb3_yaw" default="$(eval -1 * second_tb3_yaw)" />
+
+    <arg name="neg_third_tb3_x_pos" default="$(eval -1 * third_tb3_x_pos)" />
+    <arg name="neg_third_tb3_y_pos" default="$(eval -1 * third_tb3_y_pos)" />
+    <arg name="neg_third_tb3_z_pos" default="$(eval -1 * third_tb3_z_pos)" />
+    <arg name="neg_third_tb3_yaw" default="$(eval -1 * third_tb3_yaw)" />
+
     <include file="$(find gazebo_ros)/launch/empty_world.launch">
         <arg name="world_name" value="$(find aws_robomaker_small_house_world)/worlds/small_house.world" />
         <arg name="paused" value="false" />
@@ -39,7 +54,7 @@
         <!-- <node pkg="tf" type="static_transform_publisher" name="fix_odom" args="0 0 0 0 0 0 $(arg first_tb3)/odom $(arg first_tb3)/base_footprint 50" /> -->
 
         <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model $(arg first_tb3) -x $(arg first_tb3_x_pos) -y $(arg first_tb3_y_pos) -z $(arg first_tb3_z_pos) -Y $(arg first_tb3_yaw) -param robot_description" />
-        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg first_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg first_tb3)/map 50" />
+        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg first_tb3)_tf_broadcaster" args="$(arg first_tb3_x_pos) $(arg first_tb3_y_pos) $(arg first_tb3_z_pos) $(arg first_tb3_yaw) 0 0 /map /$(arg first_tb3)/map 50" />
     
     
         <include file="$(find traceback_bringup)/launch/modified_gmapping.launch">
@@ -55,7 +70,7 @@
         <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg first_tb3)_$(arg first_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg first_tb3)/$(arg first_tb3)/map 50" />
     
     
-        <node pkg="tf" type="static_transform_publisher" name="$(arg first_tb3)_fake_to_odom_tf_broadcaster" args="7 1 0 0 0 0 /$(arg first_tb3)/fake /$(arg first_tb3)/odom 50" />
+        <node pkg="tf" type="static_transform_publisher" name="$(arg first_tb3)_fake_to_odom_tf_broadcaster" args="$(arg neg_first_tb3_x_pos) $(arg neg_first_tb3_y_pos) $(arg neg_first_tb3_z_pos) $(arg neg_first_tb3_yaw) 0 0 /$(arg first_tb3)/fake /$(arg first_tb3)/odom 50" />
     </group>
 
     <group ns="$(arg second_tb3)">
@@ -69,7 +84,7 @@
         <!-- <node pkg="tf" type="static_transform_publisher" name="fix_odom" args="0 0 0 0 0 0 $(arg second_tb3)/odom $(arg second_tb3)/base_footprint 50" /> -->
 
         <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model $(arg second_tb3) -x $(arg second_tb3_x_pos) -y $(arg second_tb3_y_pos) -z $(arg second_tb3_z_pos) -Y $(arg second_tb3_yaw) -param robot_description" />
-        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg second_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg second_tb3)/map 50" />
+        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg second_tb3)_tf_broadcaster" args="$(arg second_tb3_x_pos) $(arg second_tb3_y_pos) $(arg second_tb3_z_pos) $(arg second_tb3_yaw) 0 0 /map /$(arg second_tb3)/map 50" />
     
     
         <include file="$(find traceback_bringup)/launch/modified_gmapping.launch">
@@ -84,7 +99,7 @@
         <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg second_tb3)_$(arg second_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg second_tb3)/$(arg second_tb3)/map 50" />
     
     
-        <node pkg="tf" type="static_transform_publisher" name="$(arg second_tb3)_fake_to_odom_tf_broadcaster" args="-7 1 0 0 0 0 /$(arg second_tb3)/fake /$(arg second_tb3)/odom 50" />
+        <node pkg="tf" type="static_transform_publisher" name="$(arg second_tb3)_fake_to_odom_tf_broadcaster" args="$(arg neg_second_tb3_x_pos) $(arg neg_second_tb3_y_pos) $(arg neg_second_tb3_z_pos) $(arg neg_second_tb3_yaw) 0 0 /$(arg second_tb3)/fake /$(arg second_tb3)/odom 50" />
     </group>
 
     <group ns="$(arg third_tb3)">
@@ -98,7 +113,7 @@
         <!-- <node pkg="tf" type="static_transform_publisher" name="fix_odom" args="0 0 0 0 0 0 $(arg third_tb3)/odom $(arg third_tb3)/base_footprint 50" /> -->
 
         <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model $(arg third_tb3) -x $(arg third_tb3_x_pos) -y $(arg third_tb3_y_pos) -z $(arg third_tb3_z_pos) -Y $(arg third_tb3_yaw) -param robot_description" />
-        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg third_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg third_tb3)/map 50" />
+        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg third_tb3)_tf_broadcaster" args="$(arg third_tb3_x_pos) $(arg third_tb3_y_pos) $(arg third_tb3_z_pos) $(arg third_tb3_yaw) 0 0 /map /$(arg third_tb3)/map 50" />
     
         
         <include file="$(find traceback_bringup)/launch/modified_gmapping.launch">
@@ -113,7 +128,7 @@
         <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg third_tb3)_$(arg third_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg third_tb3)/$(arg third_tb3)/map 50" />
     
     
-        <node pkg="tf" type="static_transform_publisher" name="$(arg third_tb3)_fake_to_odom_tf_broadcaster" args="-0.5 -3 0 -0.785 0 0 /$(arg third_tb3)/fake /$(arg third_tb3)/odom 50" />
+        <node pkg="tf" type="static_transform_publisher" name="$(arg third_tb3)_fake_to_odom_tf_broadcaster" args="$(arg neg_third_tb3_x_pos) $(arg neg_third_tb3_y_pos) $(arg neg_third_tb3_z_pos) $(arg neg_third_tb3_yaw) 0 0 /$(arg third_tb3)/fake /$(arg third_tb3)/odom 50" />
     </group>
 
     <node pkg="rviz" type="rviz" name="rviz"
