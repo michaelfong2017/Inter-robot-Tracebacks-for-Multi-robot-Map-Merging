@@ -2,4 +2,6 @@ move_base_msgs/MoveBaseGoal goal
 sensor_msgs/Image image
 string tracer_robot
 string traced_robot
+float64 dst_map_origin_x
+float64 dst_map_origin_y
 int64 stamp

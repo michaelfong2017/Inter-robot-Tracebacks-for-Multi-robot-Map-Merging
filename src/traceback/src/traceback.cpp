@@ -406,7 +406,7 @@ namespace traceback
 
     robots_to_current_it[robot_name_src] = temp;
 
-    startOrContinueTraceback(robot_name_src, robot_name_dst);
+    startOrContinueTraceback(robot_name_src, robot_name_dst, msg->dst_map_origin_x, msg->dst_map_origin_y);
 
     // TODO determine when to end traceback
     // robots_to_in_traceback[tracer_robot] = false;
@@ -417,6 +417,7 @@ namespace traceback
     ROS_DEBUG("Update target poses started.");
 
     std::vector<std::vector<cv::Mat>> transforms_vectors;
+    std::vector<cv::Point2i> images_width_height;
     std::vector<cv::Point2f> centers;
     std::vector<std::vector<double>> confidences;
     // Ensure consistency of transforms_vectors_, centers_ and confidences_
@@ -424,6 +425,8 @@ namespace traceback
       boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
       transforms_vectors = transform_estimator_.getTransformsVectors();
       // transform_estimator_.printTransformsVectors(transforms_vectors);
+
+      images_width_height = transform_estimator_.getImagesWidthHeight();
 
       centers = transform_estimator_.getCenters();
       for (auto &p : centers)
@@ -498,9 +501,8 @@ namespace traceback
       // is (-20m, -20m) or (-400px, -400px) when the resolution is 0.05.
       // This is achieved by translating by (20, 20) first, then rotate as usual,
       // then translate by (-20, -20).
-      // HARDCODE -20 first, which can be got by map metadata origin position.
-      double origin_x = -20.0;
-      double origin_y = -20.0;
+      double origin_x = images_width_height[i].x * resolutions_[i] / -2.0;
+      double origin_y = images_width_height[i].y * resolutions_[i] / -2.0;
       cv::Mat pose_src(3, 1, CV_64F);
       pose_src.at<double>(0, 0) = (pose.position.x - origin_x) / resolutions_[i];
       pose_src.at<double>(1, 0) = (pose.position.y - origin_y) / resolutions_[i];
@@ -581,11 +583,14 @@ namespace traceback
       robots_to_current_it[robot_name_src] = min_it;
       /** just for finding min_it END */
 
-      startOrContinueTraceback(robot_name_src, robot_name_dst);
+      double dst_map_origin_x = images_width_height[max_position].x * resolutions_[max_position] / -2.0;
+      double dst_map_origin_y = images_width_height[max_position].y * resolutions_[max_position] / -2.0;
+
+      startOrContinueTraceback(robot_name_src, robot_name_dst, dst_map_origin_x, dst_map_origin_y);
     }
   }
 
-  void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst)
+  void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double dst_map_origin_x, double dst_map_origin_y)
   {
     /** Get parameters other than robot names */
     size_t i;
@@ -616,9 +621,8 @@ namespace traceback
     // Transform goal from dst frame to src (robot i) frame
     // Same as above, it is required to manually rotate about the bottom-left corner, which
     // is (-20m, -20m) or (-400px, -400px) when the resolution is 0.05.
-    // HARDCODE -20 first, which can be got by map metadata origin position.
-    double origin_x = -20.0;
-    double origin_y = -20.0;
+    double origin_x = dst_map_origin_x;
+    double origin_y = dst_map_origin_y;
     cv::Mat goal_dst(3, 1, CV_64F);
     goal_dst.at<double>(0, 0) = (goal_x - origin_x) / resolutions_[max_position];
     goal_dst.at<double>(1, 0) = (goal_y - origin_y) / resolutions_[max_position];
@@ -677,6 +681,8 @@ namespace traceback
     goal_and_image.image = current_it->image;
     goal_and_image.tracer_robot = robot_name_src;
     goal_and_image.traced_robot = robot_name_dst;
+    goal_and_image.dst_map_origin_x = dst_map_origin_x;
+    goal_and_image.dst_map_origin_y = dst_map_origin_y;
     goal_and_image.stamp = current_it->stamp;
     ROS_DEBUG("Goal and image to be sent");
 

@@ -124,7 +124,7 @@ namespace traceback
 
     void updateTargetPoses();
 
-    void startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst);
+    void startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double dst_map_origin_x, double dst_map_origin_y);
 
     std::unordered_map<std::string, ros::Publisher> robots_to_visualize_marker_publisher_;
     std::string visualize_goal_topic_ = "traceback/visualize/goal";
