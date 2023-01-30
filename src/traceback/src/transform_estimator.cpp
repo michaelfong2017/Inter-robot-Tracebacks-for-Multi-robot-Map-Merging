@@ -348,6 +348,7 @@ namespace traceback
                 std::string k = *it;
                 if (!best_transforms[tracer][k].empty())
                 {
+                    best_transforms[traced][k] = cv::Mat(3, 3, CV_64F);
                     best_transforms[traced][k].at<double>(0, 2) = best_transforms[traced][tracer].at<double>(0, 2) + best_transforms[tracer][k].at<double>(0, 2);
                     best_transforms[traced][k].at<double>(1, 2) = best_transforms[traced][tracer].at<double>(1, 2) + best_transforms[tracer][k].at<double>(1, 2);
 
@@ -359,6 +360,7 @@ namespace traceback
                 }
                 if (!best_transforms[k][tracer].empty())
                 {
+                    best_transforms[k][traced] = cv::Mat(3, 3, CV_64F);
                     best_transforms[k][traced].at<double>(0, 2) = best_transforms[k][tracer].at<double>(0, 2) + best_transforms[tracer][traced].at<double>(0, 2);
                     best_transforms[k][traced].at<double>(1, 2) = best_transforms[k][tracer].at<double>(1, 2) + best_transforms[tracer][traced].at<double>(1, 2);
 
@@ -384,6 +386,7 @@ namespace traceback
                 std::string k = *it;
                 if (!best_transforms[traced][k].empty())
                 {
+                    best_transforms[tracer][k] = cv::Mat(3, 3, CV_64F);
                     best_transforms[tracer][k].at<double>(0, 2) = best_transforms[tracer][traced].at<double>(0, 2) + best_transforms[traced][k].at<double>(0, 2);
                     best_transforms[tracer][k].at<double>(1, 2) = best_transforms[tracer][traced].at<double>(1, 2) + best_transforms[traced][k].at<double>(1, 2);
 
@@ -395,6 +398,7 @@ namespace traceback
                 }
                 if (!best_transforms[k][traced].empty())
                 {
+                    best_transforms[k][tracer] = cv::Mat(3, 3, CV_64F);
                     best_transforms[k][tracer].at<double>(0, 2) = best_transforms[k][traced].at<double>(0, 2) + best_transforms[traced][tracer].at<double>(0, 2);
                     best_transforms[k][tracer].at<double>(1, 2) = best_transforms[k][traced].at<double>(1, 2) + best_transforms[traced][tracer].at<double>(1, 2);
 
