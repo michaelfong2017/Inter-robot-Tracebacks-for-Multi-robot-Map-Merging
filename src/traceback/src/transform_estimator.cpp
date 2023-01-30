@@ -63,7 +63,7 @@ namespace traceback
         matcher = {};
 
         // #ifndef NDEBUG
-        // internal::writeDebugMatchingInfo(images_, image_features, pairwise_matches);
+        // internal::writeDebugMatchingInfo(images_, image_features, pairwise_matches, "_", "_");
         // #endif
 
         /* use only matches that has enough confidence. leave out matches that are not
@@ -119,15 +119,11 @@ namespace traceback
             toPairwiseTransforms(transforms, good_indices, images_.size(), transforms_vectors_);
             // printTransformsVectors(transforms_vectors_);
 
-            images_width_height_.clear();
-            images_width_height_.resize(images_.size());
             centers_.clear();
             centers_.resize(images_.size());
             size_t i = 0;
             for (const cv::Mat &image : images_)
             {
-                images_width_height_[i] = cv::Point2i(images_[i].cols, images_[i].rows);
-
                 centers_[i] = findWeightedCenterOfConvexHulls(image, i);
                 ++i;
             }
@@ -455,11 +451,6 @@ namespace traceback
     std::vector<std::vector<cv::Mat>> TransformEstimator::getTransformsVectors()
     {
         return transforms_vectors_;
-    }
-
-    std::vector<cv::Point2i> TransformEstimator::getImagesWidthHeight()
-    {
-        return images_width_height_;
     }
 
     std::vector<cv::Point2f> TransformEstimator::getCenters()

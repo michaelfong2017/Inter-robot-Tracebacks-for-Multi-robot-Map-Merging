@@ -81,6 +81,7 @@ namespace traceback
     std::forward_list<MapSubscription> map_subscriptions_;
     size_t map_subscriptions_size_;
     boost::shared_mutex map_subscriptions_mutex_;
+    std::vector<cv::Point2d> map_origins_;
 
     std::unordered_map<std::string, CameraSubscription *> robots_to_camera_subscriptions_;
     std::forward_list<CameraSubscription> camera_subscriptions_;
@@ -124,7 +125,7 @@ namespace traceback
 
     void updateTargetPoses();
 
-    void startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double dst_map_origin_x, double dst_map_origin_y);
+    void startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
 
     std::unordered_map<std::string, ros::Publisher> robots_to_visualize_marker_publisher_;
     std::string visualize_goal_topic_ = "traceback/visualize/goal";

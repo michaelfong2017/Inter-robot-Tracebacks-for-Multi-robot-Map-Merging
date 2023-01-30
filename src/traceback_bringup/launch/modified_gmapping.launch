@@ -14,10 +14,10 @@
     <param name="odom_frame" value="$(arg robot_name)/fake_odom" />
     <param name="map_frame" value="$(arg robot_name)/map" />
     <rosparam command="load" file="$(find turtlebot3_slam)/config/gmapping_params.yaml" />
-    <param name="xmin" value="-20.0" />
+    <!-- <param name="xmin" value="-20.0" />
     <param name="ymin" value="-20.0" />
     <param name="xmax" value="20.0" />
-    <param name="ymax" value="20.0" />
+    <param name="ymax" value="20.0" /> -->
   </node>
   <!-- SLAM: Gmapping, Cartographer, Hector, Karto, Frontier_exploration, RTAB-Map END -->
 

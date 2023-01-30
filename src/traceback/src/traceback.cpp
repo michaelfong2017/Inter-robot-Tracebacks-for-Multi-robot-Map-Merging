@@ -406,7 +406,7 @@ namespace traceback
 
     robots_to_current_it[robot_name_src] = temp;
 
-    startOrContinueTraceback(robot_name_src, robot_name_dst, msg->dst_map_origin_x, msg->dst_map_origin_y);
+    startOrContinueTraceback(robot_name_src, robot_name_dst, msg->src_map_origin_x, msg->src_map_origin_y, msg->dst_map_origin_x, msg->dst_map_origin_y);
 
     // TODO determine when to end traceback
     // robots_to_in_traceback[tracer_robot] = false;
@@ -417,7 +417,7 @@ namespace traceback
     ROS_DEBUG("Update target poses started.");
 
     std::vector<std::vector<cv::Mat>> transforms_vectors;
-    std::vector<cv::Point2i> images_width_height;
+    std::vector<cv::Point2d> map_origins;
     std::vector<cv::Point2f> centers;
     std::vector<std::vector<double>> confidences;
     // Ensure consistency of transforms_vectors_, centers_ and confidences_
@@ -426,7 +426,7 @@ namespace traceback
       transforms_vectors = transform_estimator_.getTransformsVectors();
       // transform_estimator_.printTransformsVectors(transforms_vectors);
 
-      images_width_height = transform_estimator_.getImagesWidthHeight();
+      map_origins = map_origins_;
 
       centers = transform_estimator_.getCenters();
       for (auto &p : centers)
@@ -501,18 +501,26 @@ namespace traceback
       // is (-20m, -20m) or (-400px, -400px) when the resolution is 0.05.
       // This is achieved by translating by (20, 20) first, then rotate as usual,
       // then translate by (-20, -20).
-      double origin_x = images_width_height[i].x * resolutions_[i] / -2.0;
-      double origin_y = images_width_height[i].y * resolutions_[i] / -2.0;
+      double src_map_origin_x = map_origins[i].x;
+      double src_map_origin_y = map_origins[i].y;
+      double dst_map_origin_x = map_origins[max_position].x;
+      double dst_map_origin_y = map_origins[max_position].y;
+
       cv::Mat pose_src(3, 1, CV_64F);
-      pose_src.at<double>(0, 0) = (pose.position.x - origin_x) / resolutions_[i];
-      pose_src.at<double>(1, 0) = (pose.position.y - origin_y) / resolutions_[i];
+      pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[i];
+      pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[i];
       pose_src.at<double>(2, 0) = 1.0;
 
       cv::Mat pose_dst = transforms_vectors[i][max_position] * pose_src;
       pose_dst.at<double>(0, 0) *= resolutions_[max_position];
       pose_dst.at<double>(1, 0) *= resolutions_[max_position];
-      pose_dst.at<double>(0, 0) += origin_x;
-      pose_dst.at<double>(1, 0) += origin_y;
+      pose_dst.at<double>(0, 0) += src_map_origin_x;
+      pose_dst.at<double>(1, 0) += src_map_origin_y;
+      // Also adjust the difference between the origins
+      pose_dst.at<double>(0, 0) += dst_map_origin_x;
+      pose_dst.at<double>(1, 0) += dst_map_origin_y;
+      pose_dst.at<double>(0, 0) -= src_map_origin_x;
+      pose_dst.at<double>(1, 0) -= src_map_origin_y;
 
       // ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
@@ -583,14 +591,11 @@ namespace traceback
       robots_to_current_it[robot_name_src] = min_it;
       /** just for finding min_it END */
 
-      double dst_map_origin_x = images_width_height[max_position].x * resolutions_[max_position] / -2.0;
-      double dst_map_origin_y = images_width_height[max_position].y * resolutions_[max_position] / -2.0;
-
-      startOrContinueTraceback(robot_name_src, robot_name_dst, dst_map_origin_x, dst_map_origin_y);
+      startOrContinueTraceback(robot_name_src, robot_name_dst, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
     }
   }
 
-  void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double dst_map_origin_x, double dst_map_origin_y)
+  void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
   {
     /** Get parameters other than robot names */
     size_t i;
@@ -621,18 +626,21 @@ namespace traceback
     // Transform goal from dst frame to src (robot i) frame
     // Same as above, it is required to manually rotate about the bottom-left corner, which
     // is (-20m, -20m) or (-400px, -400px) when the resolution is 0.05.
-    double origin_x = dst_map_origin_x;
-    double origin_y = dst_map_origin_y;
     cv::Mat goal_dst(3, 1, CV_64F);
-    goal_dst.at<double>(0, 0) = (goal_x - origin_x) / resolutions_[max_position];
-    goal_dst.at<double>(1, 0) = (goal_y - origin_y) / resolutions_[max_position];
+    goal_dst.at<double>(0, 0) = (goal_x - dst_map_origin_x) / resolutions_[max_position];
+    goal_dst.at<double>(1, 0) = (goal_y - dst_map_origin_y) / resolutions_[max_position];
     goal_dst.at<double>(2, 0) = 1.0;
 
     cv::Mat goal_src = transforms_vectors[max_position][i] * goal_dst;
     goal_src.at<double>(0, 0) *= resolutions_[i];
     goal_src.at<double>(1, 0) *= resolutions_[i];
-    goal_src.at<double>(0, 0) += origin_x;
-    goal_src.at<double>(1, 0) += origin_y;
+    goal_src.at<double>(0, 0) += dst_map_origin_x;
+    goal_src.at<double>(1, 0) += dst_map_origin_y;
+    // Also adjust the difference between the origins
+    goal_src.at<double>(0, 0) += src_map_origin_x;
+    goal_src.at<double>(1, 0) += src_map_origin_y;
+    goal_src.at<double>(0, 0) -= dst_map_origin_x;
+    goal_src.at<double>(1, 0) -= dst_map_origin_y;
 
     ROS_INFO("transformed goal_src (x, y) = (%f, %f)", goal_src.at<double>(0, 0), goal_src.at<double>(1, 0));
 
@@ -681,6 +689,8 @@ namespace traceback
     goal_and_image.image = current_it->image;
     goal_and_image.tracer_robot = robot_name_src;
     goal_and_image.traced_robot = robot_name_dst;
+    goal_and_image.src_map_origin_x = src_map_origin_x;
+    goal_and_image.src_map_origin_y = src_map_origin_y;
     goal_and_image.dst_map_origin_x = dst_map_origin_x;
     goal_and_image.dst_map_origin_y = dst_map_origin_y;
     goal_and_image.stamp = current_it->stamp;
@@ -840,6 +850,7 @@ namespace traceback
     // TODO transforms_indexes_ can have concurrency problem
     transforms_indexes_.clear();
     resolutions_.clear();
+    map_origins_.clear();
     {
       boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
       size_t i = 0;
@@ -856,6 +867,7 @@ namespace traceback
         grids.push_back(subscription.readonly_map);
         transforms_indexes_.insert({i, subscription.robot_namespace});
         resolutions_.emplace_back(subscription.readonly_map->info.resolution);
+        map_origins_.emplace_back(cv::Point2d(subscription.readonly_map->info.origin.position.x, subscription.readonly_map->info.origin.position.y));
         ++i;
       }
     }

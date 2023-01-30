@@ -33,7 +33,6 @@ namespace traceback
         bool estimateTransforms(FeatureType feature = FeatureType::ORB,
                                 double confidence = 1.0);
         std::vector<std::vector<cv::Mat>> getTransformsVectors();
-        std::vector<cv::Point2i> getImagesWidthHeight();
         std::vector<cv::Point2f> getCenters();
         std::vector<std::vector<double>> getConfidences();
 
@@ -48,7 +47,6 @@ namespace traceback
         std::vector<cv::Mat> images_;
 
         std::vector<std::vector<cv::Mat>> transforms_vectors_;
-        std::vector<cv::Point2i> images_width_height_;
         std::vector<cv::Point2f> centers_;
         std::vector<std::vector<double>> confidences_;
 
