@@ -175,8 +175,10 @@ namespace traceback
           std::ofstream fw("transform_needed.txt", std::ofstream::app);
           if (fw.is_open())
           {
-            fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-               << current_time << " - " << "Match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
+            fw << current_time << " - "
+               << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+               << current_time << " - "
+               << "Match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
             fw.close();
           }
         }
@@ -194,8 +196,10 @@ namespace traceback
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
             if (fw.is_open())
             {
-              fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << current_time << " - " << "ACCEPT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
+              fw << current_time << " - "
+                 << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << current_time << " - "
+                 << "ACCEPT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
               fw.close();
             }
           }
@@ -221,8 +225,10 @@ namespace traceback
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
             if (fw.is_open())
             {
-              fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << current_time << " - " << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
+              fw << current_time << " - "
+                 << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << current_time << " - "
+                 << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
               fw.close();
             }
           }
@@ -299,8 +305,10 @@ namespace traceback
           std::ofstream fw("transform_needed.txt", std::ofstream::app);
           if (fw.is_open())
           {
-            fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-               << current_time << " - " << "Does not match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
+            fw << current_time << " - "
+               << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+               << current_time << " - "
+               << "Does not match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
             fw.close();
           }
         }
@@ -313,8 +321,10 @@ namespace traceback
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
             if (fw.is_open())
             {
-              fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << current_time << " - " << "REJECT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
+              fw << current_time << " - "
+                 << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << current_time << " - "
+                 << "REJECT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
               fw.close();
             }
           }
@@ -340,8 +350,10 @@ namespace traceback
             std::ofstream fw("transform_needed.txt", std::ofstream::app);
             if (fw.is_open())
             {
-              fw << current_time << " - " << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << current_time << " - " << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
+              fw << current_time << " - "
+                 << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
+                 << current_time << " - "
+                 << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
               fw.close();
             }
           }
@@ -462,6 +474,7 @@ namespace traceback
 
       // Find it END
       size_t max_position = it - confidences[i].begin();
+      std::string robot_name_dst = transforms_indexes_[max_position];
 
       // ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
 
@@ -477,14 +490,27 @@ namespace traceback
       // ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
 
       // Transform current pose from src frame to dst frame
+      // Since OpenCV transform estimation rotates about the top-left corner,
+      // which is the bottom-left corner in the world coordinates.
+      // However, the (0, 0) of each map is at center rather than at bottom-left corner,
+      // making the coordinate transformation by default rotates about the center of the map.
+      // Therefore, it is required to manually rotate about the bottom-left corner, which
+      // is (-20m, -20m) or (-400px, -400px) when the resolution is 0.05.
+      // This is achieved by translating by (20, 20) first, then rotate as usual,
+      // then translate by (-20, -20).
+      // HARDCODE -20 first, which can be got by map metadata origin position.
+      double origin_x = -20.0;
+      double origin_y = -20.0;
       cv::Mat pose_src(3, 1, CV_64F);
-      pose_src.at<double>(0, 0) = pose.position.x / resolutions_[i];
-      pose_src.at<double>(1, 0) = pose.position.y / resolutions_[i];
+      pose_src.at<double>(0, 0) = (pose.position.x - origin_x) / resolutions_[i];
+      pose_src.at<double>(1, 0) = (pose.position.y - origin_y) / resolutions_[i];
       pose_src.at<double>(2, 0) = 1.0;
 
-      cv::Mat pose_dst = transforms_vectors[max_position][i] * pose_src;
+      cv::Mat pose_dst = transforms_vectors[i][max_position] * pose_src;
       pose_dst.at<double>(0, 0) *= resolutions_[max_position];
       pose_dst.at<double>(1, 0) *= resolutions_[max_position];
+      pose_dst.at<double>(0, 0) += origin_x;
+      pose_dst.at<double>(1, 0) += origin_y;
 
       // ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
@@ -501,16 +527,16 @@ namespace traceback
       ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
       ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
 
-      ROS_INFO("transforms[%zu][%zu] (width, height) = (%d, %d)", max_position, i, transforms_vectors[max_position][i].cols, transforms_vectors[max_position][i].rows);
+      ROS_INFO("transforms[%s][%s] (width, height) = (%d, %d)", robot_name_src.c_str(), robot_name_dst.c_str(), transforms_vectors[i][max_position].cols, transforms_vectors[i][max_position].rows);
 
-      int width = transforms_vectors[max_position][i].cols;
-      int height = transforms_vectors[max_position][i].rows;
+      int width = transforms_vectors[i][max_position].cols;
+      int height = transforms_vectors[i][max_position].rows;
       std::string s = "";
       for (int y = 0; y < height; y++)
       {
         for (int x = 0; x < width; x++)
         {
-          double val = transforms_vectors[max_position][i].at<double>(y, x);
+          double val = transforms_vectors[i][max_position].at<double>(y, x);
           if (x == width - 1)
           {
             s += std::to_string(val) + "\n";
@@ -526,8 +552,6 @@ namespace traceback
 
       // This is only updated here (start/restart traceback)
       robots_src_to_current_transforms_vectors_[robot_name_src] = transforms_vectors;
-
-      std::string robot_name_dst = transforms_indexes_[max_position];
 
       pairwise_transform_needed_history_[robot_name_src][robot_name_dst].clear();
 
@@ -590,14 +614,21 @@ namespace traceback
     double goal_y = current_it->pose.position.y;
 
     // Transform goal from dst frame to src (robot i) frame
+    // Same as above, it is required to manually rotate about the bottom-left corner, which
+    // is (-20m, -20m) or (-400px, -400px) when the resolution is 0.05.
+    // HARDCODE -20 first, which can be got by map metadata origin position.
+    double origin_x = -20.0;
+    double origin_y = -20.0;
     cv::Mat goal_dst(3, 1, CV_64F);
-    goal_dst.at<double>(0, 0) = goal_x / resolutions_[max_position];
-    goal_dst.at<double>(1, 0) = goal_y / resolutions_[max_position];
+    goal_dst.at<double>(0, 0) = (goal_x - origin_x) / resolutions_[max_position];
+    goal_dst.at<double>(1, 0) = (goal_y - origin_y) / resolutions_[max_position];
     goal_dst.at<double>(2, 0) = 1.0;
 
-    cv::Mat goal_src = transforms_vectors[i][max_position] * goal_dst;
+    cv::Mat goal_src = transforms_vectors[max_position][i] * goal_dst;
     goal_src.at<double>(0, 0) *= resolutions_[i];
     goal_src.at<double>(1, 0) *= resolutions_[i];
+    goal_src.at<double>(0, 0) += origin_x;
+    goal_src.at<double>(1, 0) += origin_y;
 
     ROS_INFO("transformed goal_src (x, y) = (%f, %f)", goal_src.at<double>(0, 0), goal_src.at<double>(1, 0));
 
@@ -610,7 +641,7 @@ namespace traceback
     // Note that due to scaling, the "rotation matrix" values can exceed 1, and therefore need to normalize it.
     geometry_msgs::Quaternion goal_q = current_it->pose.orientation;
     geometry_msgs::Quaternion transform_q;
-    cv::Mat transform = transforms_vectors[i][max_position];
+    cv::Mat transform = transforms_vectors[max_position][i];
     matToQuaternion(transform, transform_q);
     tf2::Quaternion tf2_goal_q;
     tf2_goal_q.setW(goal_q.w);

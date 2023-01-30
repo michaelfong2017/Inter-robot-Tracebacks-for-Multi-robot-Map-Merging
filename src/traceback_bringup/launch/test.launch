@@ -4,45 +4,14 @@
     <arg name="third_tb3" default="tb3_2" />
 
     <group ns="$(arg first_tb3)">
-        <include file="$(find traceback_bringup)/launch/modified_gmapping.launch">
-            <arg name="robot_name" value="$(arg first_tb3)" />
-        </include>
-
-        <include file="$(find traceback_bringup)/launch/modified_move_base.launch">
-            <arg name="cmd_vel_topic" value="cmd_vel" />
-            <arg name="robot_name" value="$(arg first_tb3)" />
-        </include>
-
-
-        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg first_tb3)_$(arg first_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg first_tb3)/$(arg first_tb3)/map 50" />
         <include file="$(find explore_lite)/launch/explore.launch"></include>
     </group>
 
     <group ns="$(arg second_tb3)">
-        <include file="$(find traceback_bringup)/launch/modified_gmapping.launch">
-            <arg name="robot_name" value="$(arg second_tb3)" />
-        </include>
-
-        <include file="$(find traceback_bringup)/launch/modified_move_base.launch">
-            <arg name="cmd_vel_topic" value="cmd_vel" />
-            <arg name="robot_name" value="$(arg second_tb3)" />
-        </include>
-
-        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg second_tb3)_$(arg second_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg second_tb3)/$(arg second_tb3)/map 50" />
         <include file="$(find explore_lite)/launch/explore.launch"></include>
     </group>
 
     <group ns="$(arg third_tb3)">
-        <include file="$(find traceback_bringup)/launch/modified_gmapping.launch">
-            <arg name="robot_name" value="$(arg third_tb3)" />
-        </include>
-
-        <include file="$(find traceback_bringup)/launch/modified_move_base.launch">
-            <arg name="cmd_vel_topic" value="cmd_vel" />
-            <arg name="robot_name" value="$(arg third_tb3)" />
-        </include>
-
-        <node pkg="tf" type="static_transform_publisher" name="world_to_$(arg third_tb3)_$(arg third_tb3)_tf_broadcaster" args="0 0 0 0 0 0 /map /$(arg third_tb3)/$(arg third_tb3)/map 50" />
         <include file="$(find explore_lite)/launch/explore.launch"></include>
     </group>
 
@@ -59,7 +28,7 @@
         <param name="estimation_rate" value="0.1"/>
         <param name="estimation_confidence" value="1.0"/>
         <param name="camera_image_update_rate" value="0.5"/>
-        <param name="essential_mat_confidence" value="0.2"/>
+        <param name="essential_mat_confidence" value="0.4"/>
         <param name="accept_count_needed" value="20"/>
         <param name="reject_count_needed" value="4"/>
         <param name="consecutive_abort_count_needed" value="4" />
