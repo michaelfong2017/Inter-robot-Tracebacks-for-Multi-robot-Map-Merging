@@ -44,6 +44,10 @@ namespace traceback
 
     std::string tracer_robot = msg->tracer_robot;
     std::string traced_robot = msg->traced_robot;
+    double src_map_origin_x = msg->src_map_origin_x;
+    double src_map_origin_y = msg->src_map_origin_y;
+    double dst_map_origin_x = msg->dst_map_origin_x;
+    double dst_map_origin_y = msg->dst_map_origin_y;
 
     // Mark this min_index as visited so that it will not be repeatedly visited again and again.
     // Also valid for aborted goal
@@ -250,8 +254,34 @@ namespace traceback
 
           std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
 
+          // Convert OpenCV transform to world transform, considering the origins
+          cv::Mat mat_transform = mat_transforms[traced_robot_index];
+          cv::Mat world_transform;
+          imageTransformToMapTransform(mat_transform, world_transform, resolutions_[tracer_robot_index], resolutions_[traced_robot_index], src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
           //
-          transform_estimator_.updateBestTransforms(mat_transforms[traced_robot_index], tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
+
+          {
+            std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::out);
+            if (fw.is_open())
+            {
+              fw << "Accepted transform:" << std::endl;
+              fw << world_transform.at<double>(0, 0) << "\t" << world_transform.at<double>(0, 1) << "\t" << world_transform.at<double>(0, 2) << std::endl;
+              fw << world_transform.at<double>(1, 0) << "\t" << world_transform.at<double>(1, 1) << "\t" << world_transform.at<double>(1, 2) << std::endl;
+              fw << world_transform.at<double>(2, 0) << "\t" << world_transform.at<double>(2, 1) << "\t" << world_transform.at<double>(2, 2) << std::endl;
+              fw << "Transform further needed:" << std::endl;
+              fw << "(tx, ty, r) = (" << average_tx << ", " << average_ty << ", " << average_r << ")" << std::endl;
+              fw.close();
+            }
+          }
+
+          // Adjust by average tx, ty and r needed
+          cv::Mat adjusted;
+          double scale = 1.0;
+          adjustTransform(world_transform, adjusted, scale, average_tx, average_ty, average_r);
+          //
+
+          //
+          transform_estimator_.updateBestTransforms(world_transform, tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
           //
 
           if (has_best_transforms_.size() == resolutions_.size())
@@ -406,7 +436,7 @@ namespace traceback
 
     robots_to_current_it[robot_name_src] = temp;
 
-    startOrContinueTraceback(robot_name_src, robot_name_dst, msg->src_map_origin_x, msg->src_map_origin_y, msg->dst_map_origin_x, msg->dst_map_origin_y);
+    startOrContinueTraceback(robot_name_src, robot_name_dst, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
 
     // TODO determine when to end traceback
     // robots_to_in_traceback[tracer_robot] = false;
@@ -1064,17 +1094,90 @@ namespace traceback
       b /= mag;
     }
     if (a > 1)
-      a == 0.9999;
+      a = 0.9999;
     if (a < -0.9999)
-      a == -1;
+      a = -1;
     if (b > 1)
-      b == 0.9999;
+      b = 0.9999;
     if (b < -1)
-      b == -0.9999;
+      b = -0.9999;
     q.w = std::sqrt(2. + 2. * a) * 0.5;
     q.x = 0.;
     q.y = 0.;
     q.z = std::copysign(std::sqrt(2. - 2. * a) * 0.5, b);
+  }
+
+  // Input 3x3, output 3x3.
+  void Traceback::imageTransformToMapTransform(cv::Mat &image, cv::Mat &map, float src_resolution, float dst_resolution, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
+  {
+    cv::Mat t1(3, 3, CV_64F);
+    t1.at<double>(0, 0) = 1.0;
+    t1.at<double>(0, 1) = 0.0;
+    t1.at<double>(0, 2) = -1 * src_map_origin_x;
+    t1.at<double>(1, 0) = 0.0;
+    t1.at<double>(1, 1) = 1.0;
+    t1.at<double>(1, 2) = -1 * src_map_origin_y;
+    t1.at<double>(2, 0) = 0.0;
+    t1.at<double>(2, 1) = 0.0;
+    t1.at<double>(2, 2) = 1.0;
+
+    cv::Mat s1(3, 3, CV_64F);
+    s1.at<double>(0, 0) = 1 / src_resolution;
+    s1.at<double>(0, 1) = 0.0;
+    s1.at<double>(0, 2) = 0.0;
+    s1.at<double>(1, 0) = 0.0;
+    s1.at<double>(1, 1) = 1 / src_resolution;
+    s1.at<double>(1, 2) = 0.0;
+    s1.at<double>(2, 0) = 0.0;
+    s1.at<double>(2, 1) = 0.0;
+    s1.at<double>(2, 2) = 1.0;
+
+    cv::Mat s2(3, 3, CV_64F);
+    s2.at<double>(0, 0) = dst_resolution;
+    s2.at<double>(0, 1) = 0.0;
+    s2.at<double>(0, 2) = 0.0;
+    s2.at<double>(1, 0) = 0.0;
+    s2.at<double>(1, 1) = dst_resolution;
+    s2.at<double>(1, 2) = 0.0;
+    s2.at<double>(2, 0) = 0.0;
+    s2.at<double>(2, 1) = 0.0;
+    s2.at<double>(2, 2) = 1.0;
+
+    cv::Mat t2(3, 3, CV_64F);
+    t2.at<double>(0, 0) = 1.0;
+    t2.at<double>(0, 1) = 0.0;
+    t2.at<double>(0, 2) = dst_map_origin_x;
+    t2.at<double>(1, 0) = 0.0;
+    t2.at<double>(1, 1) = 1.0;
+    t2.at<double>(1, 2) = dst_map_origin_y;
+    t2.at<double>(2, 0) = 0.0;
+    t2.at<double>(2, 1) = 0.0;
+    t2.at<double>(2, 2) = 1.0;
+
+    map = t2 * s2 * image * s1 * t1;
+
+    // Since I need to feed the initial poses, I need to change it.
+    map.at<double>(0, 1) *= -1;
+    map.at<double>(0, 2) *= -1;
+    map.at<double>(1, 0) *= -1;
+    map.at<double>(1, 2) *= -1;
+
+    double a = map.at<double>(0, 0);
+    double b = map.at<double>(1, 0);
+    double mag = sqrt(a * a + b * b);
+    if (mag != 0)
+    {
+      map.at<double>(0, 0) /= mag;
+      map.at<double>(0, 1) /= mag;
+      map.at<double>(1, 0) /= mag;
+      map.at<double>(1, 1) /= mag;
+    }
+  }
+
+  void Traceback::adjustTransform(cv::Mat &mat, cv::Mat adjusted, double scale, double tx, double ty, double r)
+  {
+    // TODO
+    adjusted = mat;
   }
 
   // Return /tb3_0 for cases such as /tb3_0/map, /tb3_0/camera/rgb/image_raw and /tb3_0/tb3_0/map (this case is not used).

@@ -305,6 +305,7 @@ namespace traceback
         }
     }
 
+    // Not just multiply transformation matrix because we are dealing with differences between initial poses.
     void TransformEstimator::updateBestTransforms(cv::Mat tracer_to_traced, std::string tracer, std::string traced, std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> &best_transforms,
                                                   std::unordered_set<std::string> &has_best_transforms)
     {
@@ -320,19 +321,11 @@ namespace traceback
         // 2
         if (best_transforms[traced][tracer].empty())
         {
-            // Translation only, no rotation case
-            if (abs(tracer_to_traced.at<double>(0, 0) - 0.0f) < ZERO_ERROR && abs(tracer_to_traced.at<double>(0, 1) - 0.0f) < ZERO_ERROR && abs(tracer_to_traced.at<double>(1, 0) - 0.0f) < ZERO_ERROR && abs(tracer_to_traced.at<double>(1, 1) - 0.0f) < ZERO_ERROR)
-            {
-                best_transforms[traced][tracer] = tracer_to_traced;
-                double tx = tracer_to_traced.at<double>(0, 2);
-                best_transforms[traced][tracer].at<double>(0, 2) = -1 * tx;
-                double ty = tracer_to_traced.at<double>(1, 2);
-                best_transforms[traced][tracer].at<double>(1, 2) = -1 * ty;
-            }
-            else
-            {
-                best_transforms[traced][tracer] = tracer_to_traced.inv();
-            }
+            best_transforms[traced][tracer] = tracer_to_traced;
+            best_transforms[traced][tracer].at<double>(0, 1) *= -1;
+            best_transforms[traced][tracer].at<double>(0, 2) *= -1;
+            best_transforms[traced][tracer].at<double>(1, 0) *= -1;
+            best_transforms[traced][tracer].at<double>(1, 2) *= -1;
         }
         // 3
         if (!has_best_transforms.count(tracer) && !has_best_transforms.count(traced))
@@ -344,8 +337,8 @@ namespace traceback
             return;
         }
         // Update traced->1, traced->2, 1->traced, 2->traced, etc, if tracer->1, tracer->2, etc exists
-        // e.g. traced->1 = tracer->1 * traced->tracer
-        // e.g. 1->traced = tracer->traced * 1->tracer
+        // e.g. traced->1 = traced->tracer + tracer->1
+        // e.g. 1->traced = 1->tracer + tracer->traced
         else if (has_best_transforms.count(tracer) && !has_best_transforms.count(traced))
         {
             best_transforms[traced][traced] = cv::Mat::eye(3, 3, CV_64F);
@@ -355,19 +348,33 @@ namespace traceback
                 std::string k = *it;
                 if (!best_transforms[tracer][k].empty())
                 {
-                    best_transforms[traced][k] = best_transforms[tracer][k] * best_transforms[traced][tracer];
+                    best_transforms[traced][k].at<double>(0, 2) = best_transforms[traced][tracer].at<double>(0, 2) + best_transforms[tracer][k].at<double>(0, 2);
+                    best_transforms[traced][k].at<double>(1, 2) = best_transforms[traced][tracer].at<double>(1, 2) + best_transforms[tracer][k].at<double>(1, 2);
+
+                    cv::Mat multi = best_transforms[tracer][k] * best_transforms[traced][tracer];
+                    best_transforms[traced][k].at<double>(0, 0) = multi.at<double>(0, 0);
+                    best_transforms[traced][k].at<double>(0, 1) = multi.at<double>(0, 1);
+                    best_transforms[traced][k].at<double>(1, 0) = multi.at<double>(1, 0);
+                    best_transforms[traced][k].at<double>(1, 1) = multi.at<double>(1, 1);
                 }
                 if (!best_transforms[k][tracer].empty())
                 {
-                    best_transforms[k][traced] = best_transforms[tracer][traced] * best_transforms[k][tracer];
+                    best_transforms[k][traced].at<double>(0, 2) = best_transforms[k][tracer].at<double>(0, 2) + best_transforms[tracer][traced].at<double>(0, 2);
+                    best_transforms[k][traced].at<double>(1, 2) = best_transforms[k][tracer].at<double>(1, 2) + best_transforms[tracer][traced].at<double>(1, 2);
+
+                    cv::Mat multi = best_transforms[tracer][traced] * best_transforms[k][tracer];
+                    best_transforms[k][traced].at<double>(0, 0) = multi.at<double>(0, 0);
+                    best_transforms[k][traced].at<double>(0, 1) = multi.at<double>(0, 1);
+                    best_transforms[k][traced].at<double>(1, 0) = multi.at<double>(1, 0);
+                    best_transforms[k][traced].at<double>(1, 1) = multi.at<double>(1, 1);
                 }
             }
 
             has_best_transforms.insert(traced);
         }
         // Update tracer->1, tracer->2, 1->tracer, 2->tracer, etc, if traced->1, traced->2, etc exists
-        // e.g. tracer->1 = traced->1 * tracer->traced
-        // e.g. 1->tracer = traced->tracer * 1->traced
+        // e.g. tracer->1 = tracer->traced + traced->1 
+        // e.g. 1->tracer = 1->traced + traced->tracer 
         else if (has_best_transforms.count(traced) && !has_best_transforms.count(tracer))
         {
             best_transforms[tracer][tracer] = cv::Mat::eye(3, 3, CV_64F);
@@ -377,11 +384,25 @@ namespace traceback
                 std::string k = *it;
                 if (!best_transforms[traced][k].empty())
                 {
-                    best_transforms[tracer][k] = best_transforms[traced][k] * best_transforms[tracer][traced];
+                    best_transforms[tracer][k].at<double>(0, 2) = best_transforms[tracer][traced].at<double>(0, 2) + best_transforms[traced][k].at<double>(0, 2);
+                    best_transforms[tracer][k].at<double>(1, 2) = best_transforms[tracer][traced].at<double>(1, 2) + best_transforms[traced][k].at<double>(1, 2);
+
+                    cv::Mat multi = best_transforms[traced][k] * best_transforms[tracer][traced];
+                    best_transforms[tracer][k].at<double>(0, 0) = multi.at<double>(0, 0);
+                    best_transforms[tracer][k].at<double>(0, 1) = multi.at<double>(0, 1);
+                    best_transforms[tracer][k].at<double>(1, 0) = multi.at<double>(1, 0);
+                    best_transforms[tracer][k].at<double>(1, 1) = multi.at<double>(1, 1);
                 }
                 if (!best_transforms[k][traced].empty())
                 {
-                    best_transforms[k][tracer] = best_transforms[traced][tracer] * best_transforms[k][traced];
+                    best_transforms[k][tracer].at<double>(0, 2) = best_transforms[k][traced].at<double>(0, 2) + best_transforms[traced][tracer].at<double>(0, 2);
+                    best_transforms[k][tracer].at<double>(1, 2) = best_transforms[k][traced].at<double>(1, 2) + best_transforms[traced][tracer].at<double>(1, 2);
+
+                    cv::Mat multi = best_transforms[traced][tracer] * best_transforms[k][traced];
+                    best_transforms[k][tracer].at<double>(0, 0) = multi.at<double>(0, 0);
+                    best_transforms[k][tracer].at<double>(0, 1) = multi.at<double>(0, 1);
+                    best_transforms[k][tracer].at<double>(1, 0) = multi.at<double>(1, 0);
+                    best_transforms[k][tracer].at<double>(1, 1) = multi.at<double>(1, 1);
                 }
             }
 

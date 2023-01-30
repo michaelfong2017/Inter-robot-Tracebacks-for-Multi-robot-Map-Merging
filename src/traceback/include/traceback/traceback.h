@@ -147,6 +147,10 @@ namespace traceback
 
     void matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q);
 
+    void imageTransformToMapTransform(cv::Mat &image, cv::Mat &map, float src_resolution, float dst_resolution, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
+
+    void adjustTransform(cv::Mat &mat, cv::Mat adjusted, double scale, double tx, double ty, double r);
+
     std::string robotNameFromTopic(const std::string &topic);
     bool isRobotMapTopic(const ros::master::TopicInfo &topic);
     bool isRobotCameraTopic(const ros::master::TopicInfo &topic);

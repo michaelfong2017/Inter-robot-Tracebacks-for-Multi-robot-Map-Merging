@@ -1,0 +1,5 @@
+Number of inliers: 29
+Translation matrix t:
+-0.806673
+0.32968
+-0.490499
