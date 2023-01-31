@@ -915,7 +915,7 @@ namespace traceback
     }
 
     transform_estimator_.feed(grids.begin(), grids.end());
-    transform_estimator_.estimateTransforms(FeatureType::ORB,
+    transform_estimator_.estimateTransforms(FeatureType::SURF,
                                             confidence_threshold_);
   }
 
@@ -1132,28 +1132,6 @@ namespace traceback
     t1.at<double>(2, 0) = 0.0;
     t1.at<double>(2, 1) = 0.0;
     t1.at<double>(2, 2) = 1.0;
-
-    // cv::Mat s1(3, 3, CV_64F);
-    // s1.at<double>(0, 0) = 1 / src_resolution;
-    // s1.at<double>(0, 1) = 0.0;
-    // s1.at<double>(0, 2) = 0.0;
-    // s1.at<double>(1, 0) = 0.0;
-    // s1.at<double>(1, 1) = 1 / src_resolution;
-    // s1.at<double>(1, 2) = 0.0;
-    // s1.at<double>(2, 0) = 0.0;
-    // s1.at<double>(2, 1) = 0.0;
-    // s1.at<double>(2, 2) = 1.0;
-
-    // cv::Mat s2(3, 3, CV_64F);
-    // s2.at<double>(0, 0) = dst_resolution;
-    // s2.at<double>(0, 1) = 0.0;
-    // s2.at<double>(0, 2) = 0.0;
-    // s2.at<double>(1, 0) = 0.0;
-    // s2.at<double>(1, 1) = dst_resolution;
-    // s2.at<double>(1, 2) = 0.0;
-    // s2.at<double>(2, 0) = 0.0;
-    // s2.at<double>(2, 1) = 0.0;
-    // s2.at<double>(2, 2) = 1.0;
 
     cv::Mat t2(3, 3, CV_64F);
     t2.at<double>(0, 0) = 1.0;

@@ -115,6 +115,11 @@ namespace traceback
         double k[9] = {530.4669406576809, 0.0, 320.5, 0.0, 530.4669406576809, 240.5, 0.0, 0.0, 1.0};
         cv::Mat camera_K = cv::Mat(3, 3, CV_64F, k);
 
+        if (points1.size() < 5 || points2.size() < 5) {
+            ROS_INFO("points1 size or points2 size is less than 5.");
+            return false;
+        }
+
         cv::Mat essential_mat = cv::findEssentialMat(points1, points2, camera_K, cv::RANSAC);
 
         {

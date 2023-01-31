@@ -104,6 +104,24 @@ namespace traceback
         for (auto &transform : transforms)
         {
             transform.R.convertTo(transform.R, CV_32F);
+
+            std::string s = "";
+            for (int y = 0; y < 3; y++)
+            {
+                for (int x = 0; x < 3; x++)
+                {
+                    double val = transform.R.at<float>(y, x);
+                    if (x == 3 - 1)
+                    {
+                        s += std::to_string(val) + "\n";
+                    }
+                    else
+                    {
+                        s += std::to_string(val) + ", ";
+                    }
+                }
+            }
+            ROS_INFO("matrix:\n%s", s.c_str());
         }
         ROS_DEBUG("optimizing global transforms");
         adjuster->setConfThresh(confidence);
@@ -267,7 +285,8 @@ namespace traceback
 
             cv::Mat temp;
             invertAffineTransform(transforms[i].R.rowRange(0, 2), temp);
-            cv::Mat row(1, 3, CV_32F, {0, 0, 1});
+            float data[3] = {0.0f, 0.0f, 1.0f};
+            cv::Mat row(1, 3, CV_32F, data);
             temp.push_back(row);
 
             temp.convertTo(transforms_vectors[good_indices[i]][identity_index], CV_64F);
@@ -313,7 +332,8 @@ namespace traceback
         {
             cv::Mat temp;
             invertAffineTransform(tracer_to_traced.rowRange(0, 2), temp);
-            cv::Mat row(1, 3, CV_64F, {0, 0, 1});
+            double data[3] = {0.0, 0.0, 1.0};
+            cv::Mat row(1, 3, CV_64F, data);
             temp.push_back(row);
             best_transforms[traced][tracer] = temp;
         }
