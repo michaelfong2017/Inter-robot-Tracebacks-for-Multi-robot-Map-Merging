@@ -3,20 +3,20 @@
   <arg name="second_tb3" default="tb3_1"/>
   <arg name="third_tb3"  default="tb3_2"/>
 
-  <arg name="first_tb3_x_pos" default="-7.0"/>
-  <arg name="first_tb3_y_pos" default="-1.0"/>
+  <arg name="first_tb3_x_pos" default=" 140.0"/>
+  <arg name="first_tb3_y_pos" default=" 20.0"/>
   <arg name="first_tb3_z_pos" default=" 0.0"/>
   <arg name="first_tb3_yaw"   default=" 0"/>
 
-  <arg name="second_tb3_x_pos" default=" 7.0"/>
-  <arg name="second_tb3_y_pos" default="-1.0"/>
+  <arg name="second_tb3_x_pos" default=" -140.0"/>
+  <arg name="second_tb3_y_pos" default=" 20.0"/>
   <arg name="second_tb3_z_pos" default=" 0.0"/>
   <arg name="second_tb3_yaw"   default=" 0"/>
 
-  <arg name="third_tb3_x_pos" default=" 0.5"/>
-  <arg name="third_tb3_y_pos" default=" 3.0"/>
+  <arg name="third_tb3_x_pos" default=" -10.0"/>
+  <arg name="third_tb3_y_pos" default=" -60.0"/>
   <arg name="third_tb3_z_pos" default=" 0.0"/>
-  <arg name="third_tb3_yaw"   default=" 0.785"/>
+  <arg name="third_tb3_yaw"   default=" -0.785"/>
 
   <group ns="$(arg first_tb3)/map_merge">
     <param name="init_pose_x"   value="$(arg first_tb3_x_pos)"/>

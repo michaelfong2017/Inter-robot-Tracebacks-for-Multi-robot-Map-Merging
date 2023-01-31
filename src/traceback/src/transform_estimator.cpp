@@ -266,19 +266,9 @@ namespace traceback
                 continue;
 
             cv::Mat temp;
-            // Translation only, no rotation case
-            if (abs(transforms[i].R.at<float>(0, 0) - 0.0f) < ZERO_ERROR && abs(transforms[i].R.at<float>(0, 1) - 0.0f) < ZERO_ERROR && abs(transforms[i].R.at<float>(1, 0) - 0.0f) < ZERO_ERROR && abs(transforms[i].R.at<float>(1, 1) - 0.0f) < ZERO_ERROR)
-            {
-                temp = transforms[i].R;
-                float tx = transforms[i].R.at<float>(0, 2);
-                temp.at<float>(0, 2) = -1 * tx;
-                float ty = transforms[i].R.at<float>(1, 2);
-                temp.at<float>(1, 2) = -1 * ty;
-            }
-            else
-            {
-                temp = transforms[i].R.inv();
-            }
+            invertAffineTransform(transforms[i].R.rowRange(0, 2), temp);
+            cv::Mat row(1, 3, CV_32F, {0, 0, 1});
+            temp.push_back(row);
 
             temp.convertTo(transforms_vectors[good_indices[i]][identity_index], CV_64F);
         }
@@ -321,11 +311,11 @@ namespace traceback
         // 2
         if (best_transforms[traced][tracer].empty())
         {
-            best_transforms[traced][tracer] = tracer_to_traced.clone();
-            best_transforms[traced][tracer].at<double>(0, 1) *= -1;
-            best_transforms[traced][tracer].at<double>(0, 2) *= -1;
-            best_transforms[traced][tracer].at<double>(1, 0) *= -1;
-            best_transforms[traced][tracer].at<double>(1, 2) *= -1;
+            cv::Mat temp;
+            invertAffineTransform(tracer_to_traced.rowRange(0, 2), temp);
+            cv::Mat row(1, 3, CV_64F, {0, 0, 1});
+            temp.push_back(row);
+            best_transforms[traced][tracer] = temp;
         }
         // 3
         if (!has_best_transforms.count(tracer) && !has_best_transforms.count(traced))
@@ -337,8 +327,8 @@ namespace traceback
             return;
         }
         // Update traced->1, traced->2, 1->traced, 2->traced, etc, if tracer->1, tracer->2, etc exists
-        // e.g. traced->1 = traced->tracer + tracer->1
-        // e.g. 1->traced = 1->tracer + tracer->traced
+        // e.g. traced->1 = tracer->1 * traced->tracer
+        // e.g. 1->traced = tracer->traced * 1->tracer
         else if (has_best_transforms.count(tracer) && !has_best_transforms.count(traced))
         {
             best_transforms[traced][traced] = cv::Mat::eye(3, 3, CV_64F);
@@ -348,19 +338,19 @@ namespace traceback
                 std::string k = *it;
                 if (!best_transforms[tracer][k].empty())
                 {
-                    best_transforms[traced][k] = combineTwoMatPoses(best_transforms[traced][tracer], best_transforms[tracer][k]);
+                    best_transforms[traced][k] = best_transforms[tracer][k] * best_transforms[traced][tracer];
                 }
                 if (!best_transforms[k][tracer].empty())
                 {
-                    best_transforms[k][traced] = combineTwoMatPoses(best_transforms[k][tracer], best_transforms[tracer][traced]);
+                    best_transforms[k][traced] = best_transforms[tracer][traced] * best_transforms[k][tracer];
                 }
             }
 
             has_best_transforms.insert(traced);
         }
         // Update tracer->1, tracer->2, 1->tracer, 2->tracer, etc, if traced->1, traced->2, etc exists
-        // e.g. tracer->1 = tracer->traced + traced->1
-        // e.g. 1->tracer = 1->traced + traced->tracer
+        // e.g. tracer->1 = traced->1 * tracer->traced
+        // e.g. 1->tracer = traced->tracer * 1->traced
         else if (has_best_transforms.count(traced) && !has_best_transforms.count(tracer))
         {
             best_transforms[tracer][tracer] = cv::Mat::eye(3, 3, CV_64F);
@@ -370,30 +360,16 @@ namespace traceback
                 std::string k = *it;
                 if (!best_transforms[traced][k].empty())
                 {
-                    best_transforms[tracer][k] = combineTwoMatPoses(best_transforms[tracer][traced], best_transforms[traced][k]);
+                    best_transforms[tracer][k] = best_transforms[traced][k] * best_transforms[tracer][traced];
                 }
                 if (!best_transforms[k][traced].empty())
                 {
-                    best_transforms[k][tracer] = combineTwoMatPoses(best_transforms[k][traced], best_transforms[traced][tracer]);
+                    best_transforms[k][tracer] = best_transforms[traced][tracer] * best_transforms[k][traced];
                 }
             }
 
             has_best_transforms.insert(tracer);
         }
-    }
-
-    cv::Mat TransformEstimator::combineTwoMatPoses(cv::Mat mat1, cv::Mat mat2)
-    {
-        cv::Mat result(3, 3, CV_64F);
-        result.at<double>(0, 2) = mat1.at<double>(0, 2) + mat2.at<double>(0, 2);
-        result.at<double>(1, 2) = mat1.at<double>(1, 2) + mat2.at<double>(1, 2);
-
-        cv::Mat multi = mat1 * mat2;
-        result.at<double>(0, 0) = multi.at<double>(0, 0);
-        result.at<double>(0, 1) = multi.at<double>(0, 1);
-        result.at<double>(1, 0) = multi.at<double>(1, 0);
-        result.at<double>(1, 1) = multi.at<double>(1, 1);
-        return result;
     }
 
     void TransformEstimator::printConfidences(const std::vector<std::vector<double>> confidences)

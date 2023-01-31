@@ -1125,65 +1125,48 @@ namespace traceback
     cv::Mat t1(3, 3, CV_64F);
     t1.at<double>(0, 0) = 1.0;
     t1.at<double>(0, 1) = 0.0;
-    t1.at<double>(0, 2) = -1 * src_map_origin_x;
+    t1.at<double>(0, 2) = -1 * src_map_origin_x / src_resolution;
     t1.at<double>(1, 0) = 0.0;
     t1.at<double>(1, 1) = 1.0;
-    t1.at<double>(1, 2) = -1 * src_map_origin_y;
+    t1.at<double>(1, 2) = -1 * src_map_origin_y / src_resolution;
     t1.at<double>(2, 0) = 0.0;
     t1.at<double>(2, 1) = 0.0;
     t1.at<double>(2, 2) = 1.0;
 
-    cv::Mat s1(3, 3, CV_64F);
-    s1.at<double>(0, 0) = 1 / src_resolution;
-    s1.at<double>(0, 1) = 0.0;
-    s1.at<double>(0, 2) = 0.0;
-    s1.at<double>(1, 0) = 0.0;
-    s1.at<double>(1, 1) = 1 / src_resolution;
-    s1.at<double>(1, 2) = 0.0;
-    s1.at<double>(2, 0) = 0.0;
-    s1.at<double>(2, 1) = 0.0;
-    s1.at<double>(2, 2) = 1.0;
+    // cv::Mat s1(3, 3, CV_64F);
+    // s1.at<double>(0, 0) = 1 / src_resolution;
+    // s1.at<double>(0, 1) = 0.0;
+    // s1.at<double>(0, 2) = 0.0;
+    // s1.at<double>(1, 0) = 0.0;
+    // s1.at<double>(1, 1) = 1 / src_resolution;
+    // s1.at<double>(1, 2) = 0.0;
+    // s1.at<double>(2, 0) = 0.0;
+    // s1.at<double>(2, 1) = 0.0;
+    // s1.at<double>(2, 2) = 1.0;
 
-    cv::Mat s2(3, 3, CV_64F);
-    s2.at<double>(0, 0) = dst_resolution;
-    s2.at<double>(0, 1) = 0.0;
-    s2.at<double>(0, 2) = 0.0;
-    s2.at<double>(1, 0) = 0.0;
-    s2.at<double>(1, 1) = dst_resolution;
-    s2.at<double>(1, 2) = 0.0;
-    s2.at<double>(2, 0) = 0.0;
-    s2.at<double>(2, 1) = 0.0;
-    s2.at<double>(2, 2) = 1.0;
+    // cv::Mat s2(3, 3, CV_64F);
+    // s2.at<double>(0, 0) = dst_resolution;
+    // s2.at<double>(0, 1) = 0.0;
+    // s2.at<double>(0, 2) = 0.0;
+    // s2.at<double>(1, 0) = 0.0;
+    // s2.at<double>(1, 1) = dst_resolution;
+    // s2.at<double>(1, 2) = 0.0;
+    // s2.at<double>(2, 0) = 0.0;
+    // s2.at<double>(2, 1) = 0.0;
+    // s2.at<double>(2, 2) = 1.0;
 
     cv::Mat t2(3, 3, CV_64F);
     t2.at<double>(0, 0) = 1.0;
     t2.at<double>(0, 1) = 0.0;
-    t2.at<double>(0, 2) = dst_map_origin_x;
+    t2.at<double>(0, 2) = dst_map_origin_x / dst_resolution;
     t2.at<double>(1, 0) = 0.0;
     t2.at<double>(1, 1) = 1.0;
-    t2.at<double>(1, 2) = dst_map_origin_y;
+    t2.at<double>(1, 2) = dst_map_origin_y / dst_resolution;
     t2.at<double>(2, 0) = 0.0;
     t2.at<double>(2, 1) = 0.0;
     t2.at<double>(2, 2) = 1.0;
 
-    map = t2 * s2 * image * s1 * t1;
-
-    // Since I need to feed the initial poses, I need to change it.
-    map.at<double>(0, 1) *= -1;
-    map.at<double>(0, 2) *= -1;
-    map.at<double>(1, 0) *= -1;
-    map.at<double>(1, 2) *= -1;
-
-    double a = map.at<double>(0, 0);
-    double b = map.at<double>(1, 0);
-    double mag = sqrt(a * a + b * b);
-    if (mag != 0)
-    {
-      map.at<double>(0, 0) /= mag;
-      map.at<double>(0, 1) /= mag;
-      map.at<double>(1, 0) /= mag;
-      map.at<double>(1, 1) /= mag;
-    }
+    map = t2 * image * t1;
   }
 
   void Traceback::adjustTransform(cv::Mat &mat, cv::Mat adjusted, double scale, double tx, double ty, double r)
