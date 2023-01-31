@@ -305,6 +305,18 @@ namespace traceback
               transform.translation = t;
               transform.rotation = q;
               transforms.push_back(transform);
+
+              {
+                std::ofstream fw("Best_transforms_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot.txt", std::ofstream::app);
+                if (fw.is_open())
+                {
+                  fw << "Best transform from " << tracer_robot << " to " << dst_robot << " :" << std::endl;
+                  fw << dst_transform.at<double>(0, 0) << "\t" << dst_transform.at<double>(0, 1) << "\t" << dst_transform.at<double>(0, 2) << std::endl;
+                  fw << dst_transform.at<double>(1, 0) << "\t" << dst_transform.at<double>(1, 1) << "\t" << dst_transform.at<double>(1, 2) << std::endl;
+                  fw << dst_transform.at<double>(2, 0) << "\t" << dst_transform.at<double>(2, 1) << "\t" << dst_transform.at<double>(2, 2) << std::endl;
+                  fw.close();
+                }
+              }
             }
 
             traceback_msgs::TracebackTransforms traceback_transforms;

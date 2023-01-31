@@ -39,6 +39,8 @@ namespace traceback
         void updateBestTransforms(cv::Mat tracer_to_traced, std::string tracer, std::string traced, std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> &best_transforms,
                                   std::unordered_set<std::string> &has_best_transforms);
 
+        cv::Mat combineTwoMatPoses(cv::Mat mat1, cv::Mat mat2);
+
         void printConfidences(const std::vector<std::vector<double>> confidences);
         void printTransformsVectors(const std::vector<std::vector<cv::Mat>> transforms_vectors);
 
