@@ -287,24 +287,29 @@ namespace traceback
           if (has_best_transforms_.size() == resolutions_.size())
           {
             std::vector<std::string> robot_names;
-            std::vector<geometry_msgs::Transform> transforms;
+            std::vector<double> m_00;
+            std::vector<double> m_01;
+            std::vector<double> m_02;
+            std::vector<double> m_10;
+            std::vector<double> m_11;
+            std::vector<double> m_12;
+            std::vector<double> m_20;
+            std::vector<double> m_21;
+            std::vector<double> m_22;
             for (auto it = best_transforms_[tracer_robot].begin(); it != best_transforms_[tracer_robot].end(); ++it)
             {
               std::string dst_robot = it->first;
               cv::Mat dst_transform = it->second;
               robot_names.push_back(dst_robot);
-              geometry_msgs::Quaternion q;
-              geometry_msgs::Vector3 t;
-              geometry_msgs::Transform transform;
-
-              matToQuaternion(dst_transform, q);
-              t.x = dst_transform.at<double>(2, 0);
-              t.y = dst_transform.at<double>(2, 1);
-              t.z = 0.0;
-
-              transform.translation = t;
-              transform.rotation = q;
-              transforms.push_back(transform);
+              m_00.push_back(dst_transform.at<double>(0, 0));
+              m_01.push_back(dst_transform.at<double>(0, 1));
+              m_02.push_back(dst_transform.at<double>(0, 2));
+              m_10.push_back(dst_transform.at<double>(1, 0));
+              m_11.push_back(dst_transform.at<double>(1, 1));
+              m_12.push_back(dst_transform.at<double>(1, 2));
+              m_20.push_back(dst_transform.at<double>(2, 0));
+              m_21.push_back(dst_transform.at<double>(2, 1));
+              m_22.push_back(dst_transform.at<double>(2, 2));
 
               {
                 std::ofstream fw("Best_transforms_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot.txt", std::ofstream::app);
@@ -321,7 +326,15 @@ namespace traceback
 
             traceback_msgs::TracebackTransforms traceback_transforms;
             traceback_transforms.robot_names = robot_names;
-            traceback_transforms.transforms = transforms;
+            traceback_transforms.m_00 = m_00;
+            traceback_transforms.m_01 = m_01;
+            traceback_transforms.m_02 = m_02;
+            traceback_transforms.m_10 = m_10;
+            traceback_transforms.m_11 = m_11;
+            traceback_transforms.m_12 = m_12;
+            traceback_transforms.m_20 = m_20;
+            traceback_transforms.m_21 = m_21;
+            traceback_transforms.m_22 = m_22;
 
             traceback_transforms_publisher_.publish(traceback_transforms);
           }
