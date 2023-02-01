@@ -100,8 +100,8 @@ namespace traceback
     std::unordered_map<std::string, ros::Subscriber> robots_to_image_and_image_subscriber_;
     std::string traceback_image_and_image_topic_ = "traceback/image_and_image";
 
-    std::unordered_map<std::string, bool> robots_to_in_traceback;
-    std::unordered_map<std::string, std::list<PoseImagePair>::iterator> robots_to_current_it;
+    std::unordered_map<std::string, bool> robots_to_in_traceback_;
+    std::unordered_map<std::string, std::list<PoseImagePair>::iterator> robots_to_current_it_;
 
     std::unordered_map<std::string, std::vector<std::vector<cv::Mat>>> robots_src_to_current_transforms_vectors_;
 
@@ -122,6 +122,8 @@ namespace traceback
     std::unordered_set<std::string> has_best_transforms_;
 
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
+
+    void continueTraceback(std::string tracer_robot, std::string traced_robot, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
 
     void updateTargetPoses();
 

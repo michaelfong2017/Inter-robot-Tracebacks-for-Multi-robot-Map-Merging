@@ -48,6 +48,35 @@ namespace traceback
     double src_map_origin_y = msg->src_map_origin_y;
     double dst_map_origin_x = msg->dst_map_origin_x;
     double dst_map_origin_y = msg->dst_map_origin_y;
+    geometry_msgs::Pose arrived_pose = msg->arrived_pose;
+
+    if (msg->second_traceback)
+    {
+      ROS_INFO("Second traceback done for tracer %s", tracer_robot.c_str());
+      ROS_INFO("Abort = %s", msg->aborted ? "true" : "false");
+
+      {
+        ROS_DEBUG("Arrived position (x, y) = (%f, %f)", arrived_pose.position.x, arrived_pose.position.y);
+        ROS_DEBUG("Arrived orientation (x, y, z, w) = (%f, %f, %f, %f)", arrived_pose.orientation.x, arrived_pose.orientation.y, arrived_pose.orientation.z, arrived_pose.orientation.w);
+      }
+      // TODO triangulation
+      continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+
+      ROS_DEBUG("debug");
+      return;
+    }
+    else
+    {
+      ROS_INFO("First traceback done for tracer %s", tracer_robot.c_str());
+      ROS_INFO("Abort = %s", msg->aborted ? "true" : "false");
+
+      {
+        ROS_DEBUG("Arrived position (x, y) = (%f, %f)", arrived_pose.position.x, arrived_pose.position.y);
+        ROS_DEBUG("Arrived orientation (x, y, z, w) = (%f, %f, %f, %f)", arrived_pose.orientation.x, arrived_pose.orientation.y, arrived_pose.orientation.z, arrived_pose.orientation.w);
+      }
+
+      ROS_DEBUG("debug");
+    }
 
     // Mark this min_index as visited so that it will not be repeatedly visited again and again.
     // Also valid for aborted goal
@@ -101,7 +130,7 @@ namespace traceback
 
         pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
         pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
-        robots_to_in_traceback[tracer_robot] = false;
+        robots_to_in_traceback_[tracer_robot] = false;
         return;
       }
       else
@@ -155,9 +184,9 @@ namespace traceback
       cv::imwrite(current_time + "_" + traced_robot.substr(1) + "_traced.png",
                   cv_ptr_traced->image);
 
-      double goal_x = msg->goal.target_pose.pose.position.x;
-      double goal_y = msg->goal.target_pose.pose.position.y;
-      geometry_msgs::Quaternion goal_q = msg->goal.target_pose.pose.orientation;
+      double arrived_pose_x = arrived_pose.position.x;
+      double arrived_pose_y = arrived_pose.position.y;
+      geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
       tf2::Quaternion tf_q;
       tf_q.setW(goal_q.w);
       tf_q.setX(goal_q.x);
@@ -340,7 +369,7 @@ namespace traceback
           }
           // TEST HARDCODE sending traceback transforms END
 
-          robots_to_in_traceback[tracer_robot] = false;
+          robots_to_in_traceback_[tracer_robot] = false;
           return;
         }
         // Update AcceptRejectStatus END
@@ -349,6 +378,34 @@ namespace traceback
         // For simplicity, only do if it is not yet accepted
         else
         {
+          move_base_msgs::MoveBaseGoal goal;
+          geometry_msgs::PoseStamped new_pose_stamped;
+          new_pose_stamped.pose = arrived_pose;
+          new_pose_stamped.pose.position.x -= cos(yaw);
+          new_pose_stamped.pose.position.y -= sin(yaw);
+          new_pose_stamped.header.frame_id = tracer_robot.substr(1) + tracer_robot + "/map";
+          new_pose_stamped.header.stamp = ros::Time::now();
+          goal.target_pose = new_pose_stamped;
+
+          traceback_msgs::GoalAndImage goal_and_image;
+          goal_and_image.goal = goal;
+          goal_and_image.image = msg->traced_image;
+          goal_and_image.tracer_robot = tracer_robot;
+          goal_and_image.traced_robot = traced_robot;
+          goal_and_image.src_map_origin_x = src_map_origin_x;
+          goal_and_image.src_map_origin_y = src_map_origin_y;
+          goal_and_image.dst_map_origin_x = dst_map_origin_x;
+          goal_and_image.dst_map_origin_y = dst_map_origin_y;
+          goal_and_image.stamp = msg->stamp;
+          goal_and_image.second_traceback = true;
+          ROS_DEBUG("Goal and image to be sent");
+
+          /** Visualize goal in src robot frame */
+          visualizeGoal(new_pose_stamped, tracer_robot);
+          /** Visualize goal in src robot frame END */
+          robots_to_goal_and_image_publisher_[tracer_robot].publish(goal_and_image);
+
+          return;
         }
       }
       else
@@ -415,7 +472,7 @@ namespace traceback
 
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
           pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
-          robots_to_in_traceback[tracer_robot] = false;
+          robots_to_in_traceback_[tracer_robot] = false;
           return;
         }
         // Update AcceptRejectStatus END
@@ -425,11 +482,16 @@ namespace traceback
     // TODO different cases: continue traceback, accept, reject
     // assume continue traceback now
     // Assume does not have to pop_front the list first
+    continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+  }
+
+  void Traceback::continueTraceback(std::string tracer_robot, std::string traced_robot, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
+  {
     std::string robot_name_src = tracer_robot;
     std::string robot_name_dst = traced_robot;
     ROS_INFO("Continue traceback process for robot %s", robot_name_src.c_str());
 
-    std::list<PoseImagePair>::iterator temp = robots_to_current_it[robot_name_src];
+    std::list<PoseImagePair>::iterator temp = robots_to_current_it_[robot_name_src];
 
     bool whole_list_visited = false;
     bool pass_end = false;
@@ -459,12 +521,9 @@ namespace traceback
       }
     }
 
-    robots_to_current_it[robot_name_src] = temp;
+    robots_to_current_it_[robot_name_src] = temp;
 
     startOrContinueTraceback(robot_name_src, robot_name_dst, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-
-    // TODO determine when to end traceback
-    // robots_to_in_traceback[tracer_robot] = false;
   }
 
   void Traceback::updateTargetPoses()
@@ -579,13 +638,13 @@ namespace traceback
 
       // ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
-      if (robots_to_in_traceback[robot_name_src])
+      if (robots_to_in_traceback_[robot_name_src])
       {
         continue; // continue to next robot since the current robot is currently in traceback process
       }
       else
       {
-        robots_to_in_traceback[robot_name_src] = true;
+        robots_to_in_traceback_[robot_name_src] = true;
       }
 
       ROS_INFO("Start traceback process for robot %s", robot_name_src.c_str());
@@ -643,7 +702,7 @@ namespace traceback
         }
       }
 
-      robots_to_current_it[robot_name_src] = min_it;
+      robots_to_current_it_[robot_name_src] = min_it;
       /** just for finding min_it END */
 
       startOrContinueTraceback(robot_name_src, robot_name_dst, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
@@ -673,7 +732,7 @@ namespace traceback
     std::vector<std::vector<cv::Mat>> transforms_vectors = robots_src_to_current_transforms_vectors_[robot_name_src];
     /** Get parameters other than robot names END */
 
-    std::list<PoseImagePair>::iterator current_it = robots_to_current_it[robot_name_src];
+    std::list<PoseImagePair>::iterator current_it = robots_to_current_it_[robot_name_src];
 
     double goal_x = current_it->pose.position.x;
     double goal_y = current_it->pose.position.y;
@@ -748,6 +807,7 @@ namespace traceback
     goal_and_image.src_map_origin_y = src_map_origin_y;
     goal_and_image.dst_map_origin_x = dst_map_origin_x;
     goal_and_image.dst_map_origin_y = dst_map_origin_y;
+    goal_and_image.second_traceback = false;
     goal_and_image.stamp = current_it->stamp;
     ROS_DEBUG("Goal and image to be sent");
 
@@ -1086,8 +1146,8 @@ namespace traceback
                                                                       }));
         robots_to_visualize_marker_publisher_.emplace(robot_name, node_.advertise<visualization_msgs::Marker>(ros::names::append(robot_name, visualize_goal_topic_), 10));
 
-        robots_to_in_traceback.emplace(robot_name, false);
-        robots_to_current_it.emplace(robot_name, nullptr);
+        robots_to_in_traceback_.emplace(robot_name, false);
+        robots_to_current_it_.emplace(robot_name, nullptr);
 
         traceback_transforms_publisher_ = node_.advertise<traceback_msgs::TracebackTransforms>(traceback_transforms_topic_, 10);
 

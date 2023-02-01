@@ -6,6 +6,7 @@ float64 src_map_origin_x
 float64 src_map_origin_y
 float64 dst_map_origin_x
 float64 dst_map_origin_y
-move_base_msgs/MoveBaseGoal goal
+geometry_msgs/Pose arrived_pose
 bool aborted
+bool second_traceback
 int64 stamp
