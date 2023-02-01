@@ -50,22 +50,8 @@ namespace traceback
     double dst_map_origin_y = msg->dst_map_origin_y;
     geometry_msgs::Pose arrived_pose = msg->arrived_pose;
 
-    if (msg->second_traceback)
-    {
-      ROS_INFO("Second traceback done for tracer %s", tracer_robot.c_str());
-      ROS_INFO("Abort = %s", msg->aborted ? "true" : "false");
-
-      {
-        ROS_DEBUG("Arrived position (x, y) = (%f, %f)", arrived_pose.position.x, arrived_pose.position.y);
-        ROS_DEBUG("Arrived orientation (x, y, z, w) = (%f, %f, %f, %f)", arrived_pose.orientation.x, arrived_pose.orientation.y, arrived_pose.orientation.z, arrived_pose.orientation.w);
-      }
-      // TODO triangulation
-      continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-
-      ROS_DEBUG("debug");
-      return;
-    }
-    else
+    // 1 or 2 or 3 or 4 or 5
+    if (!msg->second_traceback)
     {
       ROS_INFO("First traceback done for tracer %s", tracer_robot.c_str());
       ROS_INFO("Abort = %s", msg->aborted ? "true" : "false");
@@ -75,73 +61,216 @@ namespace traceback
         ROS_DEBUG("Arrived orientation (x, y, z, w) = (%f, %f, %f, %f)", arrived_pose.orientation.x, arrived_pose.orientation.y, arrived_pose.orientation.z, arrived_pose.orientation.w);
       }
 
-      ROS_DEBUG("debug");
-    }
-
-    // Mark this min_index as visited so that it will not be repeatedly visited again and again.
-    // Also valid for aborted goal
-    auto all = camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.find(traced_robot);
-    if (all != camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.end())
-    {
-      all->second.emplace(msg->stamp);
-    }
-    else
-    {
-      camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.insert({traced_robot, {}});
-      camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[traced_robot].emplace(msg->stamp);
-    }
-    // END
-
-    // Abort is based on the fact that the location cannot be reached
-    // Assume that this means the locations do not match
-    if (msg->aborted)
-    {
-      ROS_INFO("tracebackImageAndImageUpdate aborted +1");
+      // Mark this min_index as visited so that it will not be repeatedly visited again and again.
+      // Also valid for aborted goal
+      // Only do for the first traceback
+      auto all = camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.find(traced_robot);
+      if (all != camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.end())
       {
-        std::ofstream fw("transform_needed.txt", std::ofstream::app);
-        if (fw.is_open())
-        {
-          fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-             << "Count of abort +1" << std::endl;
-          fw.close();
-        }
-      }
-      if (++pairwise_abort_[tracer_robot][traced_robot] >= consecutive_abort_count_needed_)
-      {
-        pairwise_abort_[tracer_robot][traced_robot] = 0;
-
-        {
-          std::ofstream fw("transform_needed.txt", std::ofstream::app);
-          if (fw.is_open())
-          {
-            fw << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-               << "Aborted" << std::endl;
-            fw.close();
-          }
-        }
-
-        // Allow more time for normal exploration to prevent being stuck at local optimums
-        pairwise_paused_[tracer_robot][traced_robot] = true;
-        pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-            ros::Duration(60, 0),
-            [this, tracer_robot, traced_robot](const ros::TimerEvent &)
-            { pairwise_paused_[tracer_robot][traced_robot] = false; },
-            true);
-
-        pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
-        pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
-        robots_to_in_traceback_[tracer_robot] = false;
-        return;
+        all->second.emplace(msg->stamp);
       }
       else
       {
-        // Empty in order to directly continue traceback
+        camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.insert({traced_robot, {}});
+        camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[traced_robot].emplace(msg->stamp);
+      }
+      // END
+
+      // Abort is based on the fact that the location cannot be reached
+      // Assume that this means the locations do not match
+      // 1 or 2
+      if (msg->aborted)
+      {
+        // 1. first traceback, abort with enough consecutive count
+        if (++pairwise_abort_[tracer_robot][traced_robot] >= consecutive_abort_count_needed_)
+        {
+          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. first traceback, abort with enough consecutive count");
+
+          pairwise_abort_[tracer_robot][traced_robot] = 0;
+
+          // Allow more time for normal exploration to prevent being stuck at local optimums
+          pairwise_paused_[tracer_robot][traced_robot] = true;
+          pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
+              ros::Duration(60, 0),
+              [this, tracer_robot, traced_robot](const ros::TimerEvent &)
+              { pairwise_paused_[tracer_robot][traced_robot] = false; },
+              true);
+
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
+          robots_to_in_traceback_[tracer_robot] = false;
+          // 1. first traceback, abort with enough consecutive count END
+          return;
+        }
+        // 2. first traceback, abort without enough consecutive count
+        else
+        {
+          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. first traceback, abort without enough consecutive count");
+          continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+          // 2. first traceback, abort without enough consecutive count END
+          return;
+        }
+      }
+      // 3 or 4 or 5
+      else
+      {
+        pairwise_abort_[tracer_robot][traced_robot] = 0;
+
+        // Get cv images and analyze (first traceback, reflect in image filenames)
+        std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+
+        cv_bridge::CvImageConstPtr cv_ptr_tracer;
+        try
+        {
+          if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
+            cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
+          else
+            cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
+        }
+        catch (cv_bridge::Exception &e)
+        {
+          ROS_ERROR("cv_bridge exception: %s", e.what());
+          return;
+        }
+
+        // Process cv_ptr->image using OpenCV
+        ROS_INFO("Process cv_ptr->image using OpenCV");
+        cv::imwrite(current_time + "_first_traceback_" + tracer_robot.substr(1) + "_tracer.png",
+                    cv_ptr_tracer->image);
+
+        //
+        //
+        cv_bridge::CvImageConstPtr cv_ptr_traced;
+        try
+        {
+          if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
+            cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
+          else
+            cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
+        }
+        catch (cv_bridge::Exception &e)
+        {
+          ROS_ERROR("cv_bridge exception: %s", e.what());
+          return;
+        }
+
+        // Process cv_ptr->image using OpenCV
+        ROS_INFO("Process cv_ptr->image using OpenCV");
+        cv::imwrite(current_time + "_first_traceback_" + traced_robot.substr(1) + "_traced.png",
+                    cv_ptr_traced->image);
+
+        double arrived_pose_x = arrived_pose.position.x;
+        double arrived_pose_y = arrived_pose.position.y;
+        geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
+        tf2::Quaternion tf_q;
+        tf_q.setW(goal_q.w);
+        tf_q.setX(goal_q.x);
+        tf_q.setY(goal_q.y);
+        tf_q.setZ(goal_q.z);
+        tf2::Matrix3x3 m(tf_q);
+        double roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
+
+        TransformNeeded transform_needed;
+        bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::AKAZE,
+                                                                           essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
+        // Get cv images and analyze END
+
+        // 3. first traceback, match
+        if (is_match)
+        {
+          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "3. first traceback, match");
+          // TODO handle first traceback analysis result
+          // Reset and set new triangulation first result
+          pairwise_transform_needed_history_[tracer_robot][traced_robot].push_back(transform_needed);
+          // TODO END
+
+          // Update AcceptRejectStatus END
+          // Second traceback: after each match, navigate to a nearby location in order to
+          // estimate the absolute scale
+          // For simplicity, only do if it is not yet accepted
+
+          move_base_msgs::MoveBaseGoal goal;
+          geometry_msgs::PoseStamped new_pose_stamped;
+          new_pose_stamped.pose = arrived_pose;
+          new_pose_stamped.pose.position.x -= cos(yaw);
+          new_pose_stamped.pose.position.y -= sin(yaw);
+          new_pose_stamped.header.frame_id = tracer_robot.substr(1) + tracer_robot + "/map";
+          new_pose_stamped.header.stamp = ros::Time::now();
+          goal.target_pose = new_pose_stamped;
+
+          traceback_msgs::GoalAndImage goal_and_image;
+          goal_and_image.goal = goal;
+          goal_and_image.image = msg->traced_image;
+          goal_and_image.tracer_robot = tracer_robot;
+          goal_and_image.traced_robot = traced_robot;
+          goal_and_image.src_map_origin_x = src_map_origin_x;
+          goal_and_image.src_map_origin_y = src_map_origin_y;
+          goal_and_image.dst_map_origin_x = dst_map_origin_x;
+          goal_and_image.dst_map_origin_y = dst_map_origin_y;
+          goal_and_image.stamp = msg->stamp;
+          goal_and_image.second_traceback = true;
+          ROS_DEBUG("Goal and image to be sent");
+
+          /** Visualize goal in src robot frame */
+          visualizeGoal(new_pose_stamped, tracer_robot);
+          /** Visualize goal in src robot frame END */
+          robots_to_goal_and_image_publisher_[tracer_robot].publish(goal_and_image);
+
+          // 3. first traceback, match END
+          return;
+        }
+        // Reject if first traceback does not match
+        // 4 or 5
+        else
+        {
+          // Update AcceptRejectStatus
+          // Reject when reject count is at least reject_count_needed_ and reject count is at least two times accept count
+          // 4. first traceback, reject
+          if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 2 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+          {
+            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "4. first traceback, reject");
+            pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
+            pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
+            robots_to_in_traceback_[tracer_robot] = false;
+            // 4. first traceback, reject END
+            return;
+          }
+          else
+          {
+            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "5. first traceback, does not match but not yet reject");
+            // Assume does not have to pop_front the list first
+            // 5. first traceback, does not match but not yet reject
+            continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+            // 5. first traceback, does not match but not yet reject END
+            return;
+          }
+        }
       }
     }
+    // 6 or 7 or 8 or 9
     else
     {
-      pairwise_abort_[tracer_robot][traced_robot] = 0;
+      ROS_INFO("Second traceback done for tracer %s", tracer_robot.c_str());
+      ROS_INFO("Abort = %s", msg->aborted ? "true" : "false");
 
+      {
+        ROS_DEBUG("Arrived position (x, y) = (%f, %f)", arrived_pose.position.x, arrived_pose.position.y);
+        ROS_DEBUG("Arrived orientation (x, y, z, w) = (%f, %f, %f, %f)", arrived_pose.orientation.x, arrived_pose.orientation.y, arrived_pose.orientation.z, arrived_pose.orientation.w);
+      }
+
+      // 6. second traceback, abort
+      if (msg->aborted)
+      {
+        writeTracebackFeedbackHistory(tracer_robot, traced_robot, "6. second traceback, abort");
+        continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+        // 6. second traceback, abort END
+        return;
+      }
+      // 7 or 8 or 9
+
+      // TODO triangulation
+      // Get cv images and analyze (second traceback, reflect in image filenames)
       std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
       cv_bridge::CvImageConstPtr cv_ptr_tracer;
@@ -160,7 +289,7 @@ namespace traceback
 
       // Process cv_ptr->image using OpenCV
       ROS_INFO("Process cv_ptr->image using OpenCV");
-      cv::imwrite(current_time + "_" + tracer_robot.substr(1) + "_tracer.png",
+      cv::imwrite(current_time + "_second_traceback_" + tracer_robot.substr(1) + "_tracer.png",
                   cv_ptr_tracer->image);
 
       //
@@ -181,7 +310,7 @@ namespace traceback
 
       // Process cv_ptr->image using OpenCV
       ROS_INFO("Process cv_ptr->image using OpenCV");
-      cv::imwrite(current_time + "_" + traced_robot.substr(1) + "_traced.png",
+      cv::imwrite(current_time + "_second_traceback_" + traced_robot.substr(1) + "_traced.png",
                   cv_ptr_traced->image);
 
       double arrived_pose_x = arrived_pose.position.x;
@@ -199,43 +328,24 @@ namespace traceback
       TransformNeeded transform_needed;
       bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::AKAZE,
                                                                          essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
+      // Get cv images and analyze END
 
+      // 7 or 8
       if (is_match)
       {
-        ROS_INFO("findFurtherTransformNeeded matches");
-        ROS_INFO("transform_needed is (tx, ty, r) = (%f, %f, %f)", transform_needed.tx, transform_needed.ty, transform_needed.r);
-        {
-          std::ofstream fw("transform_needed.txt", std::ofstream::app);
-          if (fw.is_open())
-          {
-            fw << current_time << " - "
-               << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-               << current_time << " - "
-               << "Match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
-            fw.close();
-          }
-        }
-
+        // TODO handle second traceback analysis result
+        // Reset and set new triangulation second result
         pairwise_transform_needed_history_[tracer_robot][traced_robot].push_back(transform_needed);
+        // TODO END
 
-        // Update AcceptRejectStatus
         // If accepted, no further traceback is needed for this ordered pair,
         // but remember to enable other tracebacks for the same tracer
+        // TODO Combine all triangulation results
+        // 7. second traceback, accept
         if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count >= accept_count_needed_)
         {
+          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "7. second traceback, accept");
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
-
-          {
-            std::ofstream fw("transform_needed.txt", std::ofstream::app);
-            if (fw.is_open())
-            {
-              fw << current_time << " - "
-                 << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << current_time << " - "
-                 << "ACCEPT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
-              fw.close();
-            }
-          }
 
           double average_tx = 0.0;
           double average_ty = 0.0;
@@ -252,18 +362,6 @@ namespace traceback
             average_tx /= history_size;
             average_ty /= history_size;
             average_r /= history_size;
-          }
-
-          {
-            std::ofstream fw("transform_needed.txt", std::ofstream::app);
-            if (fw.is_open())
-            {
-              fw << current_time << " - "
-                 << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << current_time << " - "
-                 << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
-              fw.close();
-            }
           }
 
           // TEST HARDCODE sending traceback transforms
@@ -370,119 +468,30 @@ namespace traceback
           // TEST HARDCODE sending traceback transforms END
 
           robots_to_in_traceback_[tracer_robot] = false;
+          // 7. second traceback, accept END
           return;
         }
-        // Update AcceptRejectStatus END
-        // TODO after each match, navigate to a nearby location in order to
-        // estimate the absolute scale
-        // For simplicity, only do if it is not yet accepted
+        // Add this triangulation result to triangulation result history
+        // 8. second traceback, match but not yet aceept
         else
         {
-          move_base_msgs::MoveBaseGoal goal;
-          geometry_msgs::PoseStamped new_pose_stamped;
-          new_pose_stamped.pose = arrived_pose;
-          new_pose_stamped.pose.position.x -= cos(yaw);
-          new_pose_stamped.pose.position.y -= sin(yaw);
-          new_pose_stamped.header.frame_id = tracer_robot.substr(1) + tracer_robot + "/map";
-          new_pose_stamped.header.stamp = ros::Time::now();
-          goal.target_pose = new_pose_stamped;
+          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "8. second traceback, match but not yet aceept");
+          // TODO add triangulation result
 
-          traceback_msgs::GoalAndImage goal_and_image;
-          goal_and_image.goal = goal;
-          goal_and_image.image = msg->traced_image;
-          goal_and_image.tracer_robot = tracer_robot;
-          goal_and_image.traced_robot = traced_robot;
-          goal_and_image.src_map_origin_x = src_map_origin_x;
-          goal_and_image.src_map_origin_y = src_map_origin_y;
-          goal_and_image.dst_map_origin_x = dst_map_origin_x;
-          goal_and_image.dst_map_origin_y = dst_map_origin_y;
-          goal_and_image.stamp = msg->stamp;
-          goal_and_image.second_traceback = true;
-          ROS_DEBUG("Goal and image to be sent");
-
-          /** Visualize goal in src robot frame */
-          visualizeGoal(new_pose_stamped, tracer_robot);
-          /** Visualize goal in src robot frame END */
-          robots_to_goal_and_image_publisher_[tracer_robot].publish(goal_and_image);
-
+          continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+          // 8. second traceback, match but not yet aceept END
           return;
         }
       }
+      // 9. second traceback, does not match
       else
       {
-        ROS_INFO("findFurtherTransformNeeded does not match");
-        ROS_INFO("findFurtherTransformNeeded matches");
-        ROS_INFO("transform_needed is (tx, ty, r) = (%f, %f, %f)", transform_needed.tx, transform_needed.ty, transform_needed.r);
-        {
-          std::ofstream fw("transform_needed.txt", std::ofstream::app);
-          if (fw.is_open())
-          {
-            fw << current_time << " - "
-               << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-               << current_time << " - "
-               << "Does not match, transform_needed is (tx, ty, r) = (" + std::to_string(transform_needed.tx) + ", " + std::to_string(transform_needed.ty) + ", " + std::to_string(transform_needed.r) + ")" << std::endl;
-            fw.close();
-          }
-        }
-
-        // Update AcceptRejectStatus
-        // Reject when reject count is at least reject_count_needed_ and reject count is at least two times accept count
-        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 2 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
-        {
-          {
-            std::ofstream fw("transform_needed.txt", std::ofstream::app);
-            if (fw.is_open())
-            {
-              fw << current_time << " - "
-                 << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << current_time << " - "
-                 << "REJECT Transform with (accept_count, reject_count) = (" << pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count << ", " << pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count << ")" << std::endl;
-              fw.close();
-            }
-          }
-
-          double average_tx = 0.0;
-          double average_ty = 0.0;
-          double average_r = 0.0;
-          size_t history_size = pairwise_transform_needed_history_[tracer_robot][traced_robot].size();
-          for (size_t i = 0; i < history_size; ++i)
-          {
-            average_tx += pairwise_transform_needed_history_[tracer_robot][traced_robot][i].tx;
-            average_ty += pairwise_transform_needed_history_[tracer_robot][traced_robot][i].ty;
-            average_r += pairwise_transform_needed_history_[tracer_robot][traced_robot][i].r;
-          }
-          if (history_size != 0)
-          {
-            average_tx /= history_size;
-            average_ty /= history_size;
-            average_r /= history_size;
-          }
-
-          {
-            std::ofstream fw("transform_needed.txt", std::ofstream::app);
-            if (fw.is_open())
-            {
-              fw << current_time << " - "
-                 << "tracer_robot=" << tracer_robot << ", traced_robot=" << traced_robot << " - "
-                 << current_time << " - "
-                 << "Average transform_needed is (tx, ty, r) = (" + std::to_string(average_tx) + ", " + std::to_string(average_ty) + ", " + std::to_string(average_r) + ")" << std::endl;
-              fw.close();
-            }
-          }
-
-          pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
-          pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
-          robots_to_in_traceback_[tracer_robot] = false;
-          return;
-        }
-        // Update AcceptRejectStatus END
+        writeTracebackFeedbackHistory(tracer_robot, traced_robot, "9. second traceback, does not match");
+        continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+        // 9. second traceback, does not match END
+        return;
       }
     }
-
-    // TODO different cases: continue traceback, accept, reject
-    // assume continue traceback now
-    // Assume does not have to pop_front the list first
-    continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
   }
 
   void Traceback::continueTraceback(std::string tracer_robot, std::string traced_robot, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
@@ -1224,6 +1233,18 @@ namespace traceback
   {
     // TODO
     adjusted = mat;
+  }
+
+  void Traceback::writeTracebackFeedbackHistory(std::string tracer, std::string traced, std::string feedback)
+  {
+    std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+
+    std::ofstream fw("Feedback_history_" + tracer.substr(1) + "_tracer_robot_" + traced.substr(1) + "_traced_robot.txt", std::ofstream::app);
+    if (fw.is_open())
+    {
+      fw << current_time << " - " << feedback << std::endl;
+      fw.close();
+    }
   }
 
   // Return /tb3_0 for cases such as /tb3_0/map, /tb3_0/camera/rgb/image_raw and /tb3_0/tb3_0/map (this case is not used).

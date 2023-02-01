@@ -153,6 +153,18 @@ namespace traceback
 
     void adjustTransform(cv::Mat &mat, cv::Mat adjusted, double scale, double tx, double ty, double r);
 
+    // Traceback feedbacks can be
+    // 1. first traceback, abort with enough consecutive count      -> Exit traceback process, cooldown
+    // 2. first traceback, abort without enough consecutive count   -> next goal first traceback
+    // 3. first traceback, match                                    -> same goal second traceback, first half triangulation
+    // 4. first traceback, reject                                   -> Exit traceback process
+    // 5. first traceback, does not match but not yet reject        -> next goal first traceback
+    // 6. second traceback, abort                                   -> next goal first traceback
+    // 7. second traceback, accept                                  -> Exit traceback process, combine all triangulation results
+    // 8. second traceback, match but not yet aceept                -> next goal first traceback, push this triangulation result
+    // 9. second traceback, does not match                          -> next goal first traceback
+    void writeTracebackFeedbackHistory(std::string tracer, std::string traced, std::string feedback);
+
     std::string robotNameFromTopic(const std::string &topic);
     bool isRobotMapTopic(const ros::master::TopicInfo &topic);
     bool isRobotCameraTopic(const ros::master::TopicInfo &topic);
