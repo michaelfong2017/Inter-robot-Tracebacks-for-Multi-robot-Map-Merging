@@ -46,6 +46,20 @@ namespace traceback
     bool accepted;
   };
 
+  struct FirstTracebackResult
+  {
+    double first_x;
+    double first_y;
+    double first_tracer_to_traced_unit_tx;
+    double first_tracer_to_traced_unit_ty;
+  };
+
+  struct TriangulationResult
+  {
+    TransformNeeded transform_needed;
+    double scale;
+  };
+
   class Traceback
   {
   public:
@@ -116,7 +130,8 @@ namespace traceback
     std::unordered_map<std::string, std::unordered_map<std::string, bool>> pairwise_paused_;
     std::unordered_map<std::string, std::unordered_map<std::string, ros::Timer>> pairwise_resume_timer_;
 
-    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<TransformNeeded>>> pairwise_transform_needed_history_;
+    std::unordered_map<std::string, std::unordered_map<std::string, FirstTracebackResult>> pairwise_first_traceback_result_;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<TriangulationResult>>> pairwise_triangulation_result_history_;
 
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> best_transforms_;
     std::unordered_set<std::string> has_best_transforms_;
@@ -151,7 +166,9 @@ namespace traceback
 
     void imageTransformToMapTransform(cv::Mat &image, cv::Mat &map, float src_resolution, float dst_resolution, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
 
-    void adjustTransform(cv::Mat &mat, cv::Mat adjusted, double scale, double tx, double ty, double r);
+    double findLengthOfTranslationByTriangulation(double first_x, double first_y, double first_tracer_to_traced_unit_tx, double first_tracer_to_traced_unit_ty, double second_x, double second_y, double second_tracer_to_traced_unit_tx, double second_tracer_to_traced_unit_ty);
+
+    void findTransformationMatrix(cv::Mat &out, double tx, double ty, double r);
 
     // Traceback feedbacks can be
     // 1. first traceback, abort with enough consecutive count      -> Exit traceback process, cooldown
