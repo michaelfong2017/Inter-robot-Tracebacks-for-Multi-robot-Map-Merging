@@ -10,6 +10,10 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/stitching/detail/matchers.hpp>
 
+#ifndef HAVE_OPENCV_XFEATURES2D
+#define HAVE_OPENCV_XFEATURES2D
+#endif
+
 #ifdef HAVE_OPENCV_XFEATURES2D
 #include <opencv2/xfeatures2d/nonfree.hpp>
 #endif
@@ -30,7 +34,7 @@ namespace traceback
         return cv::ORB::create();
       case FeatureType::SURF:
 #ifdef HAVE_OPENCV_XFEATURES2D
-        return xfeatures2d::SURF::create();
+        return cv::xfeatures2d::SURF::create();
 #else
         return cv::AKAZE::create();
 #endif

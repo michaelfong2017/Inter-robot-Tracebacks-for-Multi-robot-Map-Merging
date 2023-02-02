@@ -50,14 +50,17 @@ namespace traceback
   {
     double first_x;
     double first_y;
-    double first_tracer_to_traced_unit_tx;
-    double first_tracer_to_traced_unit_ty;
+    double first_tracer_to_traced_tx;
+    double first_tracer_to_traced_ty;
+    double first_tracer_to_traced_r;
   };
 
   struct TriangulationResult
   {
-    TransformNeeded transform_needed;
-    double scale;
+    // Original, just for debug
+    cv::Mat world_transform;
+    // Original transform adjusted by triangulation result
+    cv::Mat adjusted_transform;
   };
 
   class Traceback
@@ -166,9 +169,9 @@ namespace traceback
 
     void imageTransformToMapTransform(cv::Mat &image, cv::Mat &map, float src_resolution, float dst_resolution, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
 
-    double findLengthOfTranslationByTriangulation(double first_x, double first_y, double first_tracer_to_traced_unit_tx, double first_tracer_to_traced_unit_ty, double second_x, double second_y, double second_tracer_to_traced_unit_tx, double second_tracer_to_traced_unit_ty);
+    double findLengthOfTranslationByTriangulation(double first_x, double first_y, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double second_x, double second_y, double second_tracer_to_traced_tx, double second_tracer_to_traced_ty);
 
-    void findTransformationMatrix(cv::Mat &out, double tx, double ty, double r);
+    void findAdjustedTransformation(cv::Mat &original, cv::Mat &adjusted, double scale, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double transform_needed_r, double first_x, double first_y, float src_resolution);
 
     // Traceback feedbacks can be
     // 1. first traceback, abort with enough consecutive count      -> Exit traceback process, cooldown
@@ -180,6 +183,7 @@ namespace traceback
     // 7. second traceback, accept                                  -> Exit traceback process, combine all triangulation results
     // 8. second traceback, match but not yet aceept                -> next goal first traceback, push this triangulation result
     // 9. second traceback, does not match                          -> next goal first traceback
+    // 10. first traceback, match but unwanted translation angle    -> next goal first traceback, do not increment reject count
     void writeTracebackFeedbackHistory(std::string tracer, std::string traced, std::string feedback);
 
     std::string robotNameFromTopic(const std::string &topic);

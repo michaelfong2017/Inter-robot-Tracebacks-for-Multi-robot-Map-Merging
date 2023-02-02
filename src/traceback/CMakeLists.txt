@@ -33,6 +33,11 @@ if("${OpenCV_VERSION}" VERSION_LESS "4.0")
     "available. Upgrade to OpenCV 4 to take advantage of all features.")
 endif()
 
+message(STATUS "OpenCV library: ${OpenCV_INSTALL_PATH}")
+message(STATUS "    version: ${OpenCV_VERSION}")
+message(STATUS "    libraries: ${OpenCV_LIBS}")
+message(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
+
 ################################################
 ## Declare ROS messages, services and actions ##
 ################################################
@@ -82,7 +87,6 @@ include_directories(
 #   src/combine_grids/merging_pipeline.cpp
 # )
 # add_dependencies(combine_grids ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-# target_link_libraries(combine_grids ${OpenCV_LIBRARIES})
 
 add_executable(traceback
   src/traceback.cpp
@@ -91,6 +95,7 @@ add_executable(traceback
 )
 add_dependencies(traceback ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(traceback ${catkin_LIBRARIES})
+target_link_libraries(traceback ${OpenCV_LIBRARIES})
 
 #############
 ## Install ##

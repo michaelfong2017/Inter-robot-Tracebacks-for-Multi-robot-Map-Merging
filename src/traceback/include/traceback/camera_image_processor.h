@@ -70,7 +70,7 @@ namespace traceback
         do_rectify: False
         */
         bool findFurtherTransformNeeded(const cv::Mat &tracer_robot_image, const cv::Mat &traced_robot_image, FeatureType feature_type,
-                                        double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
+                                        double confidence, double yaw, TransformNeeded &transform_needed, bool &is_unwanted_translation_angle, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
 
     private:
         std::unordered_map<std::string, sensor_msgs::Image> robots_to_current_image_;

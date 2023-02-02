@@ -170,57 +170,70 @@ namespace traceback
         m.getRPY(roll, pitch, yaw);
 
         TransformNeeded transform_needed;
+        bool is_unwanted_translation_angle = false;
         bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
-                                                                           essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
+                                                                           essential_mat_confidence_threshold_, yaw, transform_needed, is_unwanted_translation_angle, tracer_robot, traced_robot, current_time);
         // Get cv images and analyze END
 
-        // 3. first traceback, match
         if (is_match)
         {
-          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "3. first traceback, match");
-          // Set new triangulation first result
+          // 10. first traceback, match but unwanted translation angle
+          if (is_unwanted_translation_angle)
           {
-            FirstTracebackResult result;
-            result.first_x = arrived_pose.position.x;
-            result.first_y = arrived_pose.position.y;
-            result.first_tracer_to_traced_unit_tx = transform_needed.tx;
-            result.first_tracer_to_traced_unit_ty = transform_needed.ty;
-            pairwise_first_traceback_result_[tracer_robot][traced_robot] = result;
+            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "10. first traceback, match but unwanted translation angle");
+            continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+            // 10. first traceback, match but unwanted translation angle END
+            return;
           }
+          // 3. first traceback, match
+          else
+          {
+            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "3. first traceback, match");
+            // Set new triangulation first result
+            {
+              FirstTracebackResult result;
+              result.first_x = arrived_pose.position.x;
+              result.first_y = arrived_pose.position.y;
+              result.first_tracer_to_traced_tx = transform_needed.tx;
+              result.first_tracer_to_traced_ty = transform_needed.ty;
+              result.first_tracer_to_traced_r = transform_needed.r;
+              pairwise_first_traceback_result_[tracer_robot][traced_robot] = result;
+            }
 
-          // Second traceback: after each match, navigate to a nearby location in order to
-          // estimate the absolute scale
+            // Second traceback: after each match, navigate to a nearby location in order to
+            // estimate the absolute scale
 
-          move_base_msgs::MoveBaseGoal goal;
-          geometry_msgs::PoseStamped new_pose_stamped;
-          new_pose_stamped.pose = arrived_pose;
-          double distance = 0.25;
-          new_pose_stamped.pose.position.x -= cos(yaw) * distance;
-          new_pose_stamped.pose.position.y -= sin(yaw) * distance;
-          new_pose_stamped.header.frame_id = tracer_robot.substr(1) + tracer_robot + "/map";
-          new_pose_stamped.header.stamp = ros::Time::now();
-          goal.target_pose = new_pose_stamped;
+            move_base_msgs::MoveBaseGoal goal;
+            geometry_msgs::PoseStamped new_pose_stamped;
+            new_pose_stamped.pose = arrived_pose;
+            double distance = 0.25;
+            new_pose_stamped.pose.position.x -= cos(yaw) * distance;
+            new_pose_stamped.pose.position.y -= sin(yaw) * distance;
+            new_pose_stamped.header.frame_id = tracer_robot.substr(1) + tracer_robot + "/map";
+            new_pose_stamped.header.stamp = ros::Time::now();
+            goal.target_pose = new_pose_stamped;
 
-          traceback_msgs::GoalAndImage goal_and_image;
-          goal_and_image.goal = goal;
-          goal_and_image.image = msg->traced_image;
-          goal_and_image.tracer_robot = tracer_robot;
-          goal_and_image.traced_robot = traced_robot;
-          goal_and_image.src_map_origin_x = src_map_origin_x;
-          goal_and_image.src_map_origin_y = src_map_origin_y;
-          goal_and_image.dst_map_origin_x = dst_map_origin_x;
-          goal_and_image.dst_map_origin_y = dst_map_origin_y;
-          goal_and_image.stamp = msg->stamp;
-          goal_and_image.second_traceback = true;
-          ROS_DEBUG("Goal and image to be sent");
+            traceback_msgs::GoalAndImage goal_and_image;
+            goal_and_image.goal = goal;
+            goal_and_image.image = msg->traced_image;
+            goal_and_image.tracer_robot = tracer_robot;
+            goal_and_image.traced_robot = traced_robot;
+            goal_and_image.src_map_origin_x = src_map_origin_x;
+            goal_and_image.src_map_origin_y = src_map_origin_y;
+            goal_and_image.dst_map_origin_x = dst_map_origin_x;
+            goal_and_image.dst_map_origin_y = dst_map_origin_y;
+            goal_and_image.stamp = msg->stamp;
+            goal_and_image.second_traceback = true;
+            ROS_DEBUG("Goal and image to be sent");
 
-          /** Visualize goal in src robot frame */
-          visualizeGoal(new_pose_stamped, tracer_robot);
-          /** Visualize goal in src robot frame END */
-          robots_to_goal_and_image_publisher_[tracer_robot].publish(goal_and_image);
+            /** Visualize goal in src robot frame */
+            visualizeGoal(new_pose_stamped, tracer_robot);
+            /** Visualize goal in src robot frame END */
+            robots_to_goal_and_image_publisher_[tracer_robot].publish(goal_and_image);
 
-          // 3. first traceback, match END
-          return;
+            // 3. first traceback, match END
+            return;
+          }
         }
         // Reject if first traceback does not match
         // 4 or 5
@@ -325,8 +338,9 @@ namespace traceback
       m.getRPY(roll, pitch, yaw);
 
       TransformNeeded transform_needed;
+      bool is_unwanted_translation_angle = false;
       bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
-                                                                         essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
+                                                                         essential_mat_confidence_threshold_, yaw, transform_needed, is_unwanted_translation_angle, tracer_robot, traced_robot, current_time);
       // Get cv images and analyze END
 
       // 7 or 8
@@ -340,29 +354,6 @@ namespace traceback
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "7. second traceback, accept");
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
 
-          // TEST HARDCODE sending traceback transforms
-          size_t tracer_robot_index;
-          size_t traced_robot_index;
-          for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
-          {
-            if (it->second == tracer_robot)
-            {
-              tracer_robot_index = it->first;
-            }
-            else if (it->second == traced_robot)
-            {
-              traced_robot_index = it->first;
-            }
-          }
-
-          std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-
-          // Convert OpenCV transform to world transform, considering the origins
-          cv::Mat mat_transform = mat_transforms[traced_robot_index];
-          cv::Mat world_transform;
-          imageTransformToMapTransform(mat_transform, world_transform, resolutions_[tracer_robot_index], resolutions_[traced_robot_index], src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-          //
-
           // TODO may use methods other than average because an outlier can significantly affect the average.
           // Find average (tx, ty, r)
           double average_tx = 0;
@@ -371,11 +362,24 @@ namespace traceback
           size_t history_size = pairwise_triangulation_result_history_[tracer_robot][traced_robot].size();
           for (size_t i = 0; i < history_size; ++i)
           {
-            TransformNeeded transform_needed = pairwise_triangulation_result_history_[tracer_robot][traced_robot][i].transform_needed;
-            double scale = pairwise_triangulation_result_history_[tracer_robot][traced_robot][i].scale;
-            average_tx += scale * transform_needed.tx;
-            average_ty += scale * transform_needed.ty;
-            average_r += transform_needed.r;
+            TriangulationResult result = pairwise_triangulation_result_history_[tracer_robot][traced_robot][i];
+            cv::Mat adjusted_transform = result.adjusted_transform;
+            double tx = adjusted_transform.at<double>(0, 2);
+            double ty = adjusted_transform.at<double>(1, 2);
+            double r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
+
+            {
+              std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+              if (fw.is_open())
+              {
+                fw << "Index " << i << " adjusted transform (tx, ty, r) = (" << tx << ", " << ty << ", " << r << ")" << std::endl;
+                fw.close();
+              }
+            }
+
+            average_tx += tx;
+            average_ty += ty;
+            average_r += r;
           }
           if (history_size != 0)
           {
@@ -385,31 +389,44 @@ namespace traceback
           }
 
           // Compute transformation from average (tx, ty, r)
-          cv::Mat transformFromTracerToTraced;
-          // Divide by resolution to get tx and ty in pixels.
-          findTransformationMatrix(transformFromTracerToTraced, average_tx / resolutions_[tracer_robot_index], average_ty / resolutions_[tracer_robot_index], average_r);
-
-          // Adjust transform
-          cv::Mat adjusted_transform = transformFromTracerToTraced * world_transform;
+          cv::Mat average_adjusted_transform(3, 3, CV_64F);
+          average_adjusted_transform.at<double>(0, 0) = cos(average_r);
+          average_adjusted_transform.at<double>(0, 1) = -sin(average_r);
+          average_adjusted_transform.at<double>(0, 2) = average_tx;
+          average_adjusted_transform.at<double>(1, 0) = sin(average_r);
+          average_adjusted_transform.at<double>(1, 1) = cos(average_r);
+          average_adjusted_transform.at<double>(1, 2) = average_ty;
+          average_adjusted_transform.at<double>(2, 0) = 0;
+          average_adjusted_transform.at<double>(2, 1) = 0;
+          average_adjusted_transform.at<double>(2, 2) = 1;
 
           //
-          transform_estimator_.updateBestTransforms(adjusted_transform, tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
+          transform_estimator_.updateBestTransforms(average_adjusted_transform, tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
           //
 
-          std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::out);
-          if (fw.is_open())
           {
-            fw << "Unadjusted transform:" << std::endl;
-            fw << world_transform.at<double>(0, 0) << "\t" << world_transform.at<double>(0, 1) << "\t" << world_transform.at<double>(0, 2) << std::endl;
-            fw << world_transform.at<double>(1, 0) << "\t" << world_transform.at<double>(1, 1) << "\t" << world_transform.at<double>(1, 2) << std::endl;
-            fw << world_transform.at<double>(2, 0) << "\t" << world_transform.at<double>(2, 1) << "\t" << world_transform.at<double>(2, 2) << std::endl;
-            fw << "Adjustment:" << std::endl;
-            fw << "(tx, ty, r) = (" << average_tx << ", " << average_ty << ", " << average_r << ")" << std::endl;
-            fw << "Adjusted transform:" << std::endl;
-            fw << adjusted_transform.at<double>(0, 0) << "\t" << adjusted_transform.at<double>(0, 1) << "\t" << adjusted_transform.at<double>(0, 2) << std::endl;
-            fw << adjusted_transform.at<double>(1, 0) << "\t" << adjusted_transform.at<double>(1, 1) << "\t" << adjusted_transform.at<double>(1, 2) << std::endl;
-            fw << adjusted_transform.at<double>(2, 0) << "\t" << adjusted_transform.at<double>(2, 1) << "\t" << adjusted_transform.at<double>(2, 2) << std::endl;
-            fw.close();
+            std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+              fw << "Unadjusted transform:" << std::endl;
+              if (history_size != 0)
+              {
+                cv::Mat world_transform = pairwise_triangulation_result_history_[tracer_robot][traced_robot][0].world_transform;
+                fw << world_transform.at<double>(0, 0) << "\t" << world_transform.at<double>(0, 1) << "\t" << world_transform.at<double>(0, 2) << std::endl;
+                fw << world_transform.at<double>(1, 0) << "\t" << world_transform.at<double>(1, 1) << "\t" << world_transform.at<double>(1, 2) << std::endl;
+                fw << world_transform.at<double>(2, 0) << "\t" << world_transform.at<double>(2, 1) << "\t" << world_transform.at<double>(2, 2) << std::endl;
+              }
+              else
+              {
+                fw << "None because history size is 0, which should not happen!" << std::endl;
+              }
+              fw << "Average (tx, ty, r) = (" << average_tx << ", " << average_ty << ", " << average_r << ")" << std::endl;
+              fw << "Adjusted transform using average:" << std::endl;
+              fw << average_adjusted_transform.at<double>(0, 0) << "\t" << average_adjusted_transform.at<double>(0, 1) << "\t" << average_adjusted_transform.at<double>(0, 2) << std::endl;
+              fw << average_adjusted_transform.at<double>(1, 0) << "\t" << average_adjusted_transform.at<double>(1, 1) << "\t" << average_adjusted_transform.at<double>(1, 2) << std::endl;
+              fw << average_adjusted_transform.at<double>(2, 0) << "\t" << average_adjusted_transform.at<double>(2, 1) << "\t" << average_adjusted_transform.at<double>(2, 2) << std::endl;
+              fw.close();
+            }
           }
 
           if (has_best_transforms_.size() == resolutions_.size())
@@ -481,18 +498,43 @@ namespace traceback
           FirstTracebackResult result = pairwise_first_traceback_result_[tracer_robot][traced_robot];
           double first_x = result.first_x;
           double first_y = result.first_y;
-          double first_tracer_to_traced_unit_tx = result.first_tracer_to_traced_unit_tx;
-          double first_tracer_to_traced_unit_ty = result.first_tracer_to_traced_unit_ty;
+          double first_tracer_to_traced_tx = result.first_tracer_to_traced_tx;
+          double first_tracer_to_traced_ty = result.first_tracer_to_traced_ty;
           double second_x = arrived_pose.position.x;
           double second_y = arrived_pose.position.y;
-          double second_tracer_to_traced_unit_tx = transform_needed.tx;
-          double second_tracer_to_traced_unit_ty = transform_needed.ty;
+          double second_tracer_to_traced_tx = transform_needed.tx;
+          double second_tracer_to_traced_ty = transform_needed.ty;
 
-          double length_of_translation = findLengthOfTranslationByTriangulation(first_x, first_y, first_tracer_to_traced_unit_tx, first_tracer_to_traced_unit_ty, second_x, second_y, second_tracer_to_traced_unit_tx, second_tracer_to_traced_unit_ty);
+          double length_of_translation = findLengthOfTranslationByTriangulation(first_x, first_y, first_tracer_to_traced_tx, first_tracer_to_traced_ty, second_x, second_y, second_tracer_to_traced_tx, second_tracer_to_traced_ty);
+          double first_tracer_to_traced_r = result.first_tracer_to_traced_r;
           {
+            size_t tracer_robot_index;
+            size_t traced_robot_index;
+            for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+            {
+              if (it->second == tracer_robot)
+              {
+                tracer_robot_index = it->first;
+              }
+              else if (it->second == traced_robot)
+              {
+                traced_robot_index = it->first;
+              }
+            }
+
+            std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
+
+            // Convert OpenCV transform to world transform, considering the origins
+            cv::Mat mat_transform = mat_transforms[traced_robot_index];
+            cv::Mat world_transform;
+            imageTransformToMapTransform(mat_transform, world_transform, resolutions_[tracer_robot_index], resolutions_[traced_robot_index], src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+            //
+
+            cv::Mat adjusted_transform;
+            findAdjustedTransformation(world_transform, adjusted_transform, length_of_translation, first_tracer_to_traced_tx, first_tracer_to_traced_ty, first_tracer_to_traced_r, first_x, first_y, resolutions_[tracer_robot_index]);
             TriangulationResult result;
-            result.transform_needed = transform_needed;
-            result.scale = length_of_translation;
+            result.world_transform = world_transform;
+            result.adjusted_transform = adjusted_transform;
             pairwise_triangulation_result_history_[tracer_robot][traced_robot].push_back(result);
           }
 
@@ -1016,7 +1058,7 @@ namespace traceback
     }
 
     transform_estimator_.feed(grids.begin(), grids.end());
-    transform_estimator_.estimateTransforms(FeatureType::SURF,
+    transform_estimator_.estimateTransforms(FeatureType::AKAZE,
                                             confidence_threshold_);
   }
 
@@ -1248,32 +1290,56 @@ namespace traceback
     map = t2 * image * t1;
   }
 
-  double Traceback::findLengthOfTranslationByTriangulation(double first_x, double first_y, double first_tracer_to_traced_unit_tx, double first_tracer_to_traced_unit_ty, double second_x, double second_y, double second_tracer_to_traced_unit_tx, double second_tracer_to_traced_unit_ty)
+  double Traceback::findLengthOfTranslationByTriangulation(double first_x, double first_y, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double second_x, double second_y, double second_tracer_to_traced_tx, double second_tracer_to_traced_ty)
   {
-    double first_transformation_distance = sqrt(first_tracer_to_traced_unit_tx * first_tracer_to_traced_unit_tx + first_tracer_to_traced_unit_ty * first_tracer_to_traced_unit_ty);
-    double second_transformation_distance = sqrt(second_tracer_to_traced_unit_tx * second_tracer_to_traced_unit_tx + second_tracer_to_traced_unit_ty * second_tracer_to_traced_unit_ty);
-    double angle_between_two_camera_transformations = acos((first_tracer_to_traced_unit_tx * second_tracer_to_traced_unit_tx + first_tracer_to_traced_unit_ty * second_tracer_to_traced_unit_ty) / (first_transformation_distance * second_transformation_distance));
+    double first_transformation_distance = sqrt(first_tracer_to_traced_tx * first_tracer_to_traced_tx + first_tracer_to_traced_ty * first_tracer_to_traced_ty);
+    double second_transformation_distance = sqrt(second_tracer_to_traced_tx * second_tracer_to_traced_tx + second_tracer_to_traced_ty * second_tracer_to_traced_ty);
+    double angle_between_two_camera_transformations = acos((first_tracer_to_traced_tx * second_tracer_to_traced_tx + first_tracer_to_traced_ty * second_tracer_to_traced_ty) / (first_transformation_distance * second_transformation_distance));
     double second_to_first_x = first_x - second_x;
     double second_to_first_y = first_y - second_y;
     double movement_distance = sqrt(second_to_first_x * second_to_first_x + second_to_first_y * second_to_first_y);
-    double angle_between_movement_and_second_camera_transformation = acos((second_to_first_x * second_tracer_to_traced_unit_tx + second_to_first_y * second_tracer_to_traced_unit_ty) / (movement_distance * second_transformation_distance));
+    double angle_between_movement_and_second_camera_transformation = acos((second_to_first_x * second_tracer_to_traced_tx + second_to_first_y * second_tracer_to_traced_ty) / (movement_distance * second_transformation_distance));
 
     // sine formula
     return movement_distance / sin(angle_between_two_camera_transformations) * sin(angle_between_movement_and_second_camera_transformation);
   }
 
-  void Traceback::findTransformationMatrix(cv::Mat &out, double tx, double ty, double r)
+  void Traceback::findAdjustedTransformation(cv::Mat &original, cv::Mat &adjusted, double scale, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double first_tracer_to_traced_r, double first_x, double first_y, float src_resolution)
   {
-    out = cv::Mat(3, 3, CV_64F);
-    out.at<double>(0, 0) = cos(r);
-    out.at<double>(0, 1) = -sin(r);
-    out.at<double>(0, 2) = tx;
-    out.at<double>(1, 0) = sin(r);
-    out.at<double>(1, 1) = cos(r);
-    out.at<double>(1, 2) = ty;
-    out.at<double>(2, 0) = 0;
-    out.at<double>(2, 1) = 0;
-    out.at<double>(2, 2) = 1;
+    cv::Mat t1(3, 3, CV_64F);
+    t1.at<double>(0, 0) = 1.0;
+    t1.at<double>(0, 1) = 0.0;
+    t1.at<double>(0, 2) = -1 * first_x / src_resolution;
+    t1.at<double>(1, 0) = 0.0;
+    t1.at<double>(1, 1) = 1.0;
+    t1.at<double>(1, 2) = -1 * first_y / src_resolution;
+    t1.at<double>(2, 0) = 0.0;
+    t1.at<double>(2, 1) = 0.0;
+    t1.at<double>(2, 2) = 1.0;
+
+    cv::Mat adjustment(3, 3, CV_64F);
+    adjustment.at<double>(0, 0) = cos(first_tracer_to_traced_r);
+    adjustment.at<double>(0, 1) = -sin(first_tracer_to_traced_r);
+    adjustment.at<double>(0, 2) = first_tracer_to_traced_tx * scale / src_resolution;
+    adjustment.at<double>(1, 0) = sin(first_tracer_to_traced_r);
+    adjustment.at<double>(1, 1) = cos(first_tracer_to_traced_r);
+    adjustment.at<double>(1, 2) = first_tracer_to_traced_ty * scale / src_resolution;
+    adjustment.at<double>(2, 0) = 0.0;
+    adjustment.at<double>(2, 1) = 0.0;
+    adjustment.at<double>(2, 2) = 1.0;
+
+    cv::Mat t2(3, 3, CV_64F);
+    t2.at<double>(0, 0) = 1.0;
+    t2.at<double>(0, 1) = 0.0;
+    t2.at<double>(0, 2) = first_x / src_resolution;
+    t2.at<double>(1, 0) = 0.0;
+    t2.at<double>(1, 1) = 1.0;
+    t2.at<double>(1, 2) = first_y / src_resolution;
+    t2.at<double>(2, 0) = 0.0;
+    t2.at<double>(2, 1) = 0.0;
+    t2.at<double>(2, 2) = 1.0;
+
+    adjusted = t2 * adjustment * t1 * original;
   }
 
   void Traceback::writeTracebackFeedbackHistory(std::string tracer, std::string traced, std::string feedback)

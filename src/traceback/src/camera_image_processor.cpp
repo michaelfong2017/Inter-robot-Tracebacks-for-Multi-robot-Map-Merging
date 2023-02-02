@@ -12,7 +12,7 @@
 namespace traceback
 {
     bool CameraImageProcessor::findFurtherTransformNeeded(const cv::Mat &tracer_robot_image, const cv::Mat &traced_robot_image, FeatureType feature_type,
-                                                          double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
+                                                          double confidence, double yaw, TransformNeeded &transform_needed, bool &is_unwanted_translation_angle, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {
         const std::vector<cv::Mat> &images = {tracer_robot_image, traced_robot_image};
         std::vector<cv::detail::ImageFeatures> image_features;
@@ -197,6 +197,17 @@ namespace traceback
         transform_needed.tx = (-1 * transform_t.at<double>(2, 0) * cos(yaw)) + (-1 * transform_t.at<double>(0, 0) * sin(yaw));
         transform_needed.ty = transform_t.at<double>(0, 0) * cos(yaw) + (-1 * transform_t.at<double>(2, 0) * sin(yaw));
         transform_needed.r = rot[1];
+
+        // Does not proceed to second traceback for unwanted translation angle to prevent triangulation huge error
+        // Unwanted if it is too straight within 0.1 radian difference
+        double angle = atan2(transform_t.at<double>(2, 0), transform_t.at<double>(0, 0));
+        double PI = 3.1415926;
+        if (abs(angle - PI / 2) < 0.1 || abs(angle + PI / 2) < 0.1) {
+            is_unwanted_translation_angle = true;
+        }
+        else {
+            is_unwanted_translation_angle = false;
+        }
 
         ROS_INFO("Debug");
 
