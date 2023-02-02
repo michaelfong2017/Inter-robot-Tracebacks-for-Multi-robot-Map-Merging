@@ -29,7 +29,7 @@ namespace traceback
 
     // In robot world coordinates
     // tx and ty are in meters, r is in radian
-    // Unit length
+    // Any length
     struct TransformNeeded
     {
         double tx;

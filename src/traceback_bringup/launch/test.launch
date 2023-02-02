@@ -29,7 +29,7 @@
         <param name="estimation_confidence" value="1.0"/>
         <param name="camera_image_update_rate" value="0.5"/>
         <param name="essential_mat_confidence" value="0.4"/>
-        <param name="accept_count_needed" value="20"/>
+        <param name="accept_count_needed" value="10"/>
         <param name="reject_count_needed" value="4"/>
         <param name="consecutive_abort_count_needed" value="4" />
     </node>

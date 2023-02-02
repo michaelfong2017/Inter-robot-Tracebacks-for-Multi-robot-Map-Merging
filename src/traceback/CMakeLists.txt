@@ -23,6 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Boost REQUIRED COMPONENTS thread)
 
 # OpenCV is required for merging without initial positions
+set(OpenCV_DIR "/home/michael/opencv/build")
 find_package(OpenCV REQUIRED)
 if("${OpenCV_VERSION}" VERSION_LESS "3.0")
   message(FATAL_ERROR "This package needs OpenCV >= 3.0")

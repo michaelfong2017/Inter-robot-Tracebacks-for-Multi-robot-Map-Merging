@@ -170,7 +170,7 @@ namespace traceback
         m.getRPY(roll, pitch, yaw);
 
         TransformNeeded transform_needed;
-        bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::AKAZE,
+        bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
                                                                            essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
         // Get cv images and analyze END
 
@@ -194,8 +194,9 @@ namespace traceback
           move_base_msgs::MoveBaseGoal goal;
           geometry_msgs::PoseStamped new_pose_stamped;
           new_pose_stamped.pose = arrived_pose;
-          new_pose_stamped.pose.position.x -= cos(yaw);
-          new_pose_stamped.pose.position.y -= sin(yaw);
+          double distance = 0.25;
+          new_pose_stamped.pose.position.x -= cos(yaw) * distance;
+          new_pose_stamped.pose.position.y -= sin(yaw) * distance;
           new_pose_stamped.header.frame_id = tracer_robot.substr(1) + tracer_robot + "/map";
           new_pose_stamped.header.stamp = ros::Time::now();
           goal.target_pose = new_pose_stamped;
@@ -324,7 +325,7 @@ namespace traceback
       m.getRPY(roll, pitch, yaw);
 
       TransformNeeded transform_needed;
-      bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::AKAZE,
+      bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
                                                                          essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
       // Get cv images and analyze END
 
@@ -1249,12 +1250,13 @@ namespace traceback
 
   double Traceback::findLengthOfTranslationByTriangulation(double first_x, double first_y, double first_tracer_to_traced_unit_tx, double first_tracer_to_traced_unit_ty, double second_x, double second_y, double second_tracer_to_traced_unit_tx, double second_tracer_to_traced_unit_ty)
   {
-    double angle_between_two_camera_transformations = acos(first_tracer_to_traced_unit_tx * second_tracer_to_traced_unit_tx + first_tracer_to_traced_unit_ty * second_tracer_to_traced_unit_ty);
+    double first_transformation_distance = sqrt(first_tracer_to_traced_unit_tx * first_tracer_to_traced_unit_tx + first_tracer_to_traced_unit_ty * first_tracer_to_traced_unit_ty);
+    double second_transformation_distance = sqrt(second_tracer_to_traced_unit_tx * second_tracer_to_traced_unit_tx + second_tracer_to_traced_unit_ty * second_tracer_to_traced_unit_ty);
+    double angle_between_two_camera_transformations = acos((first_tracer_to_traced_unit_tx * second_tracer_to_traced_unit_tx + first_tracer_to_traced_unit_ty * second_tracer_to_traced_unit_ty) / (first_transformation_distance * second_transformation_distance));
     double second_to_first_x = first_x - second_x;
     double second_to_first_y = first_y - second_y;
     double movement_distance = sqrt(second_to_first_x * second_to_first_x + second_to_first_y * second_to_first_y);
-    // Remember to divide by movement_distance since it's not unit vector
-    double angle_between_movement_and_second_camera_transformation = acos((second_to_first_x * second_tracer_to_traced_unit_tx + second_to_first_y * second_tracer_to_traced_unit_ty) / movement_distance);
+    double angle_between_movement_and_second_camera_transformation = acos((second_to_first_x * second_tracer_to_traced_unit_tx + second_to_first_y * second_tracer_to_traced_unit_ty) / (movement_distance * second_transformation_distance));
 
     // sine formula
     return movement_distance / sin(angle_between_two_camera_transformations) * sin(angle_between_movement_and_second_camera_transformation);
