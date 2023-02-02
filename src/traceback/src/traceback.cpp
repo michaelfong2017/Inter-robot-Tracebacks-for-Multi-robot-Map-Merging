@@ -354,12 +354,11 @@ namespace traceback
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "7. second traceback, accept");
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
 
-          // TODO may use methods other than average because an outlier can significantly affect the average.
-          // Find average (tx, ty, r)
-          double average_tx = 0;
-          double average_ty = 0;
-          double average_r = 0;
-          size_t history_size = pairwise_triangulation_result_history_[tracer_robot][traced_robot].size();
+          // Sort results and only keep the middle values, then take average.
+          int history_size = pairwise_triangulation_result_history_[tracer_robot][traced_robot].size();
+          double tx_arr[history_size];
+          double ty_arr[history_size];
+          double r_arr[history_size];
           for (size_t i = 0; i < history_size; ++i)
           {
             TriangulationResult result = pairwise_triangulation_result_history_[tracer_robot][traced_robot][i];
@@ -377,16 +376,32 @@ namespace traceback
               }
             }
 
-            average_tx += tx;
-            average_ty += ty;
-            average_r += r;
+            tx_arr[i] = tx;
+            ty_arr[i] = ty;
+            r_arr[i] = r;
           }
-          if (history_size != 0)
-          {
-            average_tx /= history_size;
-            average_ty /= history_size;
-            average_r /= history_size;
+          std::sort(tx_arr, tx_arr + history_size);
+          std::sort(ty_arr, ty_arr + history_size);
+          std::sort(r_arr, r_arr + history_size);
+
+          // e.g. 9: keeps 5, 10: keeps 6.
+          int number_to_keep = history_size / 2 + 1;
+          int begin_index = (history_size - number_to_keep) / 2;
+          // inc
+          int end_index = begin_index + number_to_keep - 1;
+
+          double average_tx = 0;
+          double average_ty = 0;
+          double average_r = 0;
+          for (int i = begin_index; i <= end_index; ++i) {
+            average_tx += tx_arr[i];
+            average_ty += ty_arr[i];
+            average_r += r_arr[i];
           }
+          assert(number_to_keep != 0);
+          average_tx /= number_to_keep;
+          average_ty /= number_to_keep;
+          average_r /= number_to_keep;
 
           // Compute transformation from average (tx, ty, r)
           cv::Mat average_adjusted_transform(3, 3, CV_64F);
