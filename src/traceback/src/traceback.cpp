@@ -108,7 +108,8 @@ namespace traceback
       // 3 or 4 or 5 or 6
       else
       {
-        // TODO point cloud matching
+        pairwise_abort_[tracer_robot][traced_robot] = 0;
+
         std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
         geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
@@ -184,6 +185,18 @@ namespace traceback
             for (size_t i = 0; i < history_size; ++i)
             {
               TransformAdjustmentResult result = pairwise_triangulation_result_history_[tracer_robot][traced_robot][i];
+              {
+                std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+                if (fw.is_open())
+                {
+                  fw << "Index " << i << " transform_needed (tx, ty, r) = (" << result.transform_needed.tx << ", " << result.transform_needed.ty << ", " << result.transform_needed.r << ")" << std::endl;
+                  fw.close();
+                }
+              }
+            }
+            for (size_t i = 0; i < history_size; ++i)
+            {
+              TransformAdjustmentResult result = pairwise_triangulation_result_history_[tracer_robot][traced_robot][i];
               cv::Mat adjusted_transform = result.adjusted_transform;
               double tx = adjusted_transform.at<double>(0, 2);
               double ty = adjusted_transform.at<double>(1, 2);
@@ -206,8 +219,9 @@ namespace traceback
             std::sort(ty_arr, ty_arr + history_size);
             std::sort(r_arr, r_arr + history_size);
 
-            // e.g. 9: keeps 5, 10: keeps 6.
-            int number_to_keep = history_size / 2 + 1;
+            // e.g. 9: keeps 7, 12: keeps 8.
+            int number_to_discard_per_side = history_size / 6;
+            int number_to_keep = history_size - number_to_discard_per_side * 2;
             int begin_index = (history_size - number_to_keep) / 2;
             // inc
             int end_index = begin_index + number_to_keep - 1;
@@ -355,10 +369,11 @@ namespace traceback
               //
 
               cv::Mat adjusted_transform;
-              // TODO adjust transform based on point cloud matching
               double length_of_translation = sqrt(transform_needed.tx * transform_needed.tx + transform_needed.ty * transform_needed.ty);
               findAdjustedTransformation(world_transform, adjusted_transform, length_of_translation, transform_needed.tx / length_of_translation, transform_needed.ty / length_of_translation, transform_needed.r, arrived_pose.position.x, arrived_pose.position.y, resolutions_[tracer_robot_index]);
               TransformAdjustmentResult result;
+              result.current_time = current_time;
+              result.transform_needed = transform_needed;
               result.world_transform = world_transform;
               result.adjusted_transform = adjusted_transform;
               pairwise_triangulation_result_history_[tracer_robot][traced_robot].push_back(result);

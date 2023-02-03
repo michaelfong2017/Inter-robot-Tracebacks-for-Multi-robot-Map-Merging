@@ -64,6 +64,10 @@ namespace traceback
 
   struct TransformAdjustmentResult
   {
+    // For debug
+    std::string current_time;
+    // For debug
+    TransformNeeded transform_needed;
     // Original, just for debug
     cv::Mat world_transform;
     // Original transform adjusted by triangulation result
