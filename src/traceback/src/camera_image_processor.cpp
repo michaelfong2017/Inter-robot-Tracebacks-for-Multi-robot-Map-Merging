@@ -11,6 +11,204 @@
 
 namespace traceback
 {
+    CameraImageProcessor::CameraImageProcessor()
+    {
+        _leaf_size = 0.1;
+        _dist_threshold = 0.1;
+        _eps_angle = 15;
+        _minX = 0.0;
+        _minY = -25.0;
+        _minZ = -3.0;
+        _maxX = 50.0; // default 40.0
+        _maxY = 25.0;
+        _maxZ = 3.0;
+        _mean_k = 50;
+        _std_mul = 1.5;                  // default 1.0
+        _transformation_epsilon = 0.008; // default 0.01
+        _max_iters = 75;
+        _euclidean_fitness_epsilon = 0.1;
+        _max_correspondence_distance = 1.5; // default 1.0
+    }
+
+    bool CameraImageProcessor::pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, Eigen::Vector3f &trans_out, Eigen::Quaternionf &quat_out, std::string tracer_robot, std::string traced_robot, std::string current_time)
+    {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr tracer_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr traced_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+
+        pcl::fromROSMsg(tracer_point_cloud, *tracer_cloud_ptr);
+        filterCloud(tracer_cloud_ptr, tracer_cloud_ptr);
+        pcl::fromROSMsg(traced_point_cloud, *traced_cloud_ptr);
+        filterCloud(traced_cloud_ptr, traced_cloud_ptr);
+
+        if (tracer_cloud_ptr->size() == 0 || traced_cloud_ptr->size() == 0)
+        {
+            return false;
+        }
+
+        // cout<<"Filtered cloud has "<<filtered_cloud_ptr->size()<<"points"<<endl;
+        // cout<<"Current cloud has "<<traced_cloud_ptr->size()<<"points"<<endl;
+
+        pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+        icp.setTransformationEpsilon(_transformation_epsilon);
+        icp.setMaximumIterations(_max_iters);
+        icp.setMaxCorrespondenceDistance(_max_correspondence_distance);
+        icp.setEuclideanFitnessEpsilon(_euclidean_fitness_epsilon);
+        // icp.setInputSource(_prev_cloud_ptr);
+        // icp.setInputTarget(_downsampled_cloud_ptr);
+        icp.setInputSource(traced_cloud_ptr);
+        icp.setInputTarget(tracer_cloud_ptr);
+
+        Eigen::AngleAxisf init_rotation(0.0, Eigen::Vector3f::UnitZ());
+        Eigen::Translation3f init_translation(0.0, 0.0, 0.0);
+        Eigen::Matrix4f init_guess = (init_translation * init_rotation).matrix();
+
+        // cout<<"-------Matching clouds---------"<<endl;
+        icp.align(*transformed_cloud_ptr, init_guess);
+
+        // cout<<"-------Matching done---------"<<endl;
+
+        {
+            std::ofstream fw("ICP_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+                fw << "ICP has converged:" << icp.hasConverged()
+                   << " score: " << icp.getFitnessScore() << std::endl;
+                fw.close();
+            }
+        }
+
+        Eigen::Matrix4f t = icp.getFinalTransformation();
+        Eigen::Matrix4f prev_transformation = Eigen::Matrix4f::Identity();
+        Eigen::Matrix4f curr_transformation = prev_transformation * t; // final transformation matrix
+
+        Eigen::Matrix3f mat;   // rotation matrix
+        Eigen::Vector3f trans; // translation vector
+
+        trans << curr_transformation(0, 3), curr_transformation(1, 3), curr_transformation(2, 3);
+        mat << curr_transformation(0, 0), curr_transformation(0, 1), curr_transformation(0, 2),
+            curr_transformation(1, 0), curr_transformation(1, 1), curr_transformation(1, 2),
+            curr_transformation(2, 0), curr_transformation(2, 1), curr_transformation(2, 2);
+
+        Eigen::Quaternionf quat(mat); // rotation matrix stored as a quaternion
+
+        {
+            std::ofstream fw("ICP_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+                fw << "Transformation:" << std::endl;
+                fw << "position(x, y, z) = (" << trans[0] << ", " << trans[1] << ", " << trans[2] << ")" << std::endl;
+                fw << "rotation(x, y, z, w) = (" << quat.x() << ", " << quat.y() << ", " << quat.z() << ", " << quat.w() << ")" << std::endl;
+                fw.close();
+            }
+        }
+
+        trans_out = trans;
+        quat_out = quat;
+
+        return true;
+    }
+
+    /* @brief Cropping the cloud using Box filter */
+    void CameraImageProcessor::cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr)
+    {
+        pcl::CropBox<pcl::PointXYZ> boxFilter;
+        boxFilter.setMin(Eigen::Vector4f(_minX, _minY, _minZ, 1.0));
+        boxFilter.setMax(Eigen::Vector4f(_maxX, _maxY, _maxZ, 1.0));
+        boxFilter.setInputCloud(in_cloud_ptr);
+        boxFilter.filter(*out_cloud_ptr);
+
+        // cout<<"Crop Input: "<<in_cloud_ptr->size()<<" pts, Crop output: "<<out_cloud_ptr->size()<<" pts"<<endl;
+
+        return;
+    }
+
+    /* @brief Removing Noise using Statistical outlier method */
+    void CameraImageProcessor::removeNoise(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr)
+    {
+        pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+        sor.setInputCloud(in_cloud_ptr);
+        sor.setMeanK(_mean_k);
+        sor.setStddevMulThresh(_std_mul);
+        sor.filter(*out_cloud_ptr);
+
+        // cout<<"Noise Input: "<<in_cloud_ptr->size()<<" pts, Noise output: "<<out_cloud_ptr->size()<<" pts"<<endl;
+
+        return;
+    }
+
+    /* @brief Downsampling using Aprroximate Voxel grid filter */
+    void CameraImageProcessor::downsampleCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr)
+    {
+        // cout<<"-------Downsampling cloud---------"<<endl;
+
+        pcl::ApproximateVoxelGrid<pcl::PointXYZ> approx_vg;
+        approx_vg.setLeafSize(_leaf_size, _leaf_size, _leaf_size);
+        approx_vg.setInputCloud(in_cloud_ptr);
+        approx_vg.filter(*out_cloud_ptr);
+
+        // cout<<"DS Input: "<<in_cloud_ptr->size()<<" pts, DS output: "<<out_cloud_ptr->size()<<" pts"<<endl;
+
+        return;
+    }
+
+    /* @brief Removes ground plane using perpendicular plane model with RANSAC */
+    void CameraImageProcessor::removeGround(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr,
+                                            pcl::PointCloud<pcl::PointXYZ>::Ptr ground_plane_ptr)
+    {
+        // cout<<"-------Removing ground---------"<<endl;
+
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+        // Creating the segmentation object
+        pcl::SACSegmentation<pcl::PointXYZ> seg;
+        seg.setOptimizeCoefficients(true); // optional
+        seg.setModelType(pcl::SACMODEL_PERPENDICULAR_PLANE);
+        seg.setMethodType(pcl::SAC_RANSAC);
+        seg.setDistanceThreshold(_dist_threshold);
+        seg.setAxis(Eigen::Vector3f(0, 0, 1)); // z-axis
+        seg.setEpsAngle(_eps_angle);
+        seg.setInputCloud(in_cloud_ptr);
+        seg.segment(*inliers, *coefficients);
+        if (inliers->indices.size() == 0)
+        {
+            std::cout << "Could not estimate the plane" << std::endl;
+        }
+
+        // Remove ground from the cloud
+        pcl::ExtractIndices<pcl::PointXYZ> extract;
+        extract.setInputCloud(in_cloud_ptr);
+        extract.setIndices(inliers);
+        extract.setNegative(true); // true removes the indices
+        extract.filter(*out_cloud_ptr);
+
+        // Extract ground from the cloud
+        extract.setNegative(false); // false leaves only the indices
+        extract.filter(*ground_plane_ptr);
+
+        // cout<<"GR Input: "<<in_cloud_ptr->size()<<" pts, GR output: "<<out_cloud_ptr->size()<<" pts"<<endl;
+
+        return;
+    }
+
+    /* @brief Filters the point cloud using cropping, ground and noise removal filters and then downsamples */
+    void CameraImageProcessor::filterCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr)
+    {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr no_ground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr only_ground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr no_noise_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+        // pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+
+        cropCloud(in_cloud_ptr, cropped_cloud_ptr);
+        removeGround(cropped_cloud_ptr, no_ground_cloud_ptr, only_ground_cloud_ptr);
+        removeNoise(no_ground_cloud_ptr, no_noise_cloud_ptr);
+        // removeNoise(no_ground_cloud_ptr, out_cloud_ptr);
+        downsampleCloud(no_noise_cloud_ptr, out_cloud_ptr);
+
+        return;
+    }
+
     bool CameraImageProcessor::findFurtherTransformNeeded(const cv::Mat &tracer_robot_image, const cv::Mat &traced_robot_image, FeatureType feature_type,
                                                           double confidence, double yaw, TransformNeeded &transform_needed, bool &is_unwanted_translation_angle, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {

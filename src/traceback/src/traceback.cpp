@@ -110,7 +110,65 @@ namespace traceback
       {
         // TODO point cloud matching
         std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-        bool is_match = true;
+
+        Eigen::Vector3f trans;
+        Eigen::Quaternionf quat;
+        bool is_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, trans, quat, tracer_robot, traced_robot, current_time);
+
+        {
+          std::ofstream fw("ICP_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+          if (fw.is_open())
+          {
+            fw << "Transformation:" << std::endl;
+            fw << "position(x, y, z) = (" << trans[0] << ", " << trans[1] << ", " << trans[2] << ")" << std::endl;
+            fw << "rotation(x, y, z, w) = (" << quat.x() << ", " << quat.y() << ", " << quat.z() << ", " << quat.w() << ")" << std::endl;
+            fw.close();
+          }
+        }
+
+        // write images for debug
+        {
+          cv_bridge::CvImageConstPtr cv_ptr_tracer;
+          try
+          {
+            if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
+              cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
+            else
+              cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
+          }
+          catch (cv_bridge::Exception &e)
+          {
+            ROS_ERROR("cv_bridge exception: %s", e.what());
+            return;
+          }
+
+          // Process cv_ptr->image using OpenCV
+          ROS_INFO("Process cv_ptr->image using OpenCV");
+          cv::imwrite(current_time + tracer_robot.substr(1) + "_tracer.png",
+                      cv_ptr_tracer->image);
+
+          //
+          //
+          cv_bridge::CvImageConstPtr cv_ptr_traced;
+          try
+          {
+            if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
+              cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
+            else
+              cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
+          }
+          catch (cv_bridge::Exception &e)
+          {
+            ROS_ERROR("cv_bridge exception: %s", e.what());
+            return;
+          }
+
+          // Process cv_ptr->image using OpenCV
+          ROS_INFO("Process cv_ptr->image using OpenCV");
+          cv::imwrite(current_time + traced_robot.substr(1) + "_traced.png",
+                      cv_ptr_traced->image);
+        }
+        // end
 
         // 3 or 4
         if (is_match)

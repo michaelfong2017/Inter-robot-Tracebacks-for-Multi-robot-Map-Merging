@@ -15,6 +15,27 @@
 #include <opencv2/core/utility.hpp>
 #include <opencv2/stitching/detail/motion_estimators.hpp>
 
+#include <pcl/common/common.h>
+#include <pcl/point_types.h>
+#include <pcl/PCLPointCloud2.h>
+
+#include <pcl/conversions.h>
+#include <pcl/ModelCoefficients.h>
+#include <pcl/filters/approximate_voxel_grid.h>
+#include <pcl/filters/crop_box.h>
+#include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/registration/icp.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl_ros/transforms.h>
+#include <pcl_ros/point_cloud.h>
+
+#include <pcl/visualization/cloud_viewer.h>
+#include <pcl/visualization/pcl_visualizer.h>
+
 namespace traceback
 {
     struct PoseImagePair
@@ -44,6 +65,8 @@ namespace traceback
     public:
         friend class Traceback;
 
+        bool pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, Eigen::Vector3f &trans_out, Eigen::Quaternionf &quat_out, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
+
         /*
         Return whether traced image matches tracer image, depending on the confidence.
 
@@ -62,6 +85,8 @@ namespace traceback
                                         double confidence, double yaw, TransformNeeded &transform_needed, bool &is_unwanted_translation_angle, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
 
     private:
+        CameraImageProcessor();
+
         // In order to synchronize image and point cloud although they don't really do
         std::unordered_map<std::string, sensor_msgs::Image> robots_to_temp_image_;
 
@@ -73,6 +98,27 @@ namespace traceback
         std::unordered_map<std::string, sensor_msgs::PointCloud2> robots_to_current_point_cloud_;
 
         cv::Vec3d rotationMatrixToEulerAngles(cv::Mat &R);
+
+        /*----------ICP parameters------------*/
+        double _leaf_size;                               // leaf size for voxel grid
+        double _minX, _maxX, _minY, _maxY, _minZ, _maxZ; // min and max pts for box filter
+        int _mean_k;                                     // number of neighbors to analyze for each point for noise removal
+        double _std_mul;                                 // standard deviation multiplication threshold for noise removal
+
+        double _dist_threshold; // distance threshold for RASNSAC to consider a point as inlier (for ground removal)
+        int _eps_angle;         // allowed difference of angles in degrees for perpendicular plane model
+
+        double _transformation_epsilon;    // minimum transformation difference for termination condition
+        int _max_iters;                    // max number of registration iterations
+        double _euclidean_fitness_epsilon; // maximum allowed Euclidean error between two consecutive steps in the ICP loop
+        double _max_correspondence_distance;
+        // correspondences with higher distances will be ignored
+        void cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr);       // crops cloud using box filter
+        void removeNoise(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr);     // removes noise using Statistical outlier removal
+        void downsampleCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); // downsampling the point cloud using Voxelgrid
+        void removeGround(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr,
+                          pcl::PointCloud<pcl::PointXYZ>::Ptr ground_plane_ptr);                                                     // ground removal using RANSAC
+        void filterCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); // filtering the point cloud
     };
 }
 #endif
