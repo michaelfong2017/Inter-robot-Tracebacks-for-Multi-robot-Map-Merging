@@ -32,6 +32,8 @@
         <param name="accept_count_needed" value="11"/>
         <param name="reject_count_needed" value="4"/>
         <param name="consecutive_abort_count_needed" value="4" />
+        <!-- either "triangulation" or "pointcloud" -->
+        <param name="adjustment_mode" value="pointcloud" default="pointcloud" />
     </node>
 
 

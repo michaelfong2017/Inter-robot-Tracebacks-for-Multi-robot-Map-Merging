@@ -62,7 +62,7 @@ namespace traceback
     double first_tracer_to_traced_r;
   };
 
-  struct TriangulationResult
+  struct TransformAdjustmentResult
   {
     // Original, just for debug
     cv::Mat world_transform;
@@ -81,6 +81,7 @@ namespace traceback
     ros::NodeHandle node_;
 
     /* parameters */
+    std::string adjustment_mode_;
     double update_target_rate_;
     double discovery_rate_;
     double estimation_rate_;
@@ -142,7 +143,7 @@ namespace traceback
     std::unordered_map<std::string, std::unordered_map<std::string, ros::Timer>> pairwise_resume_timer_;
 
     std::unordered_map<std::string, std::unordered_map<std::string, FirstTracebackResult>> pairwise_first_traceback_result_;
-    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<TriangulationResult>>> pairwise_triangulation_result_history_;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<TransformAdjustmentResult>>> pairwise_triangulation_result_history_;
 
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> best_transforms_;
     std::unordered_set<std::string> has_best_transforms_;
@@ -183,6 +184,15 @@ namespace traceback
 
     void findAdjustedTransformation(cv::Mat &original, cv::Mat &adjusted, double scale, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double transform_needed_r, double first_x, double first_y, float src_resolution);
 
+    // The below cases are for pointcloud mode.
+    // 1. abort with enough consecutive count      -> Exit traceback process, cooldown
+    // 2. abort without enough consecutive count   -> next goal
+    // 3. accept                                   -> Exit traceback process, combine all point cloud matching results
+    // 4. match but not yet aceept                 -> next goal, compute and push point cloud matching result
+    // 5. reject                                   -> Exit traceback process
+    // 6. does not match but not yet reject        -> next goal
+    //
+    // The below 10 cases are for triangulation mode.
     // Traceback feedbacks can be
     // 1. first traceback, abort with enough consecutive count      -> Exit traceback process, cooldown
     // 2. first traceback, abort without enough consecutive count   -> next goal first traceback
