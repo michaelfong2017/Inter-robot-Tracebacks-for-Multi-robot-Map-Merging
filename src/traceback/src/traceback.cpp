@@ -206,6 +206,29 @@ namespace traceback
             move_base_msgs::MoveBaseGoal goal;
             geometry_msgs::PoseStamped new_pose_stamped;
             new_pose_stamped.pose = arrived_pose;
+
+            // Rotate by 30 degree
+            // geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
+            // geometry_msgs::Quaternion transform_q;
+            // tf2::Quaternion tf2_goal_q;
+            // tf2_goal_q.setW(goal_q.w);
+            // tf2_goal_q.setX(goal_q.x);
+            // tf2_goal_q.setY(goal_q.y);
+            // tf2_goal_q.setZ(goal_q.z);
+            // tf2::Quaternion tf2_transform_q;
+            // tf2_transform_q.setW(0.9659258 );
+            // tf2_transform_q.setX(0.0);
+            // tf2_transform_q.setY(0.0);
+            // tf2_transform_q.setZ(0.258819);
+            // tf2::Quaternion tf2_new_q = tf2_transform_q * tf2_goal_q;
+            // geometry_msgs::Quaternion new_q;
+            // new_q.w = tf2_new_q.w();
+            // new_q.x = tf2_new_q.x();
+            // new_q.y = tf2_new_q.y();
+            // new_q.z = tf2_new_q.z();
+            // new_pose_stamped.pose.orientation = new_q;
+            //
+
             double distance = 0.25;
             new_pose_stamped.pose.position.x -= cos(yaw) * distance;
             new_pose_stamped.pose.position.y -= sin(yaw) * distance;
@@ -393,7 +416,8 @@ namespace traceback
           double average_tx = 0;
           double average_ty = 0;
           double average_r = 0;
-          for (int i = begin_index; i <= end_index; ++i) {
+          for (int i = begin_index; i <= end_index; ++i)
+          {
             average_tx += tx_arr[i];
             average_ty += ty_arr[i];
             average_r += r_arr[i];
@@ -1316,7 +1340,36 @@ namespace traceback
     double angle_between_movement_and_second_camera_transformation = acos((second_to_first_x * second_tracer_to_traced_tx + second_to_first_y * second_tracer_to_traced_ty) / (movement_distance * second_transformation_distance));
 
     // sine formula
-    return movement_distance / sin(angle_between_two_camera_transformations) * sin(angle_between_movement_and_second_camera_transformation);
+    double length = movement_distance / sin(angle_between_two_camera_transformations) * sin(angle_between_movement_and_second_camera_transformation);
+    std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+
+    // {
+    //   std::ofstream fw("Find_length_" + current_time + "_.txt", std::ofstream::out);
+    //   if (fw.is_open())
+    //   {
+    //     fw << "first_x: " << first_x << std::endl;
+    //     fw << "first_y: " << first_y << std::endl;
+    //     fw << "first_tracer_to_traced_tx: " << first_tracer_to_traced_tx << std::endl;
+    //     fw << "first_tracer_to_traced_ty: " << first_tracer_to_traced_ty << std::endl;
+    //     fw << "second_x: " << second_x << std::endl;
+    //     fw << "second_y: " << second_y << std::endl;
+    //     fw << "second_tracer_to_traced_tx: " << second_tracer_to_traced_tx << std::endl;
+    //     fw << "second_tracer_to_traced_ty: " << second_tracer_to_traced_ty << std::endl;
+    //     fw << std::endl;
+    //     fw << "first_transformation_distance: " << first_transformation_distance << std::endl;
+    //     fw << "second_transformation_distance: " << second_transformation_distance << std::endl;
+    //     fw << "angle_between_two_camera_transformations: " << angle_between_two_camera_transformations << std::endl;
+    //     fw << "second_to_first_x: " << second_to_first_x << std::endl;
+    //     fw << "second_to_first_y: " << second_to_first_y << std::endl;
+    //     fw << "movement_distance: " << movement_distance << std::endl;
+    //     fw << "angle_between_movement_and_second_camera_transformation: " << angle_between_movement_and_second_camera_transformation << std::endl;
+    //     fw << std::endl;
+    //     fw << "length: " << length << std::endl;
+    //     fw.close();
+    //   }
+    // }
+
+    return length;
   }
 
   void Traceback::findAdjustedTransformation(cv::Mat &original, cv::Mat &adjusted, double scale, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double first_tracer_to_traced_r, double first_x, double first_y, float src_resolution)

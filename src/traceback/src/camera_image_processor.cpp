@@ -120,7 +120,7 @@ namespace traceback
             ROS_ERROR("image_features must be of size 2, matching exactly 2 images!");
         }
 
-        double k[9] = {530.4669406576809, 0.0, 320.5, 0.0, 530.4669406576809, 240.5, 0.0, 0.0, 1.0};
+        double k[9] = {554.254691191187, 0.0, 320.5, 0.0, 554.254691191187, 240.5, 0.0, 0.0, 1.0};
         cv::Mat camera_K = cv::Mat(3, 3, CV_64F, k);
 
         cv::Mat essential_mat = cv::findEssentialMat(points1, points2, camera_K, cv::RANSAC);
@@ -129,6 +129,10 @@ namespace traceback
             std::ofstream fw(current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_essential_mat.txt", std::ofstream::out);
             if (fw.is_open())
             {
+                fw << "Camera calibration matrix K:" << std::endl;
+                fw << camera_K.at<double>(0, 0) << "\t" << camera_K.at<double>(0, 1) << "\t" << camera_K.at<double>(0, 2) << std::endl;
+                fw << camera_K.at<double>(1, 0) << "\t" << camera_K.at<double>(1, 1) << "\t" << camera_K.at<double>(1, 2) << std::endl;
+                fw << camera_K.at<double>(2, 0) << "\t" << camera_K.at<double>(2, 1) << "\t" << camera_K.at<double>(2, 2) << std::endl;
                 fw << "Essential matrix E:" << std::endl;
                 fw << essential_mat.at<double>(0, 0) << "\t" << essential_mat.at<double>(0, 1) << "\t" << essential_mat.at<double>(0, 2) << std::endl;
                 fw << essential_mat.at<double>(1, 0) << "\t" << essential_mat.at<double>(1, 1) << "\t" << essential_mat.at<double>(1, 2) << std::endl;
@@ -202,10 +206,12 @@ namespace traceback
         // Unwanted if it is too straight within 0.1 radian difference
         double angle = atan2(transform_t.at<double>(2, 0), transform_t.at<double>(0, 0));
         double PI = 3.1415926;
-        if (abs(angle - PI / 2) < 0.1 || abs(angle + PI / 2) < 0.1) {
+        if (abs(angle - PI / 2) < 0.1 || abs(angle + PI / 2) < 0.1)
+        {
             is_unwanted_translation_angle = true;
         }
-        else {
+        else
+        {
             is_unwanted_translation_angle = false;
         }
 

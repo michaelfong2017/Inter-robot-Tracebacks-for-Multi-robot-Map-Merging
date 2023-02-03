@@ -47,27 +47,14 @@ namespace traceback
 
         If match, output to transform_needed.
 
-        header:
-        seq: 15307
-        stamp:
-            secs: 1089
-            nsecs: 114000000
         frame_id: "tb3_1/camera_rgb_optical_frame"
         height: 480
         width: 640
         distortion_model: "plumb_bob"
         D: [0.0, 0.0, 0.0, 0.0, 0.0]
-        K: [530.4669406576809, 0.0, 320.5, 0.0, 530.4669406576809, 240.5, 0.0, 0.0, 1.0]
+        K: [554.254691191187, 0.0, 320.5, 0.0, 554.254691191187, 240.5, 0.0, 0.0, 1.0]
         R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
-        P: [530.4669406576809, 0.0, 320.5, -37.13268584603767, 0.0, 530.4669406576809, 240.5, 0.0, 0.0, 0.0, 1.0, 0.0]
-        binning_x: 0
-        binning_y: 0
-        roi:
-        x_offset: 0
-        y_offset: 0
-        height: 0
-        width: 0
-        do_rectify: False
+        P: [554.254691191187, 0.0, 320.5, -0.0, 0.0, 554.254691191187, 240.5, 0.0, 0.0, 0.0, 1.0, 0.0]
         */
         bool findFurtherTransformNeeded(const cv::Mat &tracer_robot_image, const cv::Mat &traced_robot_image, FeatureType feature_type,
                                         double confidence, double yaw, TransformNeeded &transform_needed, bool &is_unwanted_translation_angle, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");

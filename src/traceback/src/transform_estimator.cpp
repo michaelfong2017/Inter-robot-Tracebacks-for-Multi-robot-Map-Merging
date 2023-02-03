@@ -131,6 +131,24 @@ namespace traceback
             return false;
         }
 
+        // TEST change transforms
+        // size_t identity_index = good_indices[findIdentityTransform(transforms)];
+        // for (size_t i = 0; i < transforms.size(); ++i)
+        // {
+        //     if (good_indices[i] == identity_index)
+        //         continue;
+
+        //     if (i == 0)
+        //     {
+        //         transforms[i].R.at<float>(0, 2) += 20.0f * identity_index;
+        //     }
+        //     else
+        //     {
+        //         transforms[i].R.at<float>(1, 2) += 20.0f * i;
+        //     }
+        // }
+        // TEST
+
         // Ensure consistency of transforms_vectors_, centers_ and confidences_
         {
             boost::shared_lock<boost::shared_mutex> lock(updates_mutex_);
