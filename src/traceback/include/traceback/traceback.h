@@ -13,11 +13,15 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Transform.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <map_msgs/OccupancyGridUpdate.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <ros/ros.h>
 #include <tf/tf.h>
 #include <tf/transform_listener.h>
+
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
 
 #include <forward_list>
 #include <unordered_map>
@@ -35,7 +39,10 @@ namespace traceback
   struct CameraSubscription
   {
     sensor_msgs::ImageConstPtr readonly_camera_image;
-    ros::Subscriber camera_sub;
+    // TODO synchronize image and pcl
+    sensor_msgs::PointCloud2ConstPtr point_cloud;
+    ros::Subscriber camera_rgb_sub;
+    message_filters::Subscriber<sensor_msgs::PointCloud2> camera_point_cloud_sub;
     std::string robot_namespace; // e.g /tb3_0
   };
 
@@ -87,6 +94,7 @@ namespace traceback
     std::string robot_namespace_;
 
     std::string robot_camera_image_topic_;
+    std::string robot_camera_point_cloud_topic_;
     double camera_image_update_rate_;
 
     const tf::TransformListener tf_listener_; ///< @brief Used for transforming
@@ -157,6 +165,8 @@ namespace traceback
     void receiveUpdatedCameraImage();
 
     void poseEstimation();
+
+    void CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr &msg);
 
     void CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg,
                            CameraSubscription &subscription);

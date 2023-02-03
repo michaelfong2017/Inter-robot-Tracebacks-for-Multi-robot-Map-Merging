@@ -38,6 +38,10 @@ message(STATUS "    version: ${OpenCV_VERSION}")
 message(STATUS "    libraries: ${OpenCV_LIBS}")
 message(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
 
+find_package(PCL REQUIRED)
+
+message(STATUS "PCL include path: ${PCL_INCLUDE_DIRS}")
+
 ################################################
 ## Declare ROS messages, services and actions ##
 ################################################
@@ -77,6 +81,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
   include
 )
 
@@ -96,6 +101,7 @@ add_executable(traceback
 add_dependencies(traceback ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(traceback ${catkin_LIBRARIES})
 target_link_libraries(traceback ${OpenCV_LIBRARIES})
+target_link_libraries(traceback ${PCL_LIBRARIES})
 
 #############
 ## Install ##

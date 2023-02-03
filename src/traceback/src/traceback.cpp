@@ -35,7 +35,8 @@ namespace traceback
     private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
 
     private_nh.param<std::string>("camera_image_topic", robot_camera_image_topic_, "camera/rgb/image_raw"); // Don't use image_raw
-    private_nh.param("camera_image_update_rate", camera_image_update_rate_, 0.2);                           // Too high update rate can result in "continue traceback looping"
+    private_nh.param<std::string>("camera_point_cloud_topic", robot_camera_point_cloud_topic_, "camera/depth/points");
+    private_nh.param("camera_image_update_rate", camera_image_update_rate_, 0.2); // Too high update rate can result in "continue traceback looping"
   }
 
   void Traceback::tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg)
@@ -1101,6 +1102,15 @@ namespace traceback
                                             confidence_threshold_);
   }
 
+  void Traceback::CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr &msg)
+  {
+    ROS_DEBUG("CameraPointCloudUpdate");
+    std::string frame_id = msg->header.frame_id;
+    std::string robot_name = "/" + frame_id.substr(0, frame_id.find("/"));
+    camera_image_processor_.robots_to_current_point_cloud_[robot_name] = *msg;
+    camera_image_processor_.robots_to_current_pose_[robot_name] = getRobotPose(robot_name);
+  }
+
   void Traceback::CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg, CameraSubscription &subscription)
   {
     // ROS_DEBUG("received camera image update");
@@ -1203,7 +1213,8 @@ namespace traceback
       }
       else if (isRobotCameraTopic(topic))
       {
-        std::string camera_topic;
+        std::string camera_rgb_topic;
+        std::string camera_point_cloud_topic;
 
         robot_name = robotNameFromTopic(topic.name);
         if (robots_to_camera_subscriptions_.count(robot_name))
@@ -1224,11 +1235,13 @@ namespace traceback
         robots_to_camera_subscriptions_.insert({robot_name, &subscription});
 
         /* subscribe callbacks */
-        camera_topic = ros::names::append(robot_name, robot_camera_image_topic_);
+        camera_rgb_topic = ros::names::append(robot_name, robot_camera_image_topic_);
+        camera_point_cloud_topic = ros::names::append(robot_name, robot_camera_point_cloud_topic_);
 
         subscription.robot_namespace = robot_name;
 
-        ROS_INFO("Subscribing to CAMERA topic: %s.", camera_topic.c_str());
+        ROS_INFO("Subscribing to CAMERA rgb topic: %s.", camera_rgb_topic.c_str());
+        ROS_INFO("Subscribing to CAMERA point cloud topic: %s.", camera_point_cloud_topic.c_str());
 
         // Insert empty std::vector to the map to prevent future error when accessing the map by robot name.
         auto it = camera_image_processor_.robots_to_all_pose_image_pairs_.find(subscription.robot_namespace);
@@ -1237,12 +1250,20 @@ namespace traceback
           camera_image_processor_.robots_to_all_pose_image_pairs_.insert({subscription.robot_namespace, {}});
         }
 
-        subscription.camera_sub = node_.subscribe<sensor_msgs::Image>(
-            camera_topic, 50,
+        subscription.camera_rgb_sub = node_.subscribe<sensor_msgs::Image>(
+            camera_rgb_topic, 50,
             [this, &subscription](const sensor_msgs::ImageConstPtr &msg)
             {
               CameraImageUpdate(msg, subscription);
             });
+
+        subscription.camera_point_cloud_sub.subscribe(node_,
+                                                      camera_point_cloud_topic, 1);
+        // message_filters::TimeSynchronizer<sensor_msgs::PointCloud2, sensor_msgs::PointCloud2> sync(subscription.camera_point_cloud_sub, subscription.camera_point_cloud_sub, 10);
+        boost::function<void(sensor_msgs::PointCloud2ConstPtr)> callback(boost::bind(&Traceback::CameraPointCloudUpdate, this, _1));
+        subscription.camera_point_cloud_sub.registerCallback(boost::bind(callback, _1));
+
+        // message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud
 
         // Create goal publisher for this robot
         robots_to_goal_and_image_publisher_.emplace(robot_name, node_.advertise<traceback_msgs::GoalAndImage>(ros::names::append(robot_name, traceback_goal_and_image_topic_), 10));

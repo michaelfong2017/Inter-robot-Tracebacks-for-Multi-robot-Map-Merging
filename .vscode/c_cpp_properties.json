@@ -17,7 +17,8 @@
         "/home/michael/catkin_ws/src/traceback_msgs/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_fake/include/**",
         "/home/michael/catkin_ws/src/turtlebot3_simulations/turtlebot3_gazebo/include/**",
-        "/usr/include/**"
+        "/usr/include/**",
+        "/home/michael/opencv/opencv_contrib/modules/xfeatures2d/include/**"
       ],
       "name": "ROS",
       "intelliSenseMode": "gcc-x64",
