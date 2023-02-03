@@ -13,15 +13,15 @@ namespace traceback
 {
     CameraImageProcessor::CameraImageProcessor()
     {
-        _leaf_size = 0.1;
-        _dist_threshold = 0.1;
-        _eps_angle = 15;
-        _minX = 0.0;
-        _minY = -25.0;
-        _minZ = -3.0;
-        _maxX = 50.0; // default 40.0
-        _maxY = 25.0;
-        _maxZ = 3.0;
+        _leaf_size = 0.025;
+        // _dist_threshold = 0.1;
+        // _eps_angle = 15;
+        // _minX = 0.0;
+        // _minY = -25.0;
+        // _minZ = -3.0;
+        // _maxX = 50.0; // default 40.0
+        // _maxY = 25.0;
+        // _maxZ = 3.0;
         _mean_k = 50;
         _std_mul = 1.5;                  // default 1.0
         _transformation_epsilon = 0.008; // default 0.01
@@ -30,7 +30,7 @@ namespace traceback
         _max_correspondence_distance = 1.5; // default 1.0
     }
 
-    bool CameraImageProcessor::pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, Eigen::Vector3f &trans_out, Eigen::Quaternionf &quat_out, std::string tracer_robot, std::string traced_robot, std::string current_time)
+    bool CameraImageProcessor::pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr tracer_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr traced_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
@@ -68,14 +68,17 @@ namespace traceback
 
         // cout<<"-------Matching done---------"<<endl;
 
+        if (!icp.hasConverged())
         {
-            std::ofstream fw("ICP_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-            if (fw.is_open())
-            {
-                fw << "ICP has converged:" << icp.hasConverged()
-                   << " score: " << icp.getFitnessScore() << std::endl;
-                fw.close();
-            }
+            // {
+            //     std::ofstream fw(current_time + "_ICP_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            //     if (fw.is_open())
+            //     {
+            //         fw << "ICP does not converge." << std::endl;
+            //         fw.close();
+            //     }
+            // }
+            return false;
         }
 
         Eigen::Matrix4f t = icp.getFinalTransformation();
@@ -92,10 +95,13 @@ namespace traceback
 
         Eigen::Quaternionf quat(mat); // rotation matrix stored as a quaternion
 
+        double score = icp.getFitnessScore();
         {
-            std::ofstream fw("ICP_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            std::ofstream fw(current_time + "_ICP_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::out);
             if (fw.is_open())
             {
+                fw << "ICP has converged." << std::endl;
+                fw << "Score: " << score << std::endl;
                 fw << "Transformation:" << std::endl;
                 fw << "position(x, y, z) = (" << trans[0] << ", " << trans[1] << ", " << trans[2] << ")" << std::endl;
                 fw << "rotation(x, y, z, w) = (" << quat.x() << ", " << quat.y() << ", " << quat.z() << ", " << quat.w() << ")" << std::endl;
@@ -103,10 +109,49 @@ namespace traceback
             }
         }
 
-        trans_out = trans;
-        quat_out = quat;
+        /*
+        Bear in mind that tracer is the src image and traced is the dst image.
+
+        transform_t is of the form (x, y, z)
+        t.y should be considered 0.
+        If yaw=0, the more positive the t.z is, the more the tracer is behind from the goal (traced), the more positive x translation is needed
+        to translate from tracer to traced. This is different from using image matching.
+        If yaw=0, the more positive the t.x is, the more the goal (traced) is to the left of the tracer, the more positive y translation is needed
+        to translate from tracer to traced.
+
+        For transform_R, only consider the y-axis rotation since this y-axis rotation is the z-axis rotation in the robot world.
+        The more positive this rotation, the more positive z-axis rotation is needed in the robot world.
+
+        transform_R can be directly used.
+        */
+
+        // Read the above comment to understand these calculations.
+        // Note the sign of the effect of trans[0] and trans[2].
+        // It's quite complicated to figure it out.
+        transform_needed.tx = trans[2] * cos(yaw) + (-1 * trans[0] * sin(yaw));
+        transform_needed.ty = trans[0] * cos(yaw) + trans[2] * sin(yaw);
+        transform_needed.r = quat.y() * 1.0;
 
         return true;
+    }
+
+    void CameraImageProcessor::removeInvalidValues(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_ptr)
+    {
+        pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud_ptr->points.begin();
+        while (it != cloud_ptr->points.end())
+        {
+            double x = it->x;
+            double y = it->y;
+            double z = it->z;
+            if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+            {
+                it = cloud_ptr->points.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
     }
 
     /* @brief Cropping the cloud using Box filter */
@@ -200,11 +245,18 @@ namespace traceback
         pcl::PointCloud<pcl::PointXYZ>::Ptr no_noise_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         // pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
-        cropCloud(in_cloud_ptr, cropped_cloud_ptr);
-        removeGround(cropped_cloud_ptr, no_ground_cloud_ptr, only_ground_cloud_ptr);
-        removeNoise(no_ground_cloud_ptr, no_noise_cloud_ptr);
+        // ROS_DEBUG("debug");
+        // cropCloud(in_cloud_ptr, cropped_cloud_ptr);
+        // ROS_DEBUG("debug");
+        // removeGround(cropped_cloud_ptr, no_ground_cloud_ptr, only_ground_cloud_ptr);
+        ROS_DEBUG("Before removeNoise, size: %zu", in_cloud_ptr->points.size());
+        removeNoise(in_cloud_ptr, no_noise_cloud_ptr);
         // removeNoise(no_ground_cloud_ptr, out_cloud_ptr);
+        ROS_DEBUG("Before downsampleCloud, size: %zu", no_noise_cloud_ptr->points.size());
         downsampleCloud(no_noise_cloud_ptr, out_cloud_ptr);
+        ROS_DEBUG("Before removeInvalidValues, size: %zu", out_cloud_ptr->points.size());
+        removeInvalidValues(out_cloud_ptr);
+        ROS_DEBUG("After removeInvalidValues, size: %zu", out_cloud_ptr->points.size());
 
         return;
     }

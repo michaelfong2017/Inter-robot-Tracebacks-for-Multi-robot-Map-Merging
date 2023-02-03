@@ -65,7 +65,7 @@ namespace traceback
     public:
         friend class Traceback;
 
-        bool pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, Eigen::Vector3f &trans_out, Eigen::Quaternionf &quat_out, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
+        bool pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, double yaw, TransformNeeded &transform_needed, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
 
         /*
         Return whether traced image matches tracer image, depending on the confidence.
@@ -113,6 +113,7 @@ namespace traceback
         double _euclidean_fitness_epsilon; // maximum allowed Euclidean error between two consecutive steps in the ICP loop
         double _max_correspondence_distance;
         // correspondences with higher distances will be ignored
+        void removeInvalidValues(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_ptr);
         void cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr);       // crops cloud using box filter
         void removeNoise(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr);     // removes noise using Statistical outlier removal
         void downsampleCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr); // downsampling the point cloud using Voxelgrid

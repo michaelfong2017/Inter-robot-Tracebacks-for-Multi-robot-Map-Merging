@@ -111,20 +111,17 @@ namespace traceback
         // TODO point cloud matching
         std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
-        Eigen::Vector3f trans;
-        Eigen::Quaternionf quat;
-        bool is_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, trans, quat, tracer_robot, traced_robot, current_time);
-
-        {
-          std::ofstream fw("ICP_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-          if (fw.is_open())
-          {
-            fw << "Transformation:" << std::endl;
-            fw << "position(x, y, z) = (" << trans[0] << ", " << trans[1] << ", " << trans[2] << ")" << std::endl;
-            fw << "rotation(x, y, z, w) = (" << quat.x() << ", " << quat.y() << ", " << quat.z() << ", " << quat.w() << ")" << std::endl;
-            fw.close();
-          }
-        }
+        geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
+        tf2::Quaternion tf_q;
+        tf_q.setW(goal_q.w);
+        tf_q.setX(goal_q.x);
+        tf_q.setY(goal_q.y);
+        tf_q.setZ(goal_q.z);
+        tf2::Matrix3x3 m(tf_q);
+        double roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
+        TransformNeeded transform_needed;
+        bool is_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, yaw, transform_needed, tracer_robot, traced_robot, current_time);
 
         // write images for debug
         {
@@ -359,7 +356,8 @@ namespace traceback
 
               cv::Mat adjusted_transform;
               // TODO adjust transform based on point cloud matching
-              // findAdjustedTransformation(world_transform, adjusted_transform, length_of_translation, first_tracer_to_traced_tx, first_tracer_to_traced_ty, first_tracer_to_traced_r, first_x, first_y, resolutions_[tracer_robot_index]);
+              double length_of_translation = sqrt(transform_needed.tx * transform_needed.tx + transform_needed.ty * transform_needed.ty);
+              findAdjustedTransformation(world_transform, adjusted_transform, length_of_translation, transform_needed.tx / length_of_translation, transform_needed.ty / length_of_translation, transform_needed.r, arrived_pose.position.x, arrived_pose.position.y, resolutions_[tracer_robot_index]);
               TransformAdjustmentResult result;
               result.world_transform = world_transform;
               result.adjusted_transform = adjusted_transform;
@@ -1251,6 +1249,14 @@ namespace traceback
     tf2_transform_q.setY(transform_q.y);
     tf2_transform_q.setZ(transform_q.z);
     tf2::Quaternion tf2_new_q = tf2_transform_q * tf2_goal_q;
+
+    // Rotate by -30 degree
+    // tf2_transform_q.setW(0.9659258);
+    // tf2_transform_q.setX(0.0);
+    // tf2_transform_q.setY(0.0);
+    // tf2_transform_q.setZ(-0.258819);
+    // tf2_new_q = tf2_transform_q * tf2_new_q;
+    //
 
     ROS_INFO("goal_q (x, y, z, w) = (%f, %f, %f, %f)", goal_q.x, goal_q.y, goal_q.z, goal_q.w);
     ROS_INFO("transform_q (x, y, z, w) = (%f, %f, %f, %f)", transform_q.x, transform_q.y, transform_q.z, transform_q.w);
