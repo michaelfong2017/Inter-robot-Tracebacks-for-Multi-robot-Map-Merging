@@ -911,6 +911,7 @@ namespace traceback
     traceback_msgs::GoalAndImage goal_and_image;
     goal_and_image.goal = goal;
     goal_and_image.image = current_it->image;
+    goal_and_image.point_cloud = current_it->point_cloud;
     goal_and_image.tracer_robot = robot_name_src;
     goal_and_image.traced_robot = robot_name_dst;
     goal_and_image.src_map_origin_x = src_map_origin_x;
@@ -1048,9 +1049,11 @@ namespace traceback
     {
       std::string robot_name = current.first;
       geometry_msgs::Pose pose = camera_image_processor_.robots_to_current_pose_[current.first];
+      sensor_msgs::PointCloud2 point_cloud = camera_image_processor_.robots_to_current_point_cloud_[current.first];
       PoseImagePair pose_image_pair;
       pose_image_pair.pose = pose;
       pose_image_pair.image = current.second;
+      pose_image_pair.point_cloud = point_cloud;
       pose_image_pair.stamp = ros::Time::now().toNSec();
 
       auto all = camera_image_processor_.robots_to_all_pose_image_pairs_.find(current.first);
@@ -1102,38 +1105,20 @@ namespace traceback
                                             confidence_threshold_);
   }
 
+  void Traceback::CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg)
+  {
+    std::string frame_id = msg->header.frame_id;
+    std::string robot_name = "/" + frame_id.substr(0, frame_id.find("/"));
+    camera_image_processor_.robots_to_temp_image_[robot_name] = *msg;
+  }
+
   void Traceback::CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr &msg)
   {
-    ROS_DEBUG("CameraPointCloudUpdate");
     std::string frame_id = msg->header.frame_id;
     std::string robot_name = "/" + frame_id.substr(0, frame_id.find("/"));
     camera_image_processor_.robots_to_current_point_cloud_[robot_name] = *msg;
     camera_image_processor_.robots_to_current_pose_[robot_name] = getRobotPose(robot_name);
-  }
-
-  void Traceback::CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg, CameraSubscription &subscription)
-  {
-    // ROS_DEBUG("received camera image update");
-    // ROS_DEBUG("from robot %s", subscription.robot_namespace.c_str());
-    // cv_bridge::CvImageConstPtr cv_ptr;
-    // try
-    // {
-    //   if (sensor_msgs::image_encodings::isColor(msg->encoding))
-    //     cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8);
-    //   else
-    //     cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::MONO8);
-    // }
-    // catch (cv_bridge::Exception &e)
-    // {
-    //   ROS_ERROR("cv_bridge exception: %s", e.what());
-    //   return;
-    // }
-
-    // Process cv_ptr->image using OpenCV
-    // ROS_INFO("Process cv_ptr->image using OpenCV");
-    // Insert if not exists, update if exists.
-    camera_image_processor_.robots_to_current_image_[subscription.robot_namespace] = *msg;
-    camera_image_processor_.robots_to_current_pose_[subscription.robot_namespace] = getRobotPose(subscription.robot_namespace);
+    camera_image_processor_.robots_to_current_image_[robot_name] = camera_image_processor_.robots_to_temp_image_[robot_name];
   }
 
   void Traceback::fullMapUpdate(const nav_msgs::OccupancyGrid::ConstPtr &msg,
@@ -1250,20 +1235,22 @@ namespace traceback
           camera_image_processor_.robots_to_all_pose_image_pairs_.insert({subscription.robot_namespace, {}});
         }
 
-        subscription.camera_rgb_sub = node_.subscribe<sensor_msgs::Image>(
-            camera_rgb_topic, 50,
-            [this, &subscription](const sensor_msgs::ImageConstPtr &msg)
-            {
-              CameraImageUpdate(msg, subscription);
-            });
+        subscription.camera_rgb_sub.subscribe(node_,
+                                              camera_rgb_topic, 10);
 
         subscription.camera_point_cloud_sub.subscribe(node_,
-                                                      camera_point_cloud_topic, 1);
-        // message_filters::TimeSynchronizer<sensor_msgs::PointCloud2, sensor_msgs::PointCloud2> sync(subscription.camera_point_cloud_sub, subscription.camera_point_cloud_sub, 10);
-        boost::function<void(sensor_msgs::PointCloud2ConstPtr)> callback(boost::bind(&Traceback::CameraPointCloudUpdate, this, _1));
-        subscription.camera_point_cloud_sub.registerCallback(boost::bind(callback, _1));
+                                                      camera_point_cloud_topic, 10);
 
-        // message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud
+
+        subscription.camera_rgb_sub.registerCallback(boost::bind(&Traceback::CameraImageUpdate, this, _1));
+        subscription.camera_point_cloud_sub.registerCallback(boost::bind(&Traceback::CameraPointCloudUpdate, this, _1));
+
+        // Synchronizer does not callback for unknown reason.
+        // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::PointCloud2> MySyncPolicy;
+
+        // message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(50), subscription.camera_rgb_sub, subscription.camera_point_cloud_sub);
+        // boost::function<void(sensor_msgs::ImageConstPtr, sensor_msgs::PointCloud2ConstPtr)> callback(boost::bind(&Traceback::CameraImageUpdate, this, _1, _2));
+        // sync.registerCallback(boost::bind(callback, _1, _2));
 
         // Create goal publisher for this robot
         robots_to_goal_and_image_publisher_.emplace(robot_name, node_.advertise<traceback_msgs::GoalAndImage>(ros::names::append(robot_name, traceback_goal_and_image_topic_), 10));

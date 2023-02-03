@@ -21,6 +21,7 @@ namespace traceback
     {
         geometry_msgs::Pose pose;
         sensor_msgs::Image image;
+        sensor_msgs::PointCloud2 point_cloud;
         int64_t stamp;
         bool operator<(const PoseImagePair &rhs) const
         {
@@ -61,6 +62,9 @@ namespace traceback
                                         double confidence, double yaw, TransformNeeded &transform_needed, bool &is_unwanted_translation_angle, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
 
     private:
+        // In order to synchronize image and point cloud although they don't really do
+        std::unordered_map<std::string, sensor_msgs::Image> robots_to_temp_image_;
+
         std::unordered_map<std::string, sensor_msgs::Image> robots_to_current_image_;
         std::unordered_map<std::string, geometry_msgs::Pose> robots_to_current_pose_;
         std::unordered_map<std::string, std::list<PoseImagePair>> robots_to_all_pose_image_pairs_;
