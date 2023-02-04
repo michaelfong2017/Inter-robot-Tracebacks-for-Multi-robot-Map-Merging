@@ -1860,9 +1860,9 @@ namespace traceback
     cv::Mat original_estimated_xy, adjusted_estimated_xy;
     double original_estimated_r, adjusted_estimated_r;
     original_estimated_xy = original * test_xy; //
-    original_estimated_r = atan2(original.at<double>(2, 0), original.at<double>(0, 0)) + test_r;
+    original_estimated_r = atan2(original.at<double>(1, 0), original.at<double>(0, 0)) + test_r;
     adjusted_estimated_xy = adjusted * test_xy;
-    adjusted_estimated_r = atan2(adjusted.at<double>(2, 0), adjusted.at<double>(0, 0)) + test_r;
+    adjusted_estimated_r = atan2(adjusted.at<double>(1, 0), adjusted.at<double>(0, 0)) + test_r;
 
     {
       std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
