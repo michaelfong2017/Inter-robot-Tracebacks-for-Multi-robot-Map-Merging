@@ -406,13 +406,17 @@ namespace traceback
                 double tx = pose_difference_x + transform_needed.tx;
                 double ty = pose_difference_y + transform_needed.ty;
                 double r = pose_difference_r + transform_needed.r;
+                TransformNeeded total_transform_needed;
+                total_transform_needed.tx = tx;
+                total_transform_needed.tx = ty;
+                total_transform_needed.tx = r;
 
                 double length_of_translation = sqrt(tx * tx + ty * ty);
                 cv::Mat adjusted_transform;
                 findAdjustedTransformation(world_transform, adjusted_transform, length_of_translation, tx / length_of_translation, ty / length_of_translation, r, first_pose.position.x, first_pose.position.y, resolutions_[tracer_robot_index]);
                 TransformAdjustmentResult result;
                 result.current_time = current_time;
-                result.transform_needed = transform_needed;
+                result.transform_needed = total_transform_needed;
                 result.world_transform = world_transform;
                 result.adjusted_transform = adjusted_transform;
                 pairwise_triangulation_result_history_[tracer_robot][traced_robot].push_back(result);
