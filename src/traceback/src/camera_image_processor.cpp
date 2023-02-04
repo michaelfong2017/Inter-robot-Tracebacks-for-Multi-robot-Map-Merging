@@ -120,7 +120,7 @@ namespace traceback
         to translate from tracer to traced.
 
         For transform_R, only consider the y-axis rotation since this y-axis rotation is the z-axis rotation in the robot world.
-        The more positive this rotation, the more positive z-axis rotation is needed in the robot world.
+        The more positive this rotation, the more negative z-axis rotation is needed in the robot world.
 
         transform_R can be directly used.
         */
@@ -130,7 +130,7 @@ namespace traceback
         // It's quite complicated to figure it out.
         transform_needed.tx = trans[2] * cos(yaw) + (-1 * trans[0] * sin(yaw));
         transform_needed.ty = trans[0] * cos(yaw) + trans[2] * sin(yaw);
-        transform_needed.r = quat.y() * 1.0;
+        transform_needed.r = quat.y() * -1.0;
 
         return true;
     }

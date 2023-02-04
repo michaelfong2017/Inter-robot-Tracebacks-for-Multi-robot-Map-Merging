@@ -91,6 +91,8 @@ namespace traceback
     double estimation_rate_;
     double confidence_threshold_;
     double essential_mat_confidence_threshold_;
+    double point_cloud_close_translation_;
+    double point_cloud_close_rotation_;
     int accept_count_needed_;
     int reject_count_needed_;
     int consecutive_abort_count_needed_;
@@ -149,6 +151,13 @@ namespace traceback
     std::unordered_map<std::string, std::unordered_map<std::string, FirstTracebackResult>> pairwise_first_traceback_result_;
     std::unordered_map<std::string, std::unordered_map<std::string, std::vector<TransformAdjustmentResult>>> pairwise_triangulation_result_history_;
 
+    // For point cloud mode to store the arrived pose of the first traceback
+    // so that transform needed is later computed from the last close enough arrived pose
+    // and the first arrived pose.
+    std::unordered_map<std::string, std::unordered_map<std::string, geometry_msgs::Pose>> pairwise_first_traceback_arrived_pose_;
+    // 1 means first traceback, 2 means first sub-traceback, etc.
+    std::unordered_map<std::string, std::unordered_map<std::string, size_t>> pairwise_sub_traceback_number_;
+
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> best_transforms_;
     std::unordered_set<std::string> has_best_transforms_;
 
@@ -182,6 +191,8 @@ namespace traceback
 
     void matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q);
 
+    double quaternionToYaw(geometry_msgs::Quaternion &q);
+
     void imageTransformToMapTransform(cv::Mat &image, cv::Mat &map, float src_resolution, float dst_resolution, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
 
     double findLengthOfTranslationByTriangulation(double first_x, double first_y, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double second_x, double second_y, double second_tracer_to_traced_tx, double second_tracer_to_traced_ty);
@@ -203,10 +214,11 @@ namespace traceback
     // The below cases are for pointcloud mode.
     // 1. abort with enough consecutive count      -> Exit traceback process, cooldown
     // 2. abort without enough consecutive count   -> next goal
-    // 3. accept                                   -> Exit traceback process, combine all point cloud matching results
-    // 4. match but not yet aceept                 -> next goal, compute and push point cloud matching result
-    // 5. reject                                   -> Exit traceback process
-    // 6. does not match but not yet reject        -> next goal
+    // 3. accept (match and close)                 -> Exit traceback process, combine all point cloud matching results
+    // 4. match and close but not yet aceept       -> next goal, compute and push point cloud matching result
+    // 5. match and not close                      -> same goal repeat, always keep the first arrived pose
+    // 6. reject                                   -> Exit traceback process
+    // 7. does not match but not yet reject        -> next goal
     //
     // The below 10 cases are for triangulation mode.
     // Traceback feedbacks can be
