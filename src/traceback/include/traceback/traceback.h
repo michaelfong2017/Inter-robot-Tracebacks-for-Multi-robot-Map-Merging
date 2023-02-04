@@ -217,7 +217,7 @@ namespace traceback
     // 1. abort with enough consecutive count      -> Exit traceback process, cooldown
     // 2. abort without enough consecutive count   -> next goal
     // 3. accept (match and close)                 -> Exit traceback process, combine all point cloud matching results
-    // 4. match and close but not yet aceept       -> next goal, compute and push point cloud matching result
+    // 4. match and close but not yet accept       -> next goal, compute and push point cloud matching result
     // 5. match and not close                      -> same goal repeat, always keep the first arrived pose
     // 6. reject                                   -> Exit traceback process
     // 7. does not match but not yet reject        -> next goal
@@ -231,7 +231,7 @@ namespace traceback
     // 5. first traceback, does not match but not yet reject        -> next goal first traceback
     // 6. second traceback, abort                                   -> next goal first traceback
     // 7. second traceback, accept                                  -> Exit traceback process, combine all triangulation results
-    // 8. second traceback, match but not yet aceept                -> next goal first traceback, push this triangulation result
+    // 8. second traceback, match but not yet accept                -> next goal first traceback, push this triangulation result
     // 9. second traceback, does not match                          -> next goal first traceback
     // 10. first traceback, match but unwanted translation angle    -> next goal first traceback, do not increment reject count
     void writeTracebackFeedbackHistory(std::string tracer, std::string traced, std::string feedback);

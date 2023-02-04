@@ -366,10 +366,10 @@ namespace traceback
               // 3. accept (match and close) END
               return;
             }
-            // 4. match and close but not yet aceept
+            // 4. match and close but not yet accept
             else
             {
-              writeTracebackFeedbackHistory(tracer_robot, traced_robot, "4. match and close but not yet aceept");
+              writeTracebackFeedbackHistory(tracer_robot, traced_robot, "4. match and close but not yet accept");
 
               {
                 size_t tracer_robot_index;
@@ -408,8 +408,8 @@ namespace traceback
                 double r = pose_difference_r + transform_needed.r;
                 TransformNeeded total_transform_needed;
                 total_transform_needed.tx = tx;
-                total_transform_needed.tx = ty;
-                total_transform_needed.tx = r;
+                total_transform_needed.ty = ty;
+                total_transform_needed.r = r;
 
                 double length_of_translation = sqrt(tx * tx + ty * ty);
                 cv::Mat adjusted_transform;
@@ -423,7 +423,7 @@ namespace traceback
               }
 
               continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-              // 4. match and close but not yet aceept END
+              // 4. match and close but not yet accept END
               return;
             }
           }
@@ -1006,10 +1006,10 @@ namespace traceback
             return;
           }
           // Add this triangulation result to triangulation result history
-          // 8. second traceback, match but not yet aceept
+          // 8. second traceback, match but not yet accept
           else
           {
-            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "8. second traceback, match but not yet aceept");
+            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "8. second traceback, match but not yet accept");
 
             FirstTracebackResult result = pairwise_first_traceback_result_[tracer_robot][traced_robot];
             double first_x = result.first_x;
@@ -1055,7 +1055,7 @@ namespace traceback
             }
 
             continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-            // 8. second traceback, match but not yet aceept END
+            // 8. second traceback, match but not yet accept END
             return;
           }
         }
