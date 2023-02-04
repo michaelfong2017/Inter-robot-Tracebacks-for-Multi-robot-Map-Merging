@@ -1885,34 +1885,34 @@ namespace traceback
     //      = inv(2->global) * 0->global
     // Using the above order, initial pose values can be directly used.
     cv::Mat t_0_global(3, 3, CV_64F);
-    t_0_global.at<double>(0, 0) = cos(init_0_r);
-    t_0_global.at<double>(0, 1) = -sin(init_0_r);
-    t_0_global.at<double>(0, 2) = init_0_x / resolution;
-    t_0_global.at<double>(1, 0) = sin(init_0_r);
-    t_0_global.at<double>(1, 1) = cos(init_0_r);
-    t_0_global.at<double>(1, 2) = init_0_y / resolution;
+    t_0_global.at<double>(0, 0) = cos(-1 * init_0_r);
+    t_0_global.at<double>(0, 1) = -sin(-1 * init_0_r);
+    t_0_global.at<double>(0, 2) = -1 * init_0_x / resolution;
+    t_0_global.at<double>(1, 0) = sin(-1 * init_0_r);
+    t_0_global.at<double>(1, 1) = cos(-1 * init_0_r);
+    t_0_global.at<double>(1, 2) = -1 * init_0_y / resolution;
     t_0_global.at<double>(2, 0) = 0.0;
     t_0_global.at<double>(2, 1) = 0.0;
     t_0_global.at<double>(2, 2) = 1;
 
     cv::Mat t_1_global(3, 3, CV_64F);
-    t_1_global.at<double>(0, 0) = cos(init_1_r);
-    t_1_global.at<double>(0, 1) = -sin(init_1_r);
-    t_1_global.at<double>(0, 2) = init_1_x / resolution;
-    t_1_global.at<double>(1, 0) = sin(init_1_r);
-    t_1_global.at<double>(1, 1) = cos(init_1_r);
-    t_1_global.at<double>(1, 2) = init_1_y / resolution;
+    t_1_global.at<double>(0, 0) = cos(-1 * init_1_r);
+    t_1_global.at<double>(0, 1) = -sin(-1 * init_1_r);
+    t_1_global.at<double>(0, 2) = -1 * init_1_x / resolution;
+    t_1_global.at<double>(1, 0) = sin(-1 * init_1_r);
+    t_1_global.at<double>(1, 1) = cos(-1 * init_1_r);
+    t_1_global.at<double>(1, 2) = -1 * init_1_y / resolution;
     t_1_global.at<double>(2, 0) = 0.0;
     t_1_global.at<double>(2, 1) = 0.0;
     t_1_global.at<double>(2, 2) = 1;
 
     cv::Mat t_2_global(3, 3, CV_64F);
-    t_2_global.at<double>(0, 0) = cos(init_2_r);
-    t_2_global.at<double>(0, 1) = -sin(init_2_r);
-    t_2_global.at<double>(0, 2) = init_2_x / resolution;
-    t_2_global.at<double>(1, 0) = sin(init_2_r);
-    t_2_global.at<double>(1, 1) = cos(init_2_r);
-    t_2_global.at<double>(1, 2) = init_2_y / resolution;
+    t_2_global.at<double>(0, 0) = cos(-1 * init_2_r);
+    t_2_global.at<double>(0, 1) = -sin(-1 * init_2_r);
+    t_2_global.at<double>(0, 2) = -1 * init_2_x / resolution;
+    t_2_global.at<double>(1, 0) = sin(-1 * init_2_r);
+    t_2_global.at<double>(1, 1) = cos(-1 * init_2_r);
+    t_2_global.at<double>(1, 2) = -1 * init_2_y / resolution;
     t_2_global.at<double>(2, 0) = 0.0;
     t_2_global.at<double>(2, 1) = 0.0;
     t_2_global.at<double>(2, 2) = 1;
@@ -1965,7 +1965,7 @@ namespace traceback
         fw << ground_truth_transform.at<double>(0, 0) << "\t" << ground_truth_transform.at<double>(0, 1) << "\t" << ground_truth_transform.at<double>(0, 2) << std::endl;
         fw << ground_truth_transform.at<double>(1, 0) << "\t" << ground_truth_transform.at<double>(1, 1) << "\t" << ground_truth_transform.at<double>(1, 2) << std::endl;
         fw << ground_truth_transform.at<double>(2, 0) << "\t" << ground_truth_transform.at<double>(2, 1) << "\t" << ground_truth_transform.at<double>(2, 2) << std::endl;
-        fw << "Inverse ground truth transform, that is, from robot " << tracer_robot.substr(1) << "'s frame to robot " << traced_robot.substr(1) << "'s frame:" << std::endl;
+        fw << "Inverse ground truth transform, that is, from robot " << traced_robot.substr(1) << "'s frame to robot " << tracer_robot.substr(1) << "'s frame:" << std::endl;
         fw << inverse_ground_truth_transform.at<double>(0, 0) << "\t" << inverse_ground_truth_transform.at<double>(0, 1) << "\t" << inverse_ground_truth_transform.at<double>(0, 2) << std::endl;
         fw << inverse_ground_truth_transform.at<double>(1, 0) << "\t" << inverse_ground_truth_transform.at<double>(1, 1) << "\t" << inverse_ground_truth_transform.at<double>(1, 2) << std::endl;
         fw << inverse_ground_truth_transform.at<double>(2, 0) << "\t" << inverse_ground_truth_transform.at<double>(2, 1) << "\t" << inverse_ground_truth_transform.at<double>(2, 2) << std::endl;
