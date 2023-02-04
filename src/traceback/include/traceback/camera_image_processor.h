@@ -65,7 +65,7 @@ namespace traceback
     public:
         friend class Traceback;
 
-        bool pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, double yaw, TransformNeeded &transform_needed, double &match_score, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
+        bool pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, double match_confidence, double yaw, TransformNeeded &transform_needed, double &match_score, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
 
         /*
         Return whether traced image matches tracer image, depending on the confidence.

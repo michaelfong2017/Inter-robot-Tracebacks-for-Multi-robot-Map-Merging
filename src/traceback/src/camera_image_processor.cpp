@@ -30,7 +30,7 @@ namespace traceback
         _max_correspondence_distance = 3.0; // default 1.0
     }
 
-    bool CameraImageProcessor::pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, double yaw, TransformNeeded &transform_needed, double &match_score, std::string tracer_robot, std::string traced_robot, std::string current_time)
+    bool CameraImageProcessor::pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, double match_confidence, double yaw, TransformNeeded &transform_needed, double &match_score, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr tracer_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr traced_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);

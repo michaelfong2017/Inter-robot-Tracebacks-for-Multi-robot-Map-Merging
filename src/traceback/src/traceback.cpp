@@ -133,7 +133,7 @@ namespace traceback
         double yaw = quaternionToYaw(goal_q);
         TransformNeeded transform_needed;
         double match_score;
-        bool is_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, yaw, transform_needed, match_score, tracer_robot, traced_robot, current_time);
+        bool is_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, point_cloud_match_score_, yaw, transform_needed, match_score, tracer_robot, traced_robot, current_time);
 
         {
           std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_ICP_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
