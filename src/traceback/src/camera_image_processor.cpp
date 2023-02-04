@@ -23,11 +23,11 @@ namespace traceback
         // _maxY = 25.0;
         // _maxZ = 3.0;
         _mean_k = 50;
-        _std_mul = 1.5;                  // default 1.0
-        _transformation_epsilon = 0.008; // default 0.01
+        _std_mul = 1.5;                      // default 1.0
+        _transformation_epsilon = 0.0000001; // default 0.01
         _max_iters = 75;
         _euclidean_fitness_epsilon = 0.1;
-        _max_correspondence_distance = 1.5; // default 1.0
+        _max_correspondence_distance = 5.0; // default 1.0
     }
 
     bool CameraImageProcessor::pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)

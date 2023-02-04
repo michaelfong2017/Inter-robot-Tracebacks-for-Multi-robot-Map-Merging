@@ -1803,21 +1803,36 @@ namespace traceback
 
   void Traceback::evaluateWithGroundTruth(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time)
   {
+    // initial poses w.r.t. global frame
+    double resolution = 0.05;
+    double init_0_x = -7.0;
+    double init_0_y = -1.0;
+    double init_0_r = 0.0;
+    double init_1_x = 7.0;
+    double init_1_y = -1.0;
+    double init_1_r = 0.0;
+    double init_2_x = 0.5;
+    double init_2_y = 3.0;
+    double init_2_r = 0.785;
+
+    // global origin object w.r.t. frame 0
     cv::Mat truth_0_xy(3, 1, CV_64F);
-    truth_0_xy.at<double>(0, 0) = 140.0;
-    truth_0_xy.at<double>(1, 0) = -20.0;
+    truth_0_xy.at<double>(0, 0) = -1 * init_0_x / resolution;
+    truth_0_xy.at<double>(1, 0) = -1 * init_0_y / resolution;
     truth_0_xy.at<double>(2, 0) = 1.0;
     double truth_0_r = 0.0;
+    // global origin object w.r.t. frame 1
     cv::Mat truth_1_xy(3, 1, CV_64F);
-    truth_1_xy.at<double>(0, 0) = -140.0;
-    truth_1_xy.at<double>(1, 0) = -20.0;
+    truth_1_xy.at<double>(0, 0) = -1 * init_1_x / resolution;
+    truth_1_xy.at<double>(1, 0) = -1 * init_1_y / resolution;
     truth_1_xy.at<double>(2, 0) = 1.0;
     double truth_1_r = 0.0;
+    // global origin object w.r.t. frame 2
     cv::Mat truth_2_xy(3, 1, CV_64F);
-    truth_2_xy.at<double>(0, 0) = -10.0;
-    truth_2_xy.at<double>(1, 0) = -60.0;
+    truth_2_xy.at<double>(0, 0) = -1 * init_2_x / resolution;
+    truth_2_xy.at<double>(1, 0) = -1 * init_2_y / resolution;
     truth_2_xy.at<double>(2, 0) = 1.0;
-    double truth_2_r = -0.785;
+    double truth_2_r = -1 * init_2_r;
 
     cv::Mat test_xy;
     double test_r;
@@ -1863,6 +1878,100 @@ namespace traceback
     original_estimated_r = atan2(original.at<double>(1, 0), original.at<double>(0, 0)) + test_r;
     adjusted_estimated_xy = adjusted * test_xy;
     adjusted_estimated_r = atan2(adjusted.at<double>(1, 0), adjusted.at<double>(0, 0)) + test_r;
+
+    // Compute ground truth pairwise matrix
+    // e.g. from w.r.t frame 0 to w.r.t frame 2:
+    // 0->2 = global->2 * 0->global
+    //      = inv(2->global) * 0->global
+    // Using the above order, initial pose values can be directly used.
+    cv::Mat t_0_global(3, 3, CV_64F);
+    t_0_global.at<double>(0, 0) = cos(init_0_r);
+    t_0_global.at<double>(0, 1) = -sin(init_0_r);
+    t_0_global.at<double>(0, 2) = init_0_x / resolution;
+    t_0_global.at<double>(1, 0) = sin(init_0_r);
+    t_0_global.at<double>(1, 1) = cos(init_0_r);
+    t_0_global.at<double>(1, 2) = init_0_y / resolution;
+    t_0_global.at<double>(2, 0) = 0.0;
+    t_0_global.at<double>(2, 1) = 0.0;
+    t_0_global.at<double>(2, 2) = 1;
+
+    cv::Mat t_1_global(3, 3, CV_64F);
+    t_1_global.at<double>(0, 0) = cos(init_1_r);
+    t_1_global.at<double>(0, 1) = -sin(init_1_r);
+    t_1_global.at<double>(0, 2) = init_1_x / resolution;
+    t_1_global.at<double>(1, 0) = sin(init_1_r);
+    t_1_global.at<double>(1, 1) = cos(init_1_r);
+    t_1_global.at<double>(1, 2) = init_1_y / resolution;
+    t_1_global.at<double>(2, 0) = 0.0;
+    t_1_global.at<double>(2, 1) = 0.0;
+    t_1_global.at<double>(2, 2) = 1;
+
+    cv::Mat t_2_global(3, 3, CV_64F);
+    t_2_global.at<double>(0, 0) = cos(init_2_r);
+    t_2_global.at<double>(0, 1) = -sin(init_2_r);
+    t_2_global.at<double>(0, 2) = init_2_x / resolution;
+    t_2_global.at<double>(1, 0) = sin(init_2_r);
+    t_2_global.at<double>(1, 1) = cos(init_2_r);
+    t_2_global.at<double>(1, 2) = init_2_y / resolution;
+    t_2_global.at<double>(2, 0) = 0.0;
+    t_2_global.at<double>(2, 1) = 0.0;
+    t_2_global.at<double>(2, 2) = 1;
+
+    cv::Mat t_0_1 = t_1_global.inv() * t_0_global;
+    cv::Mat t_0_2 = t_2_global.inv() * t_0_global;
+    cv::Mat t_1_0 = t_0_1.inv();
+    cv::Mat t_1_2 = t_2_global.inv() * t_1_global;
+    cv::Mat t_2_0 = t_0_2.inv();
+    cv::Mat t_2_1 = t_1_2.inv();
+
+    cv::Mat ground_truth_transform, inverse_ground_truth_transform;
+    if (tracer_robot == "/tb3_0" && traced_robot == "/tb3_1")
+    {
+      ground_truth_transform = t_0_1;
+      inverse_ground_truth_transform = t_1_0;
+    }
+    else if (tracer_robot == "/tb3_0" && traced_robot == "/tb3_2")
+    {
+      ground_truth_transform = t_0_2;
+      inverse_ground_truth_transform = t_2_0;
+    }
+    else if (tracer_robot == "/tb3_1" && traced_robot == "/tb3_0")
+    {
+      ground_truth_transform = t_1_0;
+      inverse_ground_truth_transform = t_0_1;
+    }
+    else if (tracer_robot == "/tb3_1" && traced_robot == "/tb3_2")
+    {
+      ground_truth_transform = t_1_2;
+      inverse_ground_truth_transform = t_2_1;
+    }
+    else if (tracer_robot == "/tb3_2" && traced_robot == "/tb3_0")
+    {
+      ground_truth_transform = t_2_0;
+      inverse_ground_truth_transform = t_0_2;
+    }
+    else if (tracer_robot == "/tb3_0" && traced_robot == "/tb3_2")
+    {
+      ground_truth_transform = t_2_1;
+      inverse_ground_truth_transform = t_1_2;
+    }
+    //
+    {
+      std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+      if (fw.is_open())
+      {
+        fw << std::endl;
+        fw << "Ground truth transform from robot " << tracer_robot.substr(1) << "'s frame to robot " << traced_robot.substr(1) << "'s frame:" << std::endl;
+        fw << ground_truth_transform.at<double>(0, 0) << "\t" << ground_truth_transform.at<double>(0, 1) << "\t" << ground_truth_transform.at<double>(0, 2) << std::endl;
+        fw << ground_truth_transform.at<double>(1, 0) << "\t" << ground_truth_transform.at<double>(1, 1) << "\t" << ground_truth_transform.at<double>(1, 2) << std::endl;
+        fw << ground_truth_transform.at<double>(2, 0) << "\t" << ground_truth_transform.at<double>(2, 1) << "\t" << ground_truth_transform.at<double>(2, 2) << std::endl;
+        fw << "Inverse ground truth transform, that is, from robot " << tracer_robot.substr(1) << "'s frame to robot " << traced_robot.substr(1) << "'s frame:" << std::endl;
+        fw << inverse_ground_truth_transform.at<double>(0, 0) << "\t" << inverse_ground_truth_transform.at<double>(0, 1) << "\t" << inverse_ground_truth_transform.at<double>(0, 2) << std::endl;
+        fw << inverse_ground_truth_transform.at<double>(1, 0) << "\t" << inverse_ground_truth_transform.at<double>(1, 1) << "\t" << inverse_ground_truth_transform.at<double>(1, 2) << std::endl;
+        fw << inverse_ground_truth_transform.at<double>(2, 0) << "\t" << inverse_ground_truth_transform.at<double>(2, 1) << "\t" << inverse_ground_truth_transform.at<double>(2, 2) << std::endl;
+        fw.close();
+      }
+    }
 
     {
       std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
