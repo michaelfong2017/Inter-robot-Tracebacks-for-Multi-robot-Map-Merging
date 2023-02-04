@@ -27,7 +27,8 @@
         <param name="discovery_rate" value="0.05"/>
         <param name="estimation_rate" value="0.1"/>
         <param name="estimation_confidence" value="0.8"/>
-        <param name="camera_image_update_rate" value="0.2"/>
+        <param name="camera_image_update_rate" value="2"/>
+        <param name="camera_pose_image_max_queue_size" value="20"/>
         <param name="essential_mat_confidence" value="0.5"/>
         <param name="point_cloud_match_score" value="0.1"/>
         <param name="point_cloud_close_score" value="0.005"/> <!-- Close condition 1 -->
@@ -35,7 +36,7 @@
         <param name="point_cloud_close_rotation" value="0.05"/> <!-- Close condition 2b: Rotation condition for two point clouds to be close -->
         <param name="accept_count_needed" value="5"/>
         <param name="reject_count_needed" value="4"/>
-        <param name="consecutive_abort_count_needed" value="6" />
+        <param name="consecutive_abort_count_needed" value="4" />
         <!-- either "triangulation" or "pointcloud" -->
         <param name="adjustment_mode" value="pointcloud" default="pointcloud" />
     </node>
