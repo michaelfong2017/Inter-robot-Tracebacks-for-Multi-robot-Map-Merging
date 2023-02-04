@@ -24,13 +24,13 @@ namespace traceback
         // _maxZ = 3.0;
         _mean_k = 50;
         _std_mul = 1.5;                      // default 1.0
-        _transformation_epsilon = 0.0000001; // default 0.01
+        _transformation_epsilon = 0.00000001; // default 0.01
         _max_iters = 75;
-        _euclidean_fitness_epsilon = 0.1;
-        _max_correspondence_distance = 5.0; // default 1.0
+        _euclidean_fitness_epsilon = 1.0;
+        _max_correspondence_distance = 3.0; // default 1.0
     }
 
-    bool CameraImageProcessor::pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
+    bool CameraImageProcessor::pointCloudMatching(const sensor_msgs::PointCloud2 &tracer_point_cloud, const sensor_msgs::PointCloud2 &traced_point_cloud, double yaw, TransformNeeded &transform_needed, double &match_score, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr tracer_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr traced_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
@@ -58,6 +58,7 @@ namespace traceback
         // icp.setInputTarget(_downsampled_cloud_ptr);
         icp.setInputSource(traced_cloud_ptr);
         icp.setInputTarget(tracer_cloud_ptr);
+        icp.setRANSACOutlierRejectionThreshold(0.025);
 
         Eigen::AngleAxisf init_rotation(0.0, Eigen::Vector3f::UnitZ());
         Eigen::Translation3f init_translation(0.0, 0.0, 0.0);
@@ -97,7 +98,7 @@ namespace traceback
 
         double score = icp.getFitnessScore();
         {
-            std::ofstream fw(current_time + "_ICP_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::out);
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_ICP_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "ICP has converged." << std::endl;
@@ -116,7 +117,7 @@ namespace traceback
         t.y should be considered 0.
         If yaw=0, the more positive the t.z is, the more the tracer is behind from the goal (traced), the more positive x translation is needed
         to translate from tracer to traced. This is different from using image matching.
-        If yaw=0, the more positive the t.x is, the more the goal (traced) is to the left of the tracer, the more positive y translation is needed
+        If yaw=0, the more positive the t.x is, the more the tracer is to the left of the goal (traced), the more negative y translation is needed
         to translate from tracer to traced.
 
         For transform_R, only consider the y-axis rotation since this y-axis rotation is the z-axis rotation in the robot world.
@@ -128,11 +129,18 @@ namespace traceback
         // Read the above comment to understand these calculations.
         // Note the sign of the effect of trans[0] and trans[2].
         // It's quite complicated to figure it out.
-        transform_needed.tx = trans[2] * cos(yaw) + (-1 * trans[0] * sin(yaw));
-        transform_needed.ty = trans[0] * cos(yaw) + trans[2] * sin(yaw);
+        transform_needed.tx = trans[2] * cos(yaw) + trans[0] * sin(yaw);
+        transform_needed.ty = (-1 * trans[0] * cos(yaw)) + trans[2] * sin(yaw);
         transform_needed.r = quat.y() * -1.0;
 
-        return true;
+        match_score = score;
+        
+        if (score < 0.05) {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
     void CameraImageProcessor::removeInvalidValues(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_ptr)

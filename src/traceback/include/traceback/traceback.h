@@ -91,6 +91,8 @@ namespace traceback
     double estimation_rate_;
     double confidence_threshold_;
     double essential_mat_confidence_threshold_;
+    double point_cloud_match_score_;
+    double point_cloud_close_score_;
     double point_cloud_close_translation_;
     double point_cloud_close_rotation_;
     int accept_count_needed_;

@@ -25,6 +25,8 @@ namespace traceback
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
     private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
+    private_nh.param("point_cloud_match_score", point_cloud_match_score_, 0.05);
+    private_nh.param("point_cloud_close_score", point_cloud_close_score_, 0.005);
     private_nh.param("point_cloud_close_translation", point_cloud_close_translation_, 0.05);
     private_nh.param("point_cloud_close_rotation", point_cloud_close_rotation_, 0.05);
     private_nh.param("accept_count_needed", accept_count_needed_, 8);
@@ -80,7 +82,8 @@ namespace traceback
 
         pairwise_sub_traceback_number_[tracer_robot][traced_robot] = 1;
       }
-      else {
+      else
+      {
         ++pairwise_sub_traceback_number_[tracer_robot][traced_robot];
       }
 
@@ -128,56 +131,67 @@ namespace traceback
         geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
         double yaw = quaternionToYaw(goal_q);
         TransformNeeded transform_needed;
-        bool is_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, yaw, transform_needed, tracer_robot, traced_robot, current_time);
+        double match_score;
+        bool is_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, yaw, transform_needed, match_score, tracer_robot, traced_robot, current_time);
 
-        // write images for debug
         {
-          cv_bridge::CvImageConstPtr cv_ptr_tracer;
-          try
+          std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_ICP_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+          if (fw.is_open())
           {
-            if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
-              cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
-            else
-              cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
+            fw << "transform_needed in global coordinates (x, y, r) = (" << transform_needed.tx << ", " << transform_needed.ty << ", " << transform_needed.r << ")" << std::endl;
+            fw.close();
           }
-          catch (cv_bridge::Exception &e)
-          {
-            ROS_ERROR("cv_bridge exception: %s", e.what());
-            return;
-          }
-
-          // Process cv_ptr->image using OpenCV
-          ROS_INFO("Process cv_ptr->image using OpenCV");
-          cv::imwrite(current_time + tracer_robot.substr(1) + "_tracer.png",
-                      cv_ptr_tracer->image);
-
-          //
-          //
-          cv_bridge::CvImageConstPtr cv_ptr_traced;
-          try
-          {
-            if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
-              cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
-            else
-              cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
-          }
-          catch (cv_bridge::Exception &e)
-          {
-            ROS_ERROR("cv_bridge exception: %s", e.what());
-            return;
-          }
-
-          // Process cv_ptr->image using OpenCV
-          ROS_INFO("Process cv_ptr->image using OpenCV");
-          cv::imwrite(current_time + traced_robot.substr(1) + "_traced.png",
-                      cv_ptr_traced->image);
         }
-        // end
 
         // 3 or 4 or 5
         if (is_match)
         {
+          // write images for debug
+          {
+            cv_bridge::CvImageConstPtr cv_ptr_tracer;
+            try
+            {
+              if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
+                cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
+              else
+                cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
+            }
+            catch (cv_bridge::Exception &e)
+            {
+              ROS_ERROR("cv_bridge exception: %s", e.what());
+              return;
+            }
+
+            // Process cv_ptr->image using OpenCV
+            ROS_INFO("Process cv_ptr->image using OpenCV");
+            cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer.png",
+                        cv_ptr_tracer->image);
+
+            //
+            //
+            cv_bridge::CvImageConstPtr cv_ptr_traced;
+            try
+            {
+              if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
+                cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
+              else
+                cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
+            }
+            catch (cv_bridge::Exception &e)
+            {
+              ROS_ERROR("cv_bridge exception: %s", e.what());
+              return;
+            }
+
+            // Process cv_ptr->image using OpenCV
+            ROS_INFO("Process cv_ptr->image using OpenCV");
+            cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced.png",
+                        cv_ptr_traced->image);
+          }
+          // end
+
           bool is_close = abs(transform_needed.tx) < point_cloud_close_translation_ && abs(transform_needed.ty) < point_cloud_close_translation_ && abs(transform_needed.r) < point_cloud_close_rotation_;
+          is_close = is_close || match_score < point_cloud_close_score_;
           // 3 or 4
           if (is_close)
           {
@@ -412,11 +426,14 @@ namespace traceback
           // 5. match and not close
           else
           {
-            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "5. match and not close - traceback number " + std::to_string(pairwise_sub_traceback_number_[tracer_robot][traced_robot]));
+            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "5. match and not close - traceback number " + std::to_string(pairwise_sub_traceback_number_[tracer_robot][traced_robot]) + " - " + "arrived_pose (x, y, r) = (" + std::to_string(arrived_pose.position.x) + ", " + std::to_string(arrived_pose.position.y) + ", " + std::to_string(quaternionToYaw(arrived_pose.orientation)) + ")");
 
             move_base_msgs::MoveBaseGoal goal;
             geometry_msgs::PoseStamped new_pose_stamped;
             new_pose_stamped.pose = arrived_pose;
+
+            // Walk for a shorter distance
+            double walk_factor = 1.0;
 
             // Rotate by r degree
             geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
@@ -427,7 +444,7 @@ namespace traceback
             tf2_goal_q.setY(goal_q.y);
             tf2_goal_q.setZ(goal_q.z);
             tf2::Quaternion tf2_transform_q;
-            tf2_transform_q.setRPY(0.0, 0.0, transform_needed.r);
+            tf2_transform_q.setRPY(0.0, 0.0, transform_needed.r * walk_factor);
             tf2::Quaternion tf2_new_q = tf2_transform_q * tf2_goal_q;
             geometry_msgs::Quaternion new_q;
             new_q.w = tf2_new_q.w();
@@ -437,8 +454,8 @@ namespace traceback
             new_pose_stamped.pose.orientation = new_q;
             //
 
-            new_pose_stamped.pose.position.x += transform_needed.tx;
-            new_pose_stamped.pose.position.y += transform_needed.ty;
+            new_pose_stamped.pose.position.x += transform_needed.tx * walk_factor;
+            new_pose_stamped.pose.position.y += transform_needed.ty * walk_factor;
             new_pose_stamped.header.frame_id = tracer_robot.substr(1) + tracer_robot + "/map";
             new_pose_stamped.header.stamp = ros::Time::now();
             goal.target_pose = new_pose_stamped;
@@ -2089,7 +2106,7 @@ namespace traceback
   {
     std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
-    std::ofstream fw("Feedback_history_" + tracer.substr(1) + "_tracer_robot_" + traced.substr(1) + "_traced_robot.txt", std::ofstream::app);
+    std::ofstream fw(tracer.substr(1) + "_" + traced.substr(1) + "/" + "Feedback_history_" + tracer.substr(1) + "_tracer_robot_" + traced.substr(1) + "_traced_robot.txt", std::ofstream::app);
     if (fw.is_open())
     {
       fw << current_time << " - " << feedback << std::endl;
