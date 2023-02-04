@@ -256,6 +256,7 @@ namespace traceback
             transform_estimator_.updateBestTransforms(average_adjusted_transform, tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
             //
 
+            cv::Mat world_transform = pairwise_triangulation_result_history_[tracer_robot][traced_robot][0].world_transform;
             {
               std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
               if (fw.is_open())
@@ -263,7 +264,6 @@ namespace traceback
                 fw << "Unadjusted transform:" << std::endl;
                 if (history_size != 0)
                 {
-                  cv::Mat world_transform = pairwise_triangulation_result_history_[tracer_robot][traced_robot][0].world_transform;
                   fw << world_transform.at<double>(0, 0) << "\t" << world_transform.at<double>(0, 1) << "\t" << world_transform.at<double>(0, 2) << std::endl;
                   fw << world_transform.at<double>(1, 0) << "\t" << world_transform.at<double>(1, 1) << "\t" << world_transform.at<double>(1, 2) << std::endl;
                   fw << world_transform.at<double>(2, 0) << "\t" << world_transform.at<double>(2, 1) << "\t" << world_transform.at<double>(2, 2) << std::endl;
@@ -280,6 +280,8 @@ namespace traceback
                 fw.close();
               }
             }
+
+            evaluateWithGroundTruth(world_transform, average_adjusted_transform, tracer_robot, traced_robot, current_time);
 
             if (has_best_transforms_.size() == resolutions_.size())
             {
@@ -1797,6 +1799,88 @@ namespace traceback
     t2.at<double>(2, 2) = 1.0;
 
     adjusted = t2 * adjustment * t1 * original;
+  }
+
+  void Traceback::evaluateWithGroundTruth(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time)
+  {
+    cv::Mat truth_0_xy(3, 1, CV_64F);
+    truth_0_xy.at<double>(0, 0) = 140.0;
+    truth_0_xy.at<double>(1, 0) = -20.0;
+    truth_0_xy.at<double>(2, 0) = 1.0;
+    double truth_0_r = 0.0;
+    cv::Mat truth_1_xy(3, 1, CV_64F);
+    truth_1_xy.at<double>(0, 0) = -140.0;
+    truth_1_xy.at<double>(1, 0) = -20.0;
+    truth_1_xy.at<double>(2, 0) = 1.0;
+    double truth_1_r = 0.0;
+    cv::Mat truth_2_xy(3, 1, CV_64F);
+    truth_2_xy.at<double>(0, 0) = -10.0;
+    truth_2_xy.at<double>(1, 0) = -60.0;
+    truth_2_xy.at<double>(2, 0) = 1.0;
+    double truth_2_r = -0.785;
+
+    cv::Mat test_xy;
+    double test_r;
+    if (tracer_robot == "/tb3_0")
+    {
+      test_xy = truth_0_xy;
+      test_r = truth_0_r;
+    }
+    else if (tracer_robot == "/tb3_1")
+    {
+      test_xy = truth_1_xy;
+      test_r = truth_1_r;
+    }
+    else if (tracer_robot == "/tb3_2")
+    {
+      test_xy = truth_2_xy;
+      test_r = truth_2_r;
+    }
+
+    double expected_x, expected_y, expected_r;
+    if (traced_robot == "/tb3_0")
+    {
+      expected_x = truth_0_xy.at<double>(0, 0);
+      expected_y = truth_0_xy.at<double>(1, 0);
+      expected_r = truth_0_r;
+    }
+    else if (traced_robot == "/tb3_1")
+    {
+      expected_x = truth_1_xy.at<double>(0, 0);
+      expected_y = truth_1_xy.at<double>(1, 0);
+      expected_r = truth_1_r;
+    }
+    else if (traced_robot == "/tb3_2")
+    {
+      expected_x = truth_2_xy.at<double>(0, 0);
+      expected_y = truth_2_xy.at<double>(1, 0);
+      expected_r = truth_2_r;
+    }
+
+    cv::Mat original_estimated_xy, adjusted_estimated_xy;
+    double original_estimated_r, adjusted_estimated_r;
+    original_estimated_xy = original * test_xy; //
+    original_estimated_r = atan2(original.at<double>(2, 0), original.at<double>(0, 0)) + test_r;
+    adjusted_estimated_xy = adjusted * test_xy;
+    adjusted_estimated_r = atan2(adjusted.at<double>(2, 0), adjusted.at<double>(0, 0)) + test_r;
+
+    {
+      std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+      if (fw.is_open())
+      {
+        fw << std::endl;
+        fw << "Evaluation:" << std::endl;
+        fw << "Expected transformed (x, y, r) of the global origin object" << std::endl;
+        fw << "   from robot " << tracer_robot.substr(1) << "'s frame to robot " << traced_robot.substr(1) << "'s frame:" << std::endl;
+        fw << "Expected (x, y, r) = (" << expected_x << ", " << expected_y << ", " << expected_r << ")" << std::endl;
+        fw << "Original estimated (x, y, r) = (" << original_estimated_xy.at<double>(0, 0) << ", " << original_estimated_xy.at<double>(1, 0) << ", " << original_estimated_r << ")" << std::endl;
+        fw << "Adjusted estimated (x, y, r) = (" << adjusted_estimated_xy.at<double>(0, 0) << ", " << adjusted_estimated_xy.at<double>(1, 0) << ", " << adjusted_estimated_r << ")" << std::endl;
+        fw << std::endl;
+        fw << "Error of original is " << sqrt(pow(expected_x - original_estimated_xy.at<double>(0, 0), 2) + pow(expected_y - original_estimated_xy.at<double>(1, 0), 2)) << " pixels translation and " << abs(expected_r - original_estimated_r) << " radians rotation" << std::endl;
+        fw << "Error of adjusted is " << sqrt(pow(expected_x - adjusted_estimated_xy.at<double>(0, 0), 2) + pow(expected_y - adjusted_estimated_xy.at<double>(1, 0), 2)) << " pixels translation and " << abs(expected_r - adjusted_estimated_r) << " radians rotation" << std::endl;
+        fw.close();
+      }
+    }
   }
 
   void Traceback::writeTracebackFeedbackHistory(std::string tracer, std::string traced, std::string feedback)

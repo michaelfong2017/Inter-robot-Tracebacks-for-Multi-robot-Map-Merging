@@ -188,6 +188,18 @@ namespace traceback
 
     void findAdjustedTransformation(cv::Mat &original, cv::Mat &adjusted, double scale, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double transform_needed_r, double first_x, double first_y, float src_resolution);
 
+    // Function without parameters.
+    // Currently only test with tb3_0, tb3_1 and tb3_2.
+    // Their initial poses (x, y, r) are        (-7, 1, 0), (7, 1, 0) and (0.5, 3, 0.785) in global coordinates.
+    // So, the global origin object (0, 0, 0rad) is in (7, -1, 0), (-7, -1, 0) and (-0.5, -3, -0.785) in their respective map.
+    // Hence, the wanted transformation matrix T to transform any point from tb3_0 frame to tb3_1 frame
+    // aims to fulfill T * (7, -1, 0) = (-7, -1, 0)
+    // In pixel coordinates where the resolution is defined to be 0.05.
+    // T * (140, -20, 0) = (-140, -20, 0)
+    // (140, -20, 0) for tb3_0, (-140, -20, 0) for tb3_1 and (-10, -60, -0.785) for tb3_2
+    // are hardcoded ground truth for evaluation.
+    void evaluateWithGroundTruth(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time = "");
+
     // The below cases are for pointcloud mode.
     // 1. abort with enough consecutive count      -> Exit traceback process, cooldown
     // 2. abort without enough consecutive count   -> next goal
