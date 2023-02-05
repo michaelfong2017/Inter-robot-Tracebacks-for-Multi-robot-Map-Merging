@@ -1089,14 +1089,15 @@ namespace traceback
     //   temp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
     //   pass_end = true;
     // }
-    for (int i = 0; i < 50; ++i)
+    for (int i = 0; i < 15; ++i)
     {
       if (is_middle_abort)
       {
         ++temp;
       }
-      else {
-        i = 50;
+      else
+      {
+        i = 15;
       }
       while (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(temp->stamp))
       {
@@ -1342,6 +1343,16 @@ namespace traceback
     double goal_x = current_it->pose.position.x;
     double goal_y = current_it->pose.position.y;
 
+    /** Visualize goal in src robot frame */
+    {
+      geometry_msgs::PoseStamped pose_stamped;
+      pose_stamped.pose = current_it->pose;
+      pose_stamped.header.frame_id = robot_name_dst.substr(1) + robot_name_dst + "/map";
+      pose_stamped.header.stamp = ros::Time::now();
+      visualizeGoal(pose_stamped, robot_name_src, false);
+    }
+    /** Visualize goal in src robot frame END */
+
     // Transform goal from dst frame to src (robot i) frame
     // Same as above, it is required to manually rotate about the bottom-left corner, which
     // is (-20m, -20m) or (-400px, -400px) when the resolution is 0.05.
@@ -1426,12 +1437,12 @@ namespace traceback
     ROS_DEBUG("Goal and image to be sent");
 
     /** Visualize goal in src robot frame */
-    visualizeGoal(goal.target_pose, robot_name_src);
+    visualizeGoal(goal.target_pose, robot_name_src, true);
     /** Visualize goal in src robot frame END */
     robots_to_goal_and_image_publisher_[robot_name_src].publish(goal_and_image);
   }
 
-  void Traceback::visualizeGoal(geometry_msgs::PoseStamped pose_stamped, std::string robot_name)
+  void Traceback::visualizeGoal(geometry_msgs::PoseStamped pose_stamped, std::string robot_name, bool is_src)
   {
     std_msgs::ColorRGBA blue;
     blue.r = 0;
@@ -1454,9 +1465,19 @@ namespace traceback
     m.header.frame_id = pose_stamped.header.frame_id;
     m.header.stamp = pose_stamped.header.stamp;
     m.ns = "traceback_goal";
-    m.scale.x = 0.2;
-    m.scale.y = 0.2;
-    m.scale.z = 0.2;
+    if (is_src)
+    {
+      m.scale.x = 0.2;
+      m.scale.y = 0.2;
+      m.scale.z = 0.2;
+    }
+    else
+    {
+      m.scale.x = 0.4;
+      m.scale.y = 0.4;
+      m.scale.z = 0.4;
+    }
+
     // lives forever
     m.lifetime = ros::Duration(0);
     m.frame_locked = true;
@@ -1465,7 +1486,18 @@ namespace traceback
     m.type = visualization_msgs::Marker::ARROW;
     size_t id = 0;
     m.id = int(id);
-    m.color = red;
+    if (robot_name == "/tb3_0")
+    {
+      m.color = red;
+    }
+    else if (robot_name == "/tb3_1")
+    {
+      m.color = green;
+    }
+    else if (robot_name == "/tb3_2")
+    {
+      m.color = blue;
+    }
     m.pose.position = pose_stamped.pose.position;
     m.pose.orientation = pose_stamped.pose.orientation;
     // delete previous markers, which are now unused

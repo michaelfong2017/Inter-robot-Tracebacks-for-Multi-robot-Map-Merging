@@ -174,7 +174,7 @@ namespace traceback
 
     std::unordered_map<std::string, ros::Publisher> robots_to_visualize_marker_publisher_;
     std::string visualize_goal_topic_ = "traceback/visualize/goal";
-    void visualizeGoal(geometry_msgs::PoseStamped pose_stamped, std::string robot_name); // robot_name is e.g. /tb3_0
+    void visualizeGoal(geometry_msgs::PoseStamped pose_stamped, std::string robot_name, bool is_src = true); // robot_name is e.g. /tb3_0
 
     geometry_msgs::Pose getRobotPose(std::string robot_name);
     geometry_msgs::Pose getRobotPose(const std::string &global_frame, const std::string &robot_base_frame, const tf::TransformListener &tf_listener, const double &transform_tolerance);
