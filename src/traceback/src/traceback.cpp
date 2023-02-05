@@ -119,49 +119,55 @@ namespace traceback
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. abort without enough consecutive count");
 
-          /** just for finding min_it */
-          {
-            // Get current pose
-            geometry_msgs::Pose pose = getRobotPose(tracer_robot);
-
-            size_t tracer_robot_index;
-            size_t traced_robot_index;
-            for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
-            {
-              if (it->second == tracer_robot)
+          pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
+              ros::Duration(30, 0),
+              [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
               {
-                tracer_robot_index = it->first;
-              }
-              else if (it->second == traced_robot)
-              {
-                traced_robot_index = it->first;
-              }
-            }
-            std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-            cv::Mat mat_transform = mat_transforms[traced_robot_index];
+                /** just for finding min_it */
+                {
+                  // Get current pose
+                  geometry_msgs::Pose pose = getRobotPose(tracer_robot);
 
-            cv::Mat pose_src(3, 1, CV_64F);
-            pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
-            pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
-            pose_src.at<double>(2, 0) = 1.0;
+                  size_t tracer_robot_index;
+                  size_t traced_robot_index;
+                  for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+                  {
+                    if (it->second == tracer_robot)
+                    {
+                      tracer_robot_index = it->first;
+                    }
+                    else if (it->second == traced_robot)
+                    {
+                      traced_robot_index = it->first;
+                    }
+                  }
+                  std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
+                  cv::Mat mat_transform = mat_transforms[traced_robot_index];
 
-            cv::Mat pose_dst = mat_transform * pose_src;
-            pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
-            pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
-            pose_dst.at<double>(0, 0) += src_map_origin_x;
-            pose_dst.at<double>(1, 0) += src_map_origin_y;
-            // Also adjust the difference between the origins
-            pose_dst.at<double>(0, 0) += dst_map_origin_x;
-            pose_dst.at<double>(1, 0) += dst_map_origin_y;
-            pose_dst.at<double>(0, 0) -= src_map_origin_x;
-            pose_dst.at<double>(1, 0) -= src_map_origin_y;
+                  cv::Mat pose_src(3, 1, CV_64F);
+                  pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
+                  pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
+                  pose_src.at<double>(2, 0) = 1.0;
 
-            boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-            robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], traced_robot, pose_dst);
-          }
-          /** just for finding min_it END */
-          
-          continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
+                  cv::Mat pose_dst = mat_transform * pose_src;
+                  pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
+                  pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
+                  pose_dst.at<double>(0, 0) += src_map_origin_x;
+                  pose_dst.at<double>(1, 0) += src_map_origin_y;
+                  // Also adjust the difference between the origins
+                  pose_dst.at<double>(0, 0) += dst_map_origin_x;
+                  pose_dst.at<double>(1, 0) += dst_map_origin_y;
+                  pose_dst.at<double>(0, 0) -= src_map_origin_x;
+                  pose_dst.at<double>(1, 0) -= src_map_origin_y;
+
+                  boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
+                  robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], traced_robot, pose_dst);
+                }
+                /** just for finding min_it END */
+
+                continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
+              },
+              true);
           // 2. abort without enough consecutive count END
           return;
         }
