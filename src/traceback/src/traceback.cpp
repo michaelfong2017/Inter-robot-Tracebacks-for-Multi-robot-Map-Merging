@@ -1531,15 +1531,15 @@ namespace traceback
     }
     if (is_src)
     {
-      m.scale.x = 0.2;
-      m.scale.y = 0.2;
-      m.scale.z = 0.2;
-    }
-    else
-    {
       m.scale.x = 0.4;
       m.scale.y = 0.4;
       m.scale.z = 0.4;
+    }
+    else
+    {
+      m.scale.x = 0.8;
+      m.scale.y = 0.8;
+      m.scale.z = 0.8;
     }
 
     // lives forever
