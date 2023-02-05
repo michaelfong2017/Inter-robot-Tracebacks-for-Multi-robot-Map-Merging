@@ -1343,7 +1343,7 @@ namespace traceback
     double goal_x = current_it->pose.position.x;
     double goal_y = current_it->pose.position.y;
 
-    /** Visualize goal in src robot frame */
+    /** Visualize goal in dst robot frame */
     {
       geometry_msgs::PoseStamped pose_stamped;
       pose_stamped.pose = current_it->pose;
@@ -1351,7 +1351,7 @@ namespace traceback
       pose_stamped.header.stamp = ros::Time::now();
       visualizeGoal(pose_stamped, robot_name_src, false);
     }
-    /** Visualize goal in src robot frame END */
+    /** Visualize goal in dst robot frame END */
 
     // Transform goal from dst frame to src (robot i) frame
     // Same as above, it is required to manually rotate about the bottom-left corner, which
@@ -1464,7 +1464,14 @@ namespace traceback
 
     m.header.frame_id = pose_stamped.header.frame_id;
     m.header.stamp = pose_stamped.header.stamp;
-    m.ns = "traceback_goal";
+    if (is_src)
+    {
+      m.ns = "src_frame";
+    }
+    else
+    {
+      m.ns = "dst_frame";
+    }
     if (is_src)
     {
       m.scale.x = 0.2;
@@ -1614,6 +1621,7 @@ namespace traceback
           if (current_it->second->stamp == it->stamp)
           {
             ++it;
+            all->second.erase(it);
           }
           else
           {
