@@ -1287,9 +1287,10 @@ namespace traceback
 
       /** just for finding min_it */
       double min_distance = DBL_MAX;
-      std::list<PoseImagePair>::iterator min_it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
+      std::list<PoseImagePair> pose_image_pairs = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst];
+      std::list<PoseImagePair>::iterator temp_it = pose_image_pairs.begin();
 
-      for (auto it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin(); it != camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end(); ++it)
+      for (auto it = pose_image_pairs.begin(); it != pose_image_pairs.end(); ++it)
       {
         if (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(it->stamp))
         {
@@ -1304,11 +1305,17 @@ namespace traceback
         if (distance < min_distance)
         {
           min_distance = distance;
-          min_it = it;
+          temp_it = it;
         }
       }
 
-      robots_to_current_it_[robot_name_src] = min_it;
+      for (auto it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin(); it != camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end(); ++it)
+      {
+        if (it->stamp == temp_it->stamp && it->image.header.frame_id == temp_it->image.header.frame_id)
+        {
+          robots_to_current_it_[robot_name_src] = it;
+        }
+      }
       /** just for finding min_it END */
 
       startOrContinueTraceback(robot_name_src, robot_name_dst, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
