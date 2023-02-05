@@ -161,7 +161,8 @@ namespace traceback
                   pose_dst.at<double>(1, 0) -= src_map_origin_y;
 
                   boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-                  robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], traced_robot, pose_dst);
+                  double threshold_distance = 5.0; // Go to a location at least and minimally threshold_distance far.
+                  robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
                 }
                 /** just for finding min_it END */
 
@@ -1332,7 +1333,7 @@ namespace traceback
       /** just for finding min_it */
       {
         boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[robot_name_dst]);
-        robots_to_current_it_[robot_name_src] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst], robot_name_dst, pose_dst);
+        robots_to_current_it_[robot_name_src] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst], 0.0, robot_name_dst, pose_dst);
       }
       /** just for finding min_it END */
 
@@ -1340,7 +1341,7 @@ namespace traceback
     }
   }
 
-  size_t Traceback::findMinIndex(std::vector<PoseImagePair> &pose_image_pairs, std::string robot_name_dst, cv::Mat pose_dst)
+  size_t Traceback::findMinIndex(std::vector<PoseImagePair> &pose_image_pairs, double threshold_distance, std::string robot_name_dst, cv::Mat pose_dst)
   {
     size_t min_index;
     double min_distance = DBL_MAX;
@@ -1359,7 +1360,7 @@ namespace traceback
       double src_x = pose_dst.at<double>(0, 0);
       double src_y = pose_dst.at<double>(1, 0);
       double distance = sqrt(pow(dst_x - src_x, 2) + pow(dst_y - src_y, 2));
-      if (distance < min_distance)
+      if (distance < min_distance && distance > threshold_distance)
       {
         min_distance = distance;
         min_index = i;

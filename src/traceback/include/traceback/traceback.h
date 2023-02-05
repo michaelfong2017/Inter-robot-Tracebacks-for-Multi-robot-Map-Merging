@@ -172,7 +172,7 @@ namespace traceback
 
     void updateTargetPoses();
 
-    size_t findMinIndex(std::vector<PoseImagePair> &pose_image_pairs, std::string robot_name_dst, cv::Mat pose_dst);
+    size_t findMinIndex(std::vector<PoseImagePair> &pose_image_pairs, double threshold_distance, std::string robot_name_dst, cv::Mat pose_dst);
 
     void startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
 

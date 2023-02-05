@@ -26,8 +26,8 @@
         <param name="update_target_rate" value="0.2"/>
         <param name="discovery_rate" value="0.05"/>
         <param name="estimation_rate" value="0.1"/>
-        <param name="estimation_confidence" value="0.8"/>
-        <param name="camera_image_update_rate" value="1.5"/>
+        <param name="estimation_confidence" value="0.6"/>
+        <param name="camera_image_update_rate" value="0.2"/>
         <!-- The queue size has to be large enough so that an explored near place can be found -->
         <param name="camera_pose_image_max_queue_size" value="300"/>
         <param name="camera_pose_image_queue_skip_count" value="20"/>
@@ -37,7 +37,7 @@
         <param name="point_cloud_close_translation" value="0.1"/> <!-- Close condition 2a: Translation condition (every axis) for two point clouds to be close -->
         <param name="point_cloud_close_rotation" value="0.05"/> <!-- Close condition 2b: Rotation condition for two point clouds to be close -->
         <param name="accept_count_needed" value="11"/>
-        <param name="reject_count_needed" value="8"/>
+        <param name="reject_count_needed" value="6"/>
         <param name="consecutive_abort_count_needed" value="6" />
         <!-- either "triangulation" or "pointcloud" -->
         <param name="adjustment_mode" value="pointcloud" default="pointcloud" />

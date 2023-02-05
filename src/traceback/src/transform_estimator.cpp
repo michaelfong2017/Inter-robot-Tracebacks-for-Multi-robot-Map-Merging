@@ -140,11 +140,11 @@ namespace traceback
 
         //     if (i == 0)
         //     {
-        //         transforms[i].R.at<float>(0, 2) += 20.0f * identity_index;
+        //         transforms[i].R.at<float>(0, 2) += 12.0f * identity_index;
         //     }
         //     else
         //     {
-        //         transforms[i].R.at<float>(1, 2) += 20.0f * i;
+        //         transforms[i].R.at<float>(1, 2) += 12.0f * i;
         //     }
         // }
         // TEST
