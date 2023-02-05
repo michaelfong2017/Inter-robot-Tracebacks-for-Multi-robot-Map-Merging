@@ -136,7 +136,8 @@ namespace traceback
     std::string traceback_image_and_image_topic_ = "traceback/image_and_image";
 
     std::unordered_map<std::string, bool> robots_to_in_traceback_;
-    std::unordered_map<std::string, std::list<PoseImagePair>::iterator> robots_to_current_it_;
+    std::unordered_map<std::string, size_t> robots_to_current_it_;
+    std::unordered_map<std::string, boost::shared_mutex> robots_to_current_it_mutex_;
 
     std::unordered_map<std::string, std::vector<std::vector<cv::Mat>>> robots_src_to_current_transforms_vectors_;
 
@@ -169,6 +170,8 @@ namespace traceback
     void continueTraceback(std::string tracer_robot, std::string traced_robot, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y, bool is_middle_abort = false);
 
     void updateTargetPoses();
+
+    size_t findMinIndex(std::vector<PoseImagePair> &pose_image_pairs, std::string robot_name_dst, cv::Mat pose_dst);
 
     void startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
 

@@ -1078,11 +1078,10 @@ namespace traceback
     std::string robot_name_dst = traced_robot;
     ROS_INFO("Continue traceback process for robot %s", robot_name_src.c_str());
 
-    std::list<PoseImagePair>::iterator temp = robots_to_current_it_[robot_name_src];
+    size_t temp = robots_to_current_it_[robot_name_src];
 
     bool whole_list_visited = false;
     bool pass_end = false;
-    ROS_DEBUG("Stamp is %ld", temp->stamp);
     // ++temp;
     // if (temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end())
     // {
@@ -1093,18 +1092,20 @@ namespace traceback
     {
       if (is_middle_abort)
       {
-        ++temp;
+        if (++temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size())
+        {
+          temp = 0;
+        }
       }
       else
       {
         i = 15;
       }
-      while (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(temp->stamp))
+      while (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][temp].stamp))
       {
-        ++temp;
-        if (temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end())
+        if (++temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size())
         {
-          temp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
+          temp = 0;
 
           if (pass_end)
           { // Pass the end() the second time
@@ -1286,40 +1287,45 @@ namespace traceback
       pairwise_triangulation_result_history_[robot_name_src][robot_name_dst].clear();
 
       /** just for finding min_it */
-      double min_distance = DBL_MAX;
-      std::list<PoseImagePair> pose_image_pairs = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst];
-      std::list<PoseImagePair>::iterator temp_it = pose_image_pairs.begin();
-
-      for (auto it = pose_image_pairs.begin(); it != pose_image_pairs.end(); ++it)
       {
-        if (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(it->stamp))
-        {
-          continue;
-        }
-
-        double dst_x = it->pose.position.x;
-        double dst_y = it->pose.position.y;
-        double src_x = pose_dst.at<double>(0, 0);
-        double src_y = pose_dst.at<double>(1, 0);
-        double distance = sqrt(pow(dst_x - src_x, 2) + pow(dst_y - src_y, 2));
-        if (distance < min_distance)
-        {
-          min_distance = distance;
-          temp_it = it;
-        }
-      }
-
-      for (auto it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin(); it != camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end(); ++it)
-      {
-        if (it->stamp == temp_it->stamp && it->image.header.frame_id == temp_it->image.header.frame_id)
-        {
-          robots_to_current_it_[robot_name_src] = it;
-        }
+        boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[robot_name_dst]);
+        robots_to_current_it_[robot_name_src] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst], robot_name_dst, pose_dst);
       }
       /** just for finding min_it END */
 
       startOrContinueTraceback(robot_name_src, robot_name_dst, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
     }
+  }
+
+  size_t Traceback::findMinIndex(std::vector<PoseImagePair> &pose_image_pairs, std::string robot_name_dst, cv::Mat pose_dst)
+  {
+    size_t min_index;
+    double min_distance = DBL_MAX;
+
+    size_t i = 0;
+    for (auto it = pose_image_pairs.begin(); it != pose_image_pairs.end(); ++it)
+    {
+      if (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(it->stamp))
+      {
+        ++i;
+        continue;
+      }
+
+      double dst_x = it->pose.position.x;
+      double dst_y = it->pose.position.y;
+      double src_x = pose_dst.at<double>(0, 0);
+      double src_y = pose_dst.at<double>(1, 0);
+      double distance = sqrt(pow(dst_x - src_x, 2) + pow(dst_y - src_y, 2));
+      if (distance < min_distance)
+      {
+        min_distance = distance;
+        min_index = i;
+      }
+
+      ++i;
+    }
+
+    return min_index;
   }
 
   void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
@@ -1345,15 +1351,15 @@ namespace traceback
     std::vector<std::vector<cv::Mat>> transforms_vectors = robots_src_to_current_transforms_vectors_[robot_name_src];
     /** Get parameters other than robot names END */
 
-    std::list<PoseImagePair>::iterator current_it = robots_to_current_it_[robot_name_src];
+    PoseImagePair current_it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][robots_to_current_it_[robot_name_src]];
 
-    double goal_x = current_it->pose.position.x;
-    double goal_y = current_it->pose.position.y;
+    double goal_x = current_it.pose.position.x;
+    double goal_y = current_it.pose.position.y;
 
     /** Visualize goal in dst robot frame */
     {
       geometry_msgs::PoseStamped pose_stamped;
-      pose_stamped.pose = current_it->pose;
+      pose_stamped.pose = current_it.pose;
       pose_stamped.header.frame_id = robot_name_dst.substr(1) + robot_name_dst + "/map";
       pose_stamped.header.stamp = ros::Time::now();
       visualizeGoal(pose_stamped, robot_name_src, false);
@@ -1388,7 +1394,7 @@ namespace traceback
 
     // Transform rotation
     // Note that due to scaling, the "rotation matrix" values can exceed 1, and therefore need to normalize it.
-    geometry_msgs::Quaternion goal_q = current_it->pose.orientation;
+    geometry_msgs::Quaternion goal_q = current_it.pose.orientation;
     geometry_msgs::Quaternion transform_q;
     cv::Mat transform = transforms_vectors[max_position][i];
     matToQuaternion(transform, transform_q);
@@ -1431,8 +1437,8 @@ namespace traceback
 
     traceback_msgs::GoalAndImage goal_and_image;
     goal_and_image.goal = goal;
-    goal_and_image.image = current_it->image;
-    goal_and_image.point_cloud = current_it->point_cloud;
+    goal_and_image.image = current_it.image;
+    goal_and_image.point_cloud = current_it.point_cloud;
     goal_and_image.tracer_robot = robot_name_src;
     goal_and_image.traced_robot = robot_name_dst;
     goal_and_image.src_map_origin_x = src_map_origin_x;
@@ -1440,7 +1446,7 @@ namespace traceback
     goal_and_image.dst_map_origin_x = dst_map_origin_x;
     goal_and_image.dst_map_origin_y = dst_map_origin_y;
     goal_and_image.second_traceback = false;
-    goal_and_image.stamp = current_it->stamp;
+    goal_and_image.stamp = current_it.stamp;
     ROS_DEBUG("Goal and image to be sent");
 
     /** Visualize goal in src robot frame */
@@ -1619,27 +1625,27 @@ namespace traceback
       // ROS_DEBUG("camera_image_processor_.robots_to_all_pose_image_pairs_[%s] size: %zu", all->first.c_str(), all->second.size());
       if (all->second.size() > camera_pose_image_max_queue_size_)
       {
-        std::list<PoseImagePair>::iterator it = camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].begin();
-        auto current_it = robots_to_current_it_.find(current.first);
-        if (current_it != robots_to_current_it_.end())
         {
-          // ROS_INFO("Before erase current_it->second->stamp: %ld", current_it->second->stamp);
-          // ROS_INFO("Before erase it->stamp: %ld", it->stamp);
-          if (current_it->second->stamp == it->stamp)
+          boost::lock_guard<boost::shared_mutex> lock(robots_to_current_it_mutex_[current.first]);
+
+          std::vector<PoseImagePair>::iterator it = camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].begin();
+          auto current_it = robots_to_current_it_.find(current.first);
+          if (current_it != robots_to_current_it_.end())
           {
-            ++it;
-            all->second.erase(it);
+            // ROS_INFO("Before erase current_it->second->stamp: %ld", current_it->second->stamp);
+            // ROS_INFO("Before erase it->stamp: %ld", it->stamp);
+            if (current_it->second == 0)
+            {
+              all->second.erase(std::next(all->second.begin()));
+            }
+            else
+            {
+              all->second.erase(all->second.begin());
+              --robots_to_current_it_[current.first];
+            }
+            // ROS_INFO("After erase current_it->second->stamp: %ld", current_it->second->stamp);
+            // ROS_INFO("After erase it->stamp: %ld", it->stamp);
           }
-          else
-          {
-            all->second.erase(it);
-          }
-          // ROS_INFO("After erase current_it->second->stamp: %ld", current_it->second->stamp);
-          // ROS_INFO("After erase it->stamp: %ld", it->stamp);
-        }
-        else
-        {
-          all->second.pop_front();
         }
       }
     }

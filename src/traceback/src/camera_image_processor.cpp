@@ -135,7 +135,7 @@ namespace traceback
 
         match_score = score;
         
-        if (score < 0.05) {
+        if (score < match_confidence) {
             return true;
         }
         else {

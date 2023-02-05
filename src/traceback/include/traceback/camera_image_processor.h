@@ -4,7 +4,6 @@
 #include <traceback/estimation_internal.h>
 
 #include <vector>
-#include <list>
 #include <unordered_map>
 #include <unordered_set>
 #include <boost/thread.hpp>
@@ -92,7 +91,7 @@ namespace traceback
 
         std::unordered_map<std::string, sensor_msgs::Image> robots_to_current_image_;
         std::unordered_map<std::string, geometry_msgs::Pose> robots_to_current_pose_;
-        std::unordered_map<std::string, std::list<PoseImagePair>> robots_to_all_pose_image_pairs_;
+        std::unordered_map<std::string, std::vector<PoseImagePair>> robots_to_all_pose_image_pairs_;
         std::unordered_map<std::string, std::unordered_set<size_t>> robots_to_all_visited_pose_image_pair_indexes_;
 
         std::unordered_map<std::string, sensor_msgs::PointCloud2> robots_to_current_point_cloud_;
