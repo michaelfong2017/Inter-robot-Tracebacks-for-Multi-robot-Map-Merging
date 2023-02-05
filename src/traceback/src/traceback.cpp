@@ -42,6 +42,7 @@ namespace traceback
     private_nh.param<std::string>("camera_image_topic", robot_camera_image_topic_, "camera/rgb/image_raw"); // Don't use image_raw
     private_nh.param<std::string>("camera_point_cloud_topic", robot_camera_point_cloud_topic_, "camera/depth/points");
     private_nh.param("camera_image_update_rate", camera_image_update_rate_, 0.2); // Too high update rate can result in "continue traceback looping"
+    private_nh.param("camera_pose_image_queue_skip_count", camera_pose_image_queue_skip_count_, 20);
     private_nh.param("camera_pose_image_max_queue_size", camera_pose_image_max_queue_size_, 100);
   }
 
@@ -1088,34 +1089,31 @@ namespace traceback
     //   temp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
     //   pass_end = true;
     // }
-    for (int i = 0; i < 15; ++i)
+    if (is_middle_abort)
     {
-      if (is_middle_abort)
+      if (temp + camera_pose_image_queue_skip_count_ >= camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size())
       {
-        if (++temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size())
-        {
-          temp = 0;
-        }
+        temp += camera_pose_image_queue_skip_count_ - camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size();
       }
       else
       {
-        i = 15;
+        temp += camera_pose_image_queue_skip_count_;
       }
-      while (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][temp].stamp))
+    }
+    while (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][temp].stamp))
+    {
+      if (++temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size())
       {
-        if (++temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size())
-        {
-          temp = 0;
+        temp = 0;
 
-          if (pass_end)
-          { // Pass the end() the second time
-            whole_list_visited = true;
-            break;
-          }
-          else
-          { // Pass the end() the first time
-            pass_end = true;
-          }
+        if (pass_end)
+        { // Pass the end() the second time
+          whole_list_visited = true;
+          break;
+        }
+        else
+        { // Pass the end() the first time
+          pass_end = true;
         }
       }
     }
@@ -1636,7 +1634,7 @@ namespace traceback
             // ROS_INFO("Before erase it->stamp: %ld", it->stamp);
             if (current_it->second == 0)
             {
-              all->second.erase(std::next(all->second.begin()));
+              all->second.erase(all->second.begin() + camera_pose_image_queue_skip_count_);
             }
             else
             {

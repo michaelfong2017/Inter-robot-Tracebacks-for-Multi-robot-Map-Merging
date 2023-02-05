@@ -105,6 +105,7 @@ namespace traceback
     std::string robot_camera_image_topic_;
     std::string robot_camera_point_cloud_topic_;
     double camera_image_update_rate_;
+    int camera_pose_image_queue_skip_count_;
     int camera_pose_image_max_queue_size_;
 
     const tf::TransformListener tf_listener_; ///< @brief Used for transforming

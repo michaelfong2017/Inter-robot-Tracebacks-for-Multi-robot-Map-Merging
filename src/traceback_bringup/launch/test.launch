@@ -30,6 +30,7 @@
         <param name="camera_image_update_rate" value="1.5"/>
         <!-- The queue size has to be large enough so that an explored near place can be found -->
         <param name="camera_pose_image_max_queue_size" value="150"/>
+        <param name="camera_pose_image_queue_skip_count" value="20"/>
         <param name="essential_mat_confidence" value="0.5"/>
         <param name="point_cloud_match_score" value="0.15"/>
         <param name="point_cloud_close_score" value="0.005"/> <!-- Close condition 1 -->
