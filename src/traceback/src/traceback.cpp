@@ -1175,10 +1175,10 @@ namespace traceback
         // e.g. if tb3_1 is in traceback, I want tb3_0 to not trace tb3_1 so that
         // it is impossible to have a cyclic condition where no robots will
         // navigate to a new place and every robot is circling around the same place.
-        // if (robots_to_in_traceback_[transforms_indexes_[dst]])
-        // {
-        //   continue;
-        // }
+        if (robots_to_in_traceback_[transforms_indexes_[dst]])
+        {
+          continue;
+        }
         if (*itt > max_confidence)
         {
           it = itt;
@@ -1612,6 +1612,36 @@ namespace traceback
       auto all = camera_image_processor_.robots_to_all_pose_image_pairs_.find(current.first);
       if (all != camera_image_processor_.robots_to_all_pose_image_pairs_.end())
       {
+        if (all->second.size() >= camera_pose_image_max_queue_size_)
+        {
+          {
+            boost::lock_guard<boost::shared_mutex> lock(robots_to_current_it_mutex_[current.first]);
+
+            auto current_it = robots_to_current_it_.find(current.first);
+            if (current_it != robots_to_current_it_.end())
+            {
+              // ROS_INFO("Before erase current_it stamp: %ld", all->second[current_it->second].stamp);
+              if (current_it->second == 0)
+              {
+                all->second.erase(all->second.begin() + camera_pose_image_queue_skip_count_);
+              }
+              else
+              {
+                if (robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ >= all->second.size())
+                {
+                  all->second.erase(all->second.begin() + robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ - all->second.size());
+                }
+                else
+                {
+                  all->second.erase(all->second.begin());
+                }
+                --robots_to_current_it_[current.first];
+              }
+              // ROS_INFO("After erase current_it stamp: %ld", all->second[current_it->second].stamp);
+            }
+          }
+        }
+        //
         all->second.emplace_back(pose_image_pair);
         PoseImagePair latestPair = *std::max_element(camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].begin(), camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].end());
         // ROS_INFO("latestPair.stamp: %ld", latestPair.stamp);
@@ -1621,38 +1651,6 @@ namespace traceback
         camera_image_processor_.robots_to_all_pose_image_pairs_.insert({current.first, {pose_image_pair}});
       }
       // ROS_DEBUG("camera_image_processor_.robots_to_all_pose_image_pairs_[%s] size: %zu", all->first.c_str(), all->second.size());
-      if (all->second.size() > camera_pose_image_max_queue_size_)
-      {
-        {
-          boost::lock_guard<boost::shared_mutex> lock(robots_to_current_it_mutex_[current.first]);
-
-          std::vector<PoseImagePair>::iterator it = camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].begin();
-          auto current_it = robots_to_current_it_.find(current.first);
-          if (current_it != robots_to_current_it_.end())
-          {
-            // ROS_INFO("Before erase current_it->second->stamp: %ld", current_it->second->stamp);
-            // ROS_INFO("Before erase it->stamp: %ld", it->stamp);
-            if (current_it->second == 0)
-            {
-              all->second.erase(all->second.begin() + camera_pose_image_queue_skip_count_);
-            }
-            else
-            {
-              if (robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ >= all->second.size())
-              {
-                all->second.erase(all->second.begin() + robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ - all->second.size());
-              }
-              else
-              {
-                all->second.erase(all->second.begin());
-              }
-              --robots_to_current_it_[current.first];
-            }
-            // ROS_INFO("After erase current_it->second->stamp: %ld", current_it->second->stamp);
-            // ROS_INFO("After erase it->stamp: %ld", it->stamp);
-          }
-        }
-      }
     }
   }
 
@@ -1849,7 +1847,7 @@ namespace traceback
         robots_to_visualize_marker_publisher_.emplace(robot_name, node_.advertise<visualization_msgs::Marker>(ros::names::append(robot_name, visualize_goal_topic_), 10));
 
         robots_to_in_traceback_.emplace(robot_name, false);
-        // robots_to_current_it_.emplace(robot_name, nullptr);
+        robots_to_current_it_.emplace(robot_name, 0);
 
         traceback_transforms_publisher_ = node_.advertise<traceback_msgs::TracebackTransforms>(traceback_transforms_topic_, 10);
 
