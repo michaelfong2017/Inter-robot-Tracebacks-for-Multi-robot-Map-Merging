@@ -103,7 +103,7 @@ namespace traceback
           // Allow more time for normal exploration to prevent being stuck at local optimums
           pairwise_paused_[tracer_robot][traced_robot] = true;
           pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-              ros::Duration(30, 0),
+              ros::Duration(60, 0),
               [this, tracer_robot, traced_robot](const ros::TimerEvent &)
               { pairwise_paused_[tracer_robot][traced_robot] = false; },
               true);
@@ -120,7 +120,7 @@ namespace traceback
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. abort without enough consecutive count");
 
           pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-              ros::Duration(30, 0),
+              ros::Duration(60, 0),
               [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
               {
                 /** just for finding min_it */
@@ -615,7 +615,7 @@ namespace traceback
             // Allow more time for normal exploration to prevent being stuck at local optimums
             pairwise_paused_[tracer_robot][traced_robot] = true;
             pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-                ros::Duration(30, 0),
+                ros::Duration(60, 0),
                 [this, tracer_robot, traced_robot](const ros::TimerEvent &)
                 { pairwise_paused_[tracer_robot][traced_robot] = false; },
                 true);
