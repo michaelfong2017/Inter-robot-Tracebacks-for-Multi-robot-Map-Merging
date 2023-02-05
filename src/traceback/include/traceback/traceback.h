@@ -219,6 +219,7 @@ namespace traceback
     void evaluateWithGroundTruth(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time = "");
 
     // The below cases are for pointcloud mode.
+    // For matching, need to match both images and point clouds.
     // 1. abort with enough consecutive count      -> Exit traceback process, cooldown
     // 2. abort without enough consecutive count   -> next goal
     // 3. accept (match and close)                 -> Exit traceback process, combine all point cloud matching results

@@ -103,7 +103,7 @@ namespace traceback
           // Allow more time for normal exploration to prevent being stuck at local optimums
           pairwise_paused_[tracer_robot][traced_robot] = true;
           pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-              ros::Duration(60, 0),
+              ros::Duration(30, 0),
               [this, tracer_robot, traced_robot](const ros::TimerEvent &)
               { pairwise_paused_[tracer_robot][traced_robot] = false; },
               true);
@@ -118,6 +118,49 @@ namespace traceback
         else
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. abort without enough consecutive count");
+
+          /** just for finding min_it */
+          {
+            // Get current pose
+            geometry_msgs::Pose pose = getRobotPose(tracer_robot);
+
+            size_t tracer_robot_index;
+            size_t traced_robot_index;
+            for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+            {
+              if (it->second == tracer_robot)
+              {
+                tracer_robot_index = it->first;
+              }
+              else if (it->second == traced_robot)
+              {
+                traced_robot_index = it->first;
+              }
+            }
+            std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
+            cv::Mat mat_transform = mat_transforms[traced_robot_index];
+
+            cv::Mat pose_src(3, 1, CV_64F);
+            pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
+            pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
+            pose_src.at<double>(2, 0) = 1.0;
+
+            cv::Mat pose_dst = mat_transform * pose_src;
+            pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
+            pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
+            pose_dst.at<double>(0, 0) += src_map_origin_x;
+            pose_dst.at<double>(1, 0) += src_map_origin_y;
+            // Also adjust the difference between the origins
+            pose_dst.at<double>(0, 0) += dst_map_origin_x;
+            pose_dst.at<double>(1, 0) += dst_map_origin_y;
+            pose_dst.at<double>(0, 0) -= src_map_origin_x;
+            pose_dst.at<double>(1, 0) -= src_map_origin_y;
+
+            boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
+            robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], traced_robot, pose_dst);
+          }
+          /** just for finding min_it END */
+          
           continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
           // 2. abort without enough consecutive count END
           return;
@@ -130,12 +173,47 @@ namespace traceback
 
         std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
+        // get cv images
+        cv_bridge::CvImageConstPtr cv_ptr_tracer;
+        try
+        {
+          if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
+            cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
+          else
+            cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
+        }
+        catch (cv_bridge::Exception &e)
+        {
+          ROS_ERROR("cv_bridge exception: %s", e.what());
+          return;
+        }
+
+        cv_bridge::CvImageConstPtr cv_ptr_traced;
+        try
+        {
+          if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
+            cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
+          else
+            cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
+        }
+        catch (cv_bridge::Exception &e)
+        {
+          ROS_ERROR("cv_bridge exception: %s", e.what());
+          return;
+        }
+        //
+
         geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
         double yaw = quaternionToYaw(goal_q);
         TransformNeeded transform_needed;
         double match_score;
-        bool is_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, point_cloud_match_score_, yaw, transform_needed, match_score, tracer_robot, traced_robot, current_time);
+        // Need to match both images and point clouds.
+        bool is_image_match = camera_image_processor_.matchImage(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
+                                                                 essential_mat_confidence_threshold_, tracer_robot, traced_robot, current_time);
 
+        bool is_point_cloud_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, point_cloud_match_score_, yaw, transform_needed, match_score, tracer_robot, traced_robot, current_time);
+
+        bool is_match = is_image_match && is_point_cloud_match;
         {
           std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_ICP_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
           if (fw.is_open())
@@ -148,49 +226,10 @@ namespace traceback
         // 3 or 4 or 5
         if (is_match)
         {
-          // write images for debug
-          {
-            cv_bridge::CvImageConstPtr cv_ptr_tracer;
-            try
-            {
-              if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
-                cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
-              else
-                cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
-            }
-            catch (cv_bridge::Exception &e)
-            {
-              ROS_ERROR("cv_bridge exception: %s", e.what());
-              return;
-            }
-
-            // Process cv_ptr->image using OpenCV
-            ROS_INFO("Process cv_ptr->image using OpenCV");
-            cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer.png",
-                        cv_ptr_tracer->image);
-
-            //
-            //
-            cv_bridge::CvImageConstPtr cv_ptr_traced;
-            try
-            {
-              if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
-                cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
-              else
-                cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
-            }
-            catch (cv_bridge::Exception &e)
-            {
-              ROS_ERROR("cv_bridge exception: %s", e.what());
-              return;
-            }
-
-            // Process cv_ptr->image using OpenCV
-            ROS_INFO("Process cv_ptr->image using OpenCV");
-            cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced.png",
-                        cv_ptr_traced->image);
-          }
-          // end
+          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer.png",
+                      cv_ptr_tracer->image);
+          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced.png",
+                      cv_ptr_traced->image);
 
           bool is_close = abs(transform_needed.tx) < point_cloud_close_translation_ && abs(transform_needed.ty) < point_cloud_close_translation_ && abs(transform_needed.r) < point_cloud_close_rotation_;
           is_close = is_close || match_score < point_cloud_close_score_;
@@ -570,7 +609,7 @@ namespace traceback
             // Allow more time for normal exploration to prevent being stuck at local optimums
             pairwise_paused_[tracer_robot][traced_robot] = true;
             pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-                ros::Duration(60, 0),
+                ros::Duration(30, 0),
                 [this, tracer_robot, traced_robot](const ros::TimerEvent &)
                 { pairwise_paused_[tracer_robot][traced_robot] = false; },
                 true);
@@ -1089,17 +1128,17 @@ namespace traceback
     //   temp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
     //   pass_end = true;
     // }
-    if (is_middle_abort)
-    {
-      if (temp + camera_pose_image_queue_skip_count_ >= camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size())
-      {
-        temp += camera_pose_image_queue_skip_count_ - camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size();
-      }
-      else
-      {
-        temp += camera_pose_image_queue_skip_count_;
-      }
-    }
+    // if (is_middle_abort)
+    // {
+    //   if (temp + camera_pose_image_queue_skip_count_ >= camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size())
+    //   {
+    //     temp += camera_pose_image_queue_skip_count_ - camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size();
+    //   }
+    //   else
+    //   {
+    //     temp += camera_pose_image_queue_skip_count_;
+    //   }
+    // }
     while (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][temp].stamp))
     {
       if (++temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].size())
@@ -1175,10 +1214,10 @@ namespace traceback
         // e.g. if tb3_1 is in traceback, I want tb3_0 to not trace tb3_1 so that
         // it is impossible to have a cyclic condition where no robots will
         // navigate to a new place and every robot is circling around the same place.
-        if (robots_to_in_traceback_[transforms_indexes_[dst]])
-        {
-          continue;
-        }
+        // if (robots_to_in_traceback_[transforms_indexes_[dst]])
+        // {
+        //   continue;
+        // }
         if (*itt > max_confidence)
         {
           it = itt;

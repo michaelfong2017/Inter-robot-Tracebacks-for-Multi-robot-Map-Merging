@@ -23,7 +23,7 @@ namespace traceback
         // _maxY = 25.0;
         // _maxZ = 3.0;
         _mean_k = 50;
-        _std_mul = 1.5;                      // default 1.0
+        _std_mul = 1.5;                       // default 1.0
         _transformation_epsilon = 0.00000001; // default 0.01
         _max_iters = 75;
         _euclidean_fitness_epsilon = 1.0;
@@ -134,11 +134,13 @@ namespace traceback
         transform_needed.r = quat.y() * -1.0;
 
         match_score = score;
-        
-        if (score < match_confidence) {
+
+        if (score < match_confidence)
+        {
             return true;
         }
-        else {
+        else
+        {
             return false;
         }
     }
@@ -267,6 +269,69 @@ namespace traceback
         ROS_DEBUG("After removeInvalidValues, size: %zu", out_cloud_ptr->points.size());
 
         return;
+    }
+
+    bool CameraImageProcessor::matchImage(const cv::Mat &tracer_robot_image, const cv::Mat &traced_robot_image, FeatureType feature_type,
+                                          double confidence, std::string tracer_robot, std::string traced_robot, std::string current_time)
+    {
+        const std::vector<cv::Mat> &images = {tracer_robot_image, traced_robot_image};
+        std::vector<cv::detail::ImageFeatures> image_features;
+        std::vector<cv::detail::MatchesInfo> pairwise_matches;
+        std::vector<cv::detail::CameraParams> transforms;
+        std::vector<int> good_indices;
+        // TODO investigate value translation effect on features
+        auto finder = internal::chooseFeatureFinder(feature_type);
+        cv::Ptr<cv::detail::FeaturesMatcher> matcher =
+            cv::makePtr<cv::detail::AffineBestOf2NearestMatcher>();
+
+        if (tracer_robot_image.empty() || traced_robot_image.empty())
+        {
+            ROS_ERROR("Either traced robot image or tracer robot image is empty, which should not be the case!");
+            return false;
+        }
+
+        image_features.reserve(images.size());
+        for (const cv::Mat &image : images)
+        {
+            image_features.emplace_back();
+            if (!image.empty())
+            {
+#if CV_VERSION_MAJOR >= 4
+                cv::detail::computeImageFeatures(finder, image, image_features.back());
+#else
+                (*finder)(image, image_features.back());
+#endif
+            }
+        }
+        finder = {};
+
+        /* find corespondent features */
+        try
+        {
+            ROS_DEBUG("pairwise matching features");
+            (*matcher)(image_features, pairwise_matches);
+            matcher = {};
+        }
+        catch (std::exception e)
+        {
+            ROS_INFO("Not enough features, catched!");
+            return false;
+        }
+
+        good_indices = cv::detail::leaveBiggestComponent(
+            image_features, pairwise_matches, static_cast<float>(confidence));
+
+        // no match found
+        if (good_indices.size() == 1)
+        {
+            return false;
+        }
+
+        // #ifndef NDEBUG
+        internal::writeDebugMatchingInfo(images, image_features, pairwise_matches, traced_robot, tracer_robot, current_time);
+        // #endif
+
+        return true;
     }
 
     bool CameraImageProcessor::findFurtherTransformNeeded(const cv::Mat &tracer_robot_image, const cv::Mat &traced_robot_image, FeatureType feature_type,
