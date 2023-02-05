@@ -1638,7 +1638,14 @@ namespace traceback
             }
             else
             {
-              all->second.erase(all->second.begin());
+              if (robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ >= all->second.size())
+              {
+                all->second.erase(all->second.begin() + robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ - all->second.size());
+              }
+              else
+              {
+                all->second.erase(all->second.begin());
+              }
               --robots_to_current_it_[current.first];
             }
             // ROS_INFO("After erase current_it->second->stamp: %ld", current_it->second->stamp);
