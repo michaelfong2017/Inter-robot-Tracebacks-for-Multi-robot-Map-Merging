@@ -166,7 +166,7 @@ namespace traceback
 
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
 
-    void continueTraceback(std::string tracer_robot, std::string traced_robot, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
+    void continueTraceback(std::string tracer_robot, std::string traced_robot, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y, bool is_middle_abort = false);
 
     void updateTargetPoses();
 

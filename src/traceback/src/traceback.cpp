@@ -117,7 +117,7 @@ namespace traceback
         else
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. abort without enough consecutive count");
-          continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+          continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
           // 2. abort without enough consecutive count END
           return;
         }
@@ -584,7 +584,7 @@ namespace traceback
           else
           {
             writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. first traceback, abort without enough consecutive count");
-            continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+            continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
             // 2. first traceback, abort without enough consecutive count END
             return;
           }
@@ -1072,7 +1072,7 @@ namespace traceback
     }
   }
 
-  void Traceback::continueTraceback(std::string tracer_robot, std::string traced_robot, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
+  void Traceback::continueTraceback(std::string tracer_robot, std::string traced_robot, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y, bool is_middle_abort)
   {
     std::string robot_name_src = tracer_robot;
     std::string robot_name_dst = traced_robot;
@@ -1089,21 +1089,31 @@ namespace traceback
     //   temp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
     //   pass_end = true;
     // }
-    while (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(temp->stamp))
+    for (int i = 0; i < 50; ++i)
     {
-      ++temp;
-      if (temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end())
+      if (is_middle_abort)
       {
-        temp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
+        ++temp;
+      }
+      else {
+        i = 50;
+      }
+      while (camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[robot_name_dst].count(temp->stamp))
+      {
+        ++temp;
+        if (temp == camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].end())
+        {
+          temp = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst].begin();
 
-        if (pass_end)
-        { // Pass the end() the second time
-          whole_list_visited = true;
-          break;
-        }
-        else
-        { // Pass the end() the first time
-          pass_end = true;
+          if (pass_end)
+          { // Pass the end() the second time
+            whole_list_visited = true;
+            break;
+          }
+          else
+          { // Pass the end() the first time
+            pass_end = true;
+          }
         }
       }
     }
