@@ -104,6 +104,7 @@ namespace traceback
 
     std::string robot_camera_image_topic_;
     std::string robot_camera_point_cloud_topic_;
+    int check_obstacle_nearby_pixel_distance_;
     double camera_image_update_rate_;
     int camera_pose_image_queue_skip_count_;
     int camera_pose_image_max_queue_size_;
@@ -173,6 +174,8 @@ namespace traceback
     void updateTargetPoses();
 
     size_t findMinIndex(std::vector<PoseImagePair> &pose_image_pairs, double threshold_distance, std::string robot_name_dst, cv::Mat pose_dst);
+
+    bool hasObstacleNearby(MapSubscription &subscription, int distance);
 
     void startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y);
 

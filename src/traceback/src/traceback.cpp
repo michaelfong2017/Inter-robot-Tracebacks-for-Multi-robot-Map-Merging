@@ -41,6 +41,7 @@ namespace traceback
 
     private_nh.param<std::string>("camera_image_topic", robot_camera_image_topic_, "camera/rgb/image_raw"); // Don't use image_raw
     private_nh.param<std::string>("camera_point_cloud_topic", robot_camera_point_cloud_topic_, "camera/depth/points");
+    private_nh.param("check_obstacle_nearby_pixel_distance", check_obstacle_nearby_pixel_distance_, 3);
     private_nh.param("camera_image_update_rate", camera_image_update_rate_, 0.2); // Too high update rate can result in "continue traceback looping"
     private_nh.param("camera_pose_image_queue_skip_count", camera_pose_image_queue_skip_count_, 20);
     private_nh.param("camera_pose_image_max_queue_size", camera_pose_image_max_queue_size_, 100);
@@ -1372,6 +1373,54 @@ namespace traceback
     return min_index;
   }
 
+  bool Traceback::hasObstacleNearby(MapSubscription &subscription, int distance)
+  {
+    if (!subscription.readonly_map)
+    {
+      return true;
+    }
+    std::string robot_name = subscription.robot_namespace;
+    // ROS_DEBUG("%s", robot_name.c_str());
+    auto current = camera_image_processor_.robots_to_current_pose_.find(robot_name);
+    if (current != camera_image_processor_.robots_to_current_pose_.end())
+    {
+      geometry_msgs::Pose pose = current->second;
+      int width = subscription.readonly_map->info.width;
+      int height = subscription.readonly_map->info.height;
+      double origin_x = subscription.readonly_map->info.origin.position.x;
+      double origin_y = subscription.readonly_map->info.origin.position.y;
+      float resolution = subscription.readonly_map->info.resolution;
+
+      int cx = (pose.position.x - origin_x) / resolution;
+      int cy = (pose.position.y - origin_y) / resolution;
+
+      for (int dy = 0 - distance; dy <= 0 + distance; ++dy)
+      {
+        int y = cy + dy;
+        if (y < 0 || y > height)
+        {
+          return true;
+        }
+        for (int dx = 0 - distance; dx <= 0 + distance; ++dx)
+        {
+          int x = cx + dx;
+          if (x < 0 || x > width)
+          {
+            return true;
+          }
+          int cell = subscription.readonly_map->data.at(y * width + x);
+          // ROS_DEBUG("cell (%d, %d) = %d", x, y, cell);
+          if (cell != 0)
+          {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    return true;
+  }
+
   void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
   {
     /** Get parameters other than robot names */
@@ -1644,9 +1693,25 @@ namespace traceback
   void Traceback::receiveUpdatedCameraImage()
   {
     ROS_DEBUG("Receive updated camera image started.");
+
+    // Skip when there are obstacles nearby
+    std::unordered_map<std::string, bool> robots_to_skip;
+    boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
+    for (auto &subscription : map_subscriptions_)
+    {
+      robots_to_skip[subscription.robot_namespace] = hasObstacleNearby(subscription, check_obstacle_nearby_pixel_distance_);
+    }
+    //
+
     for (auto current : camera_image_processor_.robots_to_current_image_)
     {
       std::string robot_name = current.first;
+      // Skip when there are obstacles nearby
+      if (robots_to_skip[robot_name])
+      {
+        continue;
+      }
+      //
       geometry_msgs::Pose pose = camera_image_processor_.robots_to_current_pose_[current.first];
       sensor_msgs::PointCloud2 point_cloud = camera_image_processor_.robots_to_current_point_cloud_[current.first];
       PoseImagePair pose_image_pair;

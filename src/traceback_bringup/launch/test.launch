@@ -28,6 +28,7 @@
         <param name="estimation_rate" value="0.1"/>
         <param name="estimation_confidence" value="0.6"/>
         <param name="camera_image_update_rate" value="0.2"/>
+        <param name="check_obstacle_nearby_pixel_distance" value="3"/>
         <!-- The queue size has to be large enough so that an explored near place can be found -->
         <param name="camera_pose_image_max_queue_size" value="300"/>
         <param name="camera_pose_image_queue_skip_count" value="20"/>
