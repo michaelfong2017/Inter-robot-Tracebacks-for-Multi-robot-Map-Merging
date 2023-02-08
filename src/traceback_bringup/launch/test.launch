@@ -20,30 +20,37 @@
 
 
     <node pkg="traceback" type="traceback" respawn="false" name="traceback" output="screen">
-        <param name="robot_map_topic" value="map"/>
-        <param name="robot_namespace" value="tb3"/>
-        <param name="transform_tolerance" value="0.3"/>
-        <param name="update_target_rate" value="0.2"/>
-        <param name="discovery_rate" value="0.05"/>
-        <param name="estimation_rate" value="0.1"/>
-        <param name="estimation_confidence" value="0.6"/>
-        <param name="camera_image_update_rate" value="0.2"/>
-        <param name="check_obstacle_nearby_pixel_distance" value="3"/>
+        <param name="robot_map_topic" value="map" />
+        <param name="robot_namespace" value="tb3" />
+        <param name="transform_tolerance" value="0.3" />
+        <param name="update_target_rate" value="0.2" />
+        <param name="discovery_rate" value="0.05" />
+        <param name="estimation_rate" value="0.1" />
+        <param name="estimation_confidence" value="0.6" />
+        <param name="camera_image_update_rate" value="0.2" />
+        <param name="check_obstacle_nearby_pixel_distance" value="5" />
         <!-- The queue size has to be large enough so that an explored near place can be found -->
-        <param name="camera_pose_image_max_queue_size" value="300"/>
-        <param name="camera_pose_image_queue_skip_count" value="20"/>
-        <param name="essential_mat_confidence" value="0.35"/>
-        <param name="point_cloud_match_score" value="0.15"/>
-        <param name="point_cloud_close_score" value="0.005"/> <!-- Close condition 1 -->
-        <param name="point_cloud_close_translation" value="0.1"/> <!-- Close condition 2a: Translation condition (every axis) for two point clouds to be close -->
-        <param name="point_cloud_close_rotation" value="0.05"/> <!-- Close condition 2b: Rotation condition for two point clouds to be close -->
-        <param name="accept_count_needed" value="11"/>
-        <param name="reject_count_needed" value="6"/>
+        <param name="camera_pose_image_max_queue_size" value="300" />
+        <param name="camera_pose_image_queue_skip_count" value="20" />
+        <param name="essential_mat_confidence" value="0.35" />
+        <param name="point_cloud_match_score" value="0.15" />
+        <param name="point_cloud_close_score" value="0.005" /> <!-- Close condition 1 -->
+        <param name="point_cloud_close_translation" value="0.1" /> <!-- Close condition 2a:
+        Translation condition (every axis) for two point clouds to be close -->
+        <param name="point_cloud_close_rotation" value="0.05" /> <!-- Close condition 2b: Rotation
+        condition for two point clouds to be close -->
+        <param name="accept_count_needed" value="11" />
+        <param name="reject_count_needed" value="6" />
         <param name="consecutive_abort_count_needed" value="6" />
         <!-- either "triangulation" or "pointcloud" -->
         <param name="adjustment_mode" value="pointcloud" default="pointcloud" />
     </node>
 
+
+    <node pkg="traceback" type="pcl_online_viewer" respawn="false" name="pcl_online_viewer"
+        output="screen">
+        <param name="topic" value="/$(arg first_tb3)/camera/depth/points" />
+    </node>
 
     <!-- <include file="$(find mongodb_store)/launch/mongodb_store.launch">
         <arg name="db_path" value="$(env HOME)/catkin_ws/db" />

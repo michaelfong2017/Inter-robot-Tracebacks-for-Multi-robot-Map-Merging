@@ -98,10 +98,16 @@ add_executable(traceback
   src/transform_estimator.cpp
   src/camera_image_processor.cpp
 )
+add_executable(pcl_online_viewer
+  src/pcl_online_viewer.cpp
+)
 add_dependencies(traceback ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(traceback ${catkin_LIBRARIES})
 target_link_libraries(traceback ${OpenCV_LIBRARIES})
 target_link_libraries(traceback ${PCL_LIBRARIES})
+
+target_link_libraries(pcl_online_viewer ${catkin_LIBRARIES})
+target_link_libraries(pcl_online_viewer ${PCL_LIBRARIES})
 
 #############
 ## Install ##
