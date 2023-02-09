@@ -105,7 +105,7 @@ namespace traceback
           // Allow more time for normal exploration to prevent being stuck at local optimums
           pairwise_paused_[tracer_robot][traced_robot] = true;
           pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-              ros::Duration(60, 0),
+              ros::Duration(0, 0),
               [this, tracer_robot, traced_robot](const ros::TimerEvent &)
               { pairwise_paused_[tracer_robot][traced_robot] = false; },
               true);
@@ -122,7 +122,7 @@ namespace traceback
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. abort without enough consecutive count");
 
           pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-              ros::Duration(60, 0),
+              ros::Duration(0, 0),
               [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
               {
                 /** just for finding min_it */
@@ -1873,7 +1873,15 @@ namespace traceback
             // TEST with ground truth END
 
             geometry_msgs::Pose init_pose1 = pose1;
+            init_pose1.position.x *= -1;
+            init_pose1.position.y *= -1;
+            init_pose1.position.z = 0.0;
+            init_pose1.orientation.z *= -1;
             geometry_msgs::Pose init_pose2 = pose2;
+            init_pose2.position.x *= -1;
+            init_pose2.position.y *= -1;
+            init_pose2.position.z = 0.0;
+            init_pose2.orientation.z *= -1;
 
             size_t self_robot_index;
             size_t second_robot_index;
