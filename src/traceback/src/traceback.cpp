@@ -1810,16 +1810,70 @@ namespace traceback
             geometry_msgs::Pose pose1 = robots_to_poses_[robot_name].back();
             geometry_msgs::Pose pose2 = robots_to_poses_[second_robot_name][i];
             ROS_DEBUG("Match!");
+            // TEST with ground truth
+            // double init_0_x = -7.0;
+            // double init_0_y = -1.0;
+            // double init_0_r = 0.0;
+            // double init_1_x = 7.0;
+            // double init_1_y = -1.0;
+            // double init_1_r = 0.0;
+            // double init_2_x = 0.5;
+            // double init_2_y = 3.0;
+            // double init_2_r = 0.785;
+            // geometry_msgs::Pose init_pose1 = pose1;
+            // geometry_msgs::Pose init_pose2 = pose2;
+            // if (robot_name == "/tb3_0")
+            // {
+            //   init_pose1.position.x = init_0_x;
+            //   init_pose1.position.y = init_0_y;
+            //   init_pose1.position.z = 0.0;
+            //   init_pose1.orientation.z = 0.0;
+            //   init_pose1.orientation.w = 1.0;
+            // }
+            // else if (robot_name == "/tb3_1")
+            // {
+            //   init_pose1.position.x = init_1_x;
+            //   init_pose1.position.y = init_1_y;
+            //   init_pose1.position.z = 0.0;
+            //   init_pose1.orientation.z = 0.0;
+            //   init_pose1.orientation.w = 1.0;
+            // }
+            // else if (robot_name == "/tb3_2")
+            // {
+            //   init_pose1.position.x = init_2_x;
+            //   init_pose1.position.y = init_2_y;
+            //   init_pose1.position.z = 0.0;
+            //   init_pose1.orientation.z = 0.3826834;
+            //   init_pose1.orientation.w = 0.9238795;
+            // }
+            // if (second_robot_name == "/tb3_0")
+            // {
+            //   init_pose2.position.x = init_0_x;
+            //   init_pose2.position.y = init_0_y;
+            //   init_pose2.position.z = 0.0;
+            //   init_pose2.orientation.z = 0.0;
+            //   init_pose2.orientation.w = 1.0;
+            // }
+            // else if (second_robot_name == "/tb3_1")
+            // {
+            //   init_pose2.position.x = init_1_x;
+            //   init_pose2.position.y = init_1_y;
+            //   init_pose2.position.z = 0.0;
+            //   init_pose2.orientation.z = 0.0;
+            //   init_pose2.orientation.w = 1.0;
+            // }
+            // else if (second_robot_name == "/tb3_2")
+            // {
+            //   init_pose2.position.x = init_2_x;
+            //   init_pose2.position.y = init_2_y;
+            //   init_pose2.position.z = 0.0;
+            //   init_pose2.orientation.z = 0.3826834;
+            //   init_pose2.orientation.w = 0.9238795;
+            // }
+            // TEST with ground truth END
+
             geometry_msgs::Pose init_pose1 = pose1;
-            init_pose1.position.x *= -1;
-            init_pose1.position.y *= -1;
-            init_pose1.position.z = 0.0;
-            init_pose1.orientation.z *= -1;
             geometry_msgs::Pose init_pose2 = pose2;
-            init_pose2.position.x *= -1;
-            init_pose2.position.y *= -1;
-            init_pose2.position.z = 0.0;
-            init_pose2.orientation.z *= -1;
 
             size_t self_robot_index;
             size_t second_robot_index;
@@ -1847,13 +1901,14 @@ namespace traceback
               double roll, pitch, yaw;
               m.getRPY(roll, pitch, yaw);
 
+              size_t index = i == 0 ? self_robot_index : second_robot_index;
               cv::Mat t_global_i(3, 3, CV_64F);
               t_global_i.at<double>(0, 0) = cos(-1 * yaw);
               t_global_i.at<double>(0, 1) = -sin(-1 * yaw);
-              t_global_i.at<double>(0, 2) = -1 * x / resolutions_[self_robot_index];
+              t_global_i.at<double>(0, 2) = -1 * x / resolutions_[index];
               t_global_i.at<double>(1, 0) = sin(-1 * yaw);
               t_global_i.at<double>(1, 1) = cos(-1 * yaw);
-              t_global_i.at<double>(1, 2) = -1 * y / resolutions_[second_robot_index];
+              t_global_i.at<double>(1, 2) = -1 * y / resolutions_[index];
               t_global_i.at<double>(2, 0) = 0.0;
               t_global_i.at<double>(2, 1) = 0.0;
               t_global_i.at<double>(2, 2) = 1;
@@ -1877,10 +1932,12 @@ namespace traceback
             }
             current_traceback_transforms = temp;
 
+            std::vector<cv::Point2d> local_origins = {map_origins_[self_robot_index], map_origins_[second_robot_index]};
+            std::vector<float> local_resolutions = {resolutions_[self_robot_index], resolutions_[second_robot_index]};
             std::vector<cv::Mat> modified_traceback_transforms;
             modifyTransformsBasedOnOrigins(current_traceback_transforms,
                                            modified_traceback_transforms,
-                                           map_origins_, resolutions_);
+                                           local_origins, local_resolutions);
 
             for (auto &transform : modified_traceback_transforms)
             {
@@ -1910,8 +1967,8 @@ namespace traceback
             transforms_vectors[2].resize(3);
             transforms_vectors[self_robot_index][self_robot_index] = cv::Mat::eye(3, 3, CV_64F);
             transforms_vectors[second_robot_index][second_robot_index] = cv::Mat::eye(3, 3, CV_64F);
-            transforms_vectors[self_robot_index][second_robot_index] = modified_traceback_transforms[0];
-            transforms_vectors[second_robot_index][self_robot_index] = modified_traceback_transforms[1];
+            transforms_vectors[self_robot_index][second_robot_index] = modified_traceback_transforms[1];
+            transforms_vectors[second_robot_index][self_robot_index] = modified_traceback_transforms[1].inv();
             transform_estimator_.setTransformsVectors(transforms_vectors);
             std::vector<std::vector<double>> confidences;
             confidences.resize(3);
