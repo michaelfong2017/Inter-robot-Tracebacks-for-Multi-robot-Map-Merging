@@ -24,6 +24,10 @@ namespace traceback
 
     double TransformEstimator::matchTwoFeatures(cv::detail::ImageFeatures &features1, cv::detail::ImageFeatures &features2, double confidence)
     {
+        if (features1.getKeypoints().size() < 2 || features2.getKeypoints().size() < 2) {
+            return -1.0;
+        }
+
         std::vector<cv::detail::ImageFeatures> image_features = {features1, features2};
         std::vector<cv::detail::MatchesInfo> pairwise_matches;
         std::vector<cv::detail::CameraParams> transforms;

@@ -1769,7 +1769,7 @@ namespace traceback
     // return if in "map" mode, proceed if in "image" mode
     ////
     // get cv images
-    if (estimation_mode_ == "image")
+    if (estimation_mode_ == "map")
     {
       return;
     }
