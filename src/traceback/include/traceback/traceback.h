@@ -85,6 +85,7 @@ namespace traceback
     ros::NodeHandle node_;
 
     /* parameters */
+    std::string estimation_mode_;
     std::string adjustment_mode_;
     double update_target_rate_;
     double discovery_rate_;
@@ -131,6 +132,13 @@ namespace traceback
     std::vector<float> resolutions_; // e.g. ~0.05
 
     CameraImageProcessor camera_image_processor_;
+
+    std::unordered_map<std::string, std::vector<cv::detail::ImageFeatures>> robots_to_image_features_;
+    std::unordered_map<std::string, std::vector<geometry_msgs::Pose>> robots_to_poses_;
+    void modifyTransformsBasedOnOrigins(std::vector<cv::Mat> &transforms,
+                                        std::vector<cv::Mat> &out,
+                                        std::vector<cv::Point2d> &map_origins,
+                                        std::vector<float> &resolutions);
 
     std::unordered_map<std::string, ros::Publisher> robots_to_goal_and_image_publisher_;
     std::string traceback_goal_and_image_topic_ = "traceback/goal_and_image";

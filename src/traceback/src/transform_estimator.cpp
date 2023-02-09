@@ -11,6 +11,95 @@
 
 namespace traceback
 {
+    cv::detail::ImageFeatures TransformEstimator::computeFeatures(const cv::Mat &image, FeatureType feature_type)
+    {
+        auto finder = internal::chooseFeatureFinder(feature_type);
+        cv::Ptr<cv::detail::FeaturesMatcher> matcher =
+            cv::makePtr<cv::detail::AffineBestOf2NearestMatcher>();
+
+        cv::detail::ImageFeatures image_features;
+        cv::detail::computeImageFeatures(finder, image, image_features);
+        return image_features;
+    }
+
+    double TransformEstimator::matchTwoFeatures(cv::detail::ImageFeatures &features1, cv::detail::ImageFeatures &features2, double confidence)
+    {
+        std::vector<cv::detail::ImageFeatures> image_features = {features1, features2};
+        std::vector<cv::detail::MatchesInfo> pairwise_matches;
+        std::vector<cv::detail::CameraParams> transforms;
+        std::vector<int> good_indices;
+        cv::Ptr<cv::detail::FeaturesMatcher> matcher =
+            cv::makePtr<cv::detail::AffineBestOf2NearestMatcher>();
+        cv::Ptr<cv::detail::Estimator> estimator =
+            cv::makePtr<cv::detail::AffineBasedEstimator>();
+        cv::Ptr<cv::detail::BundleAdjusterBase> adjuster =
+            cv::makePtr<cv::detail::BundleAdjusterAffinePartial>();
+
+        /* find corespondent features */
+        (*matcher)(image_features, pairwise_matches);
+        matcher = {};
+
+        // #ifndef NDEBUG
+        // internal::writeDebugMatchingInfo(images_, image_features, pairwise_matches, "_", "_");
+        // #endif
+
+        /* use only matches that has enough confidence. leave out matches that are not
+         * connected (small components) */
+        /* e.g. pairwise_matches becomes [(0, 0), (0, 1), (1, 0), (1, 1)]
+        good_indices becomes [1, 2]
+        Therefore, the 0 and 1 in pairwise_matches actually correspond to images 1 and 2 rather than images 0 and 1,
+        so do the transforms 0 and 1 later, which actually correspond to images 1 and 2 too. */
+        good_indices = cv::detail::leaveBiggestComponent(
+            image_features, pairwise_matches, static_cast<float>(confidence));
+
+        // no match found
+        if (good_indices.size() == 1)
+        {
+            return -1.0;
+        }
+
+        /* estimate transform */
+        ROS_DEBUG("calculating transforms in global reference frame");
+        // note: currently used estimator never fails
+        if (!(*estimator)(image_features, pairwise_matches, transforms))
+        {
+            return -1.0;
+        }
+
+        for (auto &match_info : pairwise_matches)
+        {
+            ROS_INFO("match_info %d, %d", match_info.src_img_idx, match_info.dst_img_idx);
+        }
+        for (auto &indice : good_indices)
+        {
+            ROS_INFO("indice %d", indice);
+        }
+        ROS_INFO("transforms size %zu", transforms.size());
+
+        for (auto &match_info : pairwise_matches)
+        {
+            if (match_info.H.empty() ||
+                match_info.src_img_idx == match_info.dst_img_idx)
+            {
+                continue;
+            }
+
+            return match_info.confidence;
+        }
+
+        return -1.0;
+    }
+
+    void TransformEstimator::setTransformsVectors(std::vector<std::vector<cv::Mat>> transforms_vectors)
+    {
+        transforms_vectors_ = transforms_vectors;
+    }
+
+    void TransformEstimator::setConfidences(std::vector<std::vector<double>> confidences)
+    {
+        confidences_ = confidences;
+    }
+
     bool TransformEstimator::estimateTransforms(FeatureType feature_type,
                                                 double confidence)
     {

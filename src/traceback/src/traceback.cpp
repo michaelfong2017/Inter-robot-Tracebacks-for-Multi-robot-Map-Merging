@@ -19,6 +19,7 @@ namespace traceback
   {
     ros::NodeHandle private_nh("~");
 
+    private_nh.param<std::string>("estimation_mode", estimation_mode_, "image");
     private_nh.param<std::string>("adjustment_mode", adjustment_mode_, "pointcloud");
     private_nh.param("update_target_rate", update_target_rate_, 0.2);
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
@@ -1763,6 +1764,169 @@ namespace traceback
       }
       // ROS_DEBUG("camera_image_processor_.robots_to_all_pose_image_pairs_[%s] size: %zu", all->first.c_str(), all->second.size());
     }
+
+    ////
+    // return if in "map" mode, proceed if in "image" mode
+    ////
+    // get cv images
+    if (estimation_mode_ == "image")
+    {
+      return;
+    }
+    for (auto current : camera_image_processor_.robots_to_current_image_)
+    {
+      std::string robot_name = current.first;
+
+      cv_bridge::CvImageConstPtr cv_ptr;
+      try
+      {
+        if (sensor_msgs::image_encodings::isColor(current.second.encoding))
+          cv_ptr = cv_bridge::toCvCopy(current.second, sensor_msgs::image_encodings::BGR8);
+        else
+          cv_ptr = cv_bridge::toCvCopy(current.second, sensor_msgs::image_encodings::MONO8);
+      }
+      catch (cv_bridge::Exception &e)
+      {
+        ROS_ERROR("cv_bridge exception: %s", e.what());
+        return;
+      }
+
+      robots_to_image_features_[robot_name].emplace_back(transform_estimator_.computeFeatures(cv_ptr->image, FeatureType::ORB));
+      robots_to_poses_[robot_name].emplace_back(getRobotPose(robot_name));
+
+      for (auto &pair : robots_to_image_features_)
+      {
+        std::string second_robot_name = pair.first;
+        if (robot_name == second_robot_name)
+        {
+          continue;
+        }
+
+        for (size_t i = 0; i < pair.second.size(); ++i)
+        {
+          double confidence_output = transform_estimator_.matchTwoFeatures(robots_to_image_features_[robot_name].back(), pair.second[i], confidence_threshold_);
+          if (confidence_output > 0.0)
+          {
+            geometry_msgs::Pose pose1 = robots_to_poses_[robot_name].back();
+            geometry_msgs::Pose pose2 = robots_to_poses_[second_robot_name][i];
+            ROS_DEBUG("Match!");
+            geometry_msgs::Pose init_pose1 = pose1;
+            init_pose1.position.x *= -1;
+            init_pose1.position.y *= -1;
+            init_pose1.position.z = 0.0;
+            init_pose1.orientation.z *= -1;
+            geometry_msgs::Pose init_pose2 = pose2;
+            init_pose2.position.x *= -1;
+            init_pose2.position.y *= -1;
+            init_pose2.position.z = 0.0;
+            init_pose2.orientation.z *= -1;
+
+            size_t self_robot_index;
+            size_t second_robot_index;
+            for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+            {
+              if (it->second == robot_name)
+              {
+                self_robot_index = it->first;
+              }
+              else if (it->second == second_robot_name)
+              {
+                second_robot_index = it->first;
+              }
+            }
+
+            std::vector<geometry_msgs::Pose> transforms = {init_pose1, init_pose2};
+            std::vector<cv::Mat> current_traceback_transforms;
+            for (size_t i = 0; i < transforms.size(); ++i)
+            {
+              double x = transforms[i].position.x;
+              double y = transforms[i].position.y;
+              tf2::Quaternion tf_q;
+              tf2::fromMsg(transforms[i].orientation, tf_q);
+              tf2::Matrix3x3 m(tf_q);
+              double roll, pitch, yaw;
+              m.getRPY(roll, pitch, yaw);
+
+              cv::Mat t_global_i(3, 3, CV_64F);
+              t_global_i.at<double>(0, 0) = cos(-1 * yaw);
+              t_global_i.at<double>(0, 1) = -sin(-1 * yaw);
+              t_global_i.at<double>(0, 2) = -1 * x / resolutions_[self_robot_index];
+              t_global_i.at<double>(1, 0) = sin(-1 * yaw);
+              t_global_i.at<double>(1, 1) = cos(-1 * yaw);
+              t_global_i.at<double>(1, 2) = -1 * y / resolutions_[second_robot_index];
+              t_global_i.at<double>(2, 0) = 0.0;
+              t_global_i.at<double>(2, 1) = 0.0;
+              t_global_i.at<double>(2, 2) = 1;
+
+              current_traceback_transforms.push_back(t_global_i);
+            }
+
+            std::vector<cv::Mat> temp;
+            for (size_t i = 0; i < transforms.size(); ++i)
+            {
+              if (i == 0)
+              {
+                temp.emplace_back(cv::Mat::eye(3, 3, CV_64F));
+              }
+              // e.g. 0->1 = t_global_1 * inv(t_global_0)
+              else
+              {
+                temp.push_back(current_traceback_transforms[i] *
+                               current_traceback_transforms[0].inv());
+              }
+            }
+            current_traceback_transforms = temp;
+
+            std::vector<cv::Mat> modified_traceback_transforms;
+            modifyTransformsBasedOnOrigins(current_traceback_transforms,
+                                           modified_traceback_transforms,
+                                           map_origins_, resolutions_);
+
+            for (auto &transform : modified_traceback_transforms)
+            {
+              std::string s = "";
+              for (int y = 0; y < 3; y++)
+              {
+                for (int x = 0; x < 3; x++)
+                {
+                  double val = transform.at<double>(y, x);
+                  if (x == 3 - 1)
+                  {
+                    s += std::to_string(val) + "\n";
+                  }
+                  else
+                  {
+                    s += std::to_string(val) + ", ";
+                  }
+                }
+              }
+              ROS_INFO("matrix:\n%s", s.c_str());
+            }
+            ROS_INFO("Continue");
+            std::vector<std::vector<cv::Mat>> transforms_vectors;
+            transforms_vectors.resize(3);
+            transforms_vectors[0].resize(3);
+            transforms_vectors[1].resize(3);
+            transforms_vectors[2].resize(3);
+            transforms_vectors[self_robot_index][self_robot_index] = cv::Mat::eye(3, 3, CV_64F);
+            transforms_vectors[second_robot_index][second_robot_index] = cv::Mat::eye(3, 3, CV_64F);
+            transforms_vectors[self_robot_index][second_robot_index] = modified_traceback_transforms[0];
+            transforms_vectors[second_robot_index][self_robot_index] = modified_traceback_transforms[1];
+            transform_estimator_.setTransformsVectors(transforms_vectors);
+            std::vector<std::vector<double>> confidences;
+            confidences.resize(3);
+            confidences[0].resize(3);
+            confidences[1].resize(3);
+            confidences[2].resize(3);
+            confidences[self_robot_index][self_robot_index] = -1.0;
+            confidences[second_robot_index][second_robot_index] = -1.0;
+            confidences[self_robot_index][second_robot_index] = confidence_output;
+            confidences[second_robot_index][self_robot_index] = confidence_output;
+            transform_estimator_.setConfidences(confidences);
+          }
+        }
+      }
+    }
   }
 
   void Traceback::poseEstimation()
@@ -1796,8 +1960,12 @@ namespace traceback
     }
 
     transform_estimator_.feed(grids.begin(), grids.end());
-    transform_estimator_.estimateTransforms(FeatureType::AKAZE,
-                                            confidence_threshold_);
+
+    if (estimation_mode_ == "map")
+    {
+      transform_estimator_.estimateTransforms(FeatureType::AKAZE,
+                                              confidence_threshold_);
+    }
   }
 
   void Traceback::CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg)
@@ -1805,6 +1973,71 @@ namespace traceback
     std::string frame_id = msg->header.frame_id;
     std::string robot_name = "/" + frame_id.substr(0, frame_id.find("/"));
     camera_image_processor_.robots_to_temp_image_[robot_name] = *msg;
+  }
+
+  void Traceback::modifyTransformsBasedOnOrigins(
+      std::vector<cv::Mat> &transforms, std::vector<cv::Mat> &out,
+      std::vector<cv::Point2d> &map_origins, std::vector<float> &resolutions)
+  {
+    size_t identity_index = -1;
+    const double ZERO_ERROR = 0.0001;
+    for (size_t k = 0; k < transforms.size(); ++k)
+    {
+      if (abs(transforms[k].at<double>(0, 0) - 1.0) < ZERO_ERROR &&
+          abs(transforms[k].at<double>(0, 1) - 0.0) < ZERO_ERROR &&
+          abs(transforms[k].at<double>(0, 2) - 0.0) < ZERO_ERROR &&
+          abs(transforms[k].at<double>(1, 0) - 0.0) < ZERO_ERROR &&
+          abs(transforms[k].at<double>(1, 1) - 1.0) < ZERO_ERROR &&
+          abs(transforms[k].at<double>(1, 2) - 0.0) < ZERO_ERROR &&
+          abs(transforms[k].at<double>(2, 0) - 0.0) < ZERO_ERROR &&
+          abs(transforms[k].at<double>(2, 1) - 0.0) < ZERO_ERROR &&
+          abs(transforms[k].at<double>(2, 2) - 1.0) < ZERO_ERROR)
+      {
+        identity_index = k;
+      }
+    }
+
+    if (identity_index == -1)
+    {
+      return;
+    }
+
+    out.clear();
+    out.reserve(transforms.size());
+
+    double src_map_origin_x = map_origins[identity_index].x;
+    double src_map_origin_y = map_origins[identity_index].y;
+    float src_resolution = resolutions[identity_index];
+    for (size_t i = 0; i < transforms.size(); ++i)
+    {
+      double dst_map_origin_x = map_origins[i].x;
+      double dst_map_origin_y = map_origins[i].y;
+      float dst_resolution = resolutions[i];
+
+      cv::Mat t1(3, 3, CV_64F);
+      t1.at<double>(0, 0) = 1.0;
+      t1.at<double>(0, 1) = 0.0;
+      t1.at<double>(0, 2) = src_map_origin_x / src_resolution;
+      t1.at<double>(1, 0) = 0.0;
+      t1.at<double>(1, 1) = 1.0;
+      t1.at<double>(1, 2) = src_map_origin_y / src_resolution;
+      t1.at<double>(2, 0) = 0.0;
+      t1.at<double>(2, 1) = 0.0;
+      t1.at<double>(2, 2) = 1.0;
+
+      cv::Mat t2(3, 3, CV_64F);
+      t2.at<double>(0, 0) = 1.0;
+      t2.at<double>(0, 1) = 0.0;
+      t2.at<double>(0, 2) = -1 * dst_map_origin_x / dst_resolution;
+      t2.at<double>(1, 0) = 0.0;
+      t2.at<double>(1, 1) = 1.0;
+      t2.at<double>(1, 2) = -1 * dst_map_origin_y / dst_resolution;
+      t2.at<double>(2, 0) = 0.0;
+      t2.at<double>(2, 1) = 0.0;
+      t2.at<double>(2, 2) = 1.0;
+
+      out.emplace_back(t2 * transforms[i] * t1);
+    }
   }
 
   void Traceback::CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr &msg)

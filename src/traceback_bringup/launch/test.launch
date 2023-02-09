@@ -26,8 +26,11 @@
         <param name="update_target_rate" value="0.2" />
         <param name="discovery_rate" value="0.05" />
         <param name="estimation_rate" value="0.1" />
-        <param name="estimation_confidence" value="0.6" />
-        <param name="camera_image_update_rate" value="0.2" />
+        <!-- either "map" or "image" -->
+        <param name="estimation_mode" value="image" default="image" />
+        <!-- In "map" mode, use a confidence of 0.6 to 1.0 -->
+        <param name="estimation_confidence" value="4.0" />
+        <param name="camera_image_update_rate" value="1" />
         <param name="check_obstacle_nearby_pixel_distance" value="5" />
         <!-- The queue size has to be large enough so that an explored near place can be found -->
         <param name="camera_pose_image_max_queue_size" value="300" />
