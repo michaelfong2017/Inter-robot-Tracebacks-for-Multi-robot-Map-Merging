@@ -2479,12 +2479,12 @@ namespace traceback
   {
     // initial poses w.r.t. global frame
     double resolution = 0.05;
-    double init_0_x = -4.0;
+    double init_0_x = -7.0;
     double init_0_y = -1.0;
     double init_0_r = 0.0;
-    double init_1_x = 4.0;
+    double init_1_x = 7.0;
     double init_1_y = -1.0;
-    double init_1_r = 3.14;
+    double init_1_r = 0.0;
     double init_2_x = 0.5;
     double init_2_y = 3.0;
     double init_2_r = 0.785;
