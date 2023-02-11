@@ -244,7 +244,7 @@ namespace traceback
 
         // Ensure consistency of transforms_vectors_, centers_ and confidences_
         {
-            boost::shared_lock<boost::shared_mutex> lock(updates_mutex_);
+            boost::lock_guard<boost::shared_mutex> lock(updates_mutex_);
             toPairwiseTransforms(transforms, good_indices, images_.size(), transforms_vectors_);
             // printTransformsVectors(transforms_vectors_);
 

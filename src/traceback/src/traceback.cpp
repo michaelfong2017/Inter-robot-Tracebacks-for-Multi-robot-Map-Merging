@@ -54,12 +54,6 @@ namespace traceback
 
     assert(adjustment_mode_ == "triangulation" || adjustment_mode_ == "pointcloud");
 
-    std::unordered_map<size_t, std::string> transforms_indexes;
-    {
-      boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
-      transforms_indexes = transforms_indexes_;
-    }
-
     if (adjustment_mode_ == "pointcloud")
     {
       std::string tracer_robot = msg->tracer_robot;
@@ -129,7 +123,7 @@ namespace traceback
 
           pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
               ros::Duration(30, 0),
-              [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, transforms_indexes](const ros::TimerEvent &)
+              [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
               {
                 /** just for finding min_it */
                 {
@@ -138,7 +132,7 @@ namespace traceback
 
                   size_t tracer_robot_index;
                   size_t traced_robot_index;
-                  for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
+                  for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
                   {
                     if (it->second == tracer_robot)
                     {
@@ -430,7 +424,7 @@ namespace traceback
               {
                 size_t tracer_robot_index;
                 size_t traced_robot_index;
-                for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
+                for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
                 {
                   if (it->second == tracer_robot)
                   {
@@ -624,7 +618,7 @@ namespace traceback
             // Allow more time for normal exploration to prevent being stuck at local optimums
             pairwise_paused_[tracer_robot][traced_robot] = true;
             pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-                ros::Duration(60, 0),
+                ros::Duration(30, 0),
                 [this, tracer_robot, traced_robot](const ros::TimerEvent &)
                 { pairwise_paused_[tracer_robot][traced_robot] = false; },
                 true);
@@ -639,7 +633,57 @@ namespace traceback
           else
           {
             writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. first traceback, abort without enough consecutive count");
-            continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
+
+            pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
+                ros::Duration(30, 0),
+                [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
+                {
+                  /** just for finding min_it */
+                  {
+                    // Get current pose
+                    geometry_msgs::Pose pose = getRobotPose(tracer_robot);
+
+                    size_t tracer_robot_index;
+                    size_t traced_robot_index;
+                    for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+                    {
+                      if (it->second == tracer_robot)
+                      {
+                        tracer_robot_index = it->first;
+                      }
+                      else if (it->second == traced_robot)
+                      {
+                        traced_robot_index = it->first;
+                      }
+                    }
+                    std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
+                    cv::Mat mat_transform = mat_transforms[traced_robot_index];
+
+                    cv::Mat pose_src(3, 1, CV_64F);
+                    pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
+                    pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
+                    pose_src.at<double>(2, 0) = 1.0;
+
+                    cv::Mat pose_dst = mat_transform * pose_src;
+                    pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
+                    pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
+                    pose_dst.at<double>(0, 0) += src_map_origin_x;
+                    pose_dst.at<double>(1, 0) += src_map_origin_y;
+                    // Also adjust the difference between the origins
+                    pose_dst.at<double>(0, 0) += dst_map_origin_x;
+                    pose_dst.at<double>(1, 0) += dst_map_origin_y;
+                    pose_dst.at<double>(0, 0) -= src_map_origin_x;
+                    pose_dst.at<double>(1, 0) -= src_map_origin_y;
+
+                    boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
+                    double threshold_distance = 5.0; // Go to a location at least and minimally threshold_distance far.
+                    robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
+                  }
+                  /** just for finding min_it END */
+
+                  continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
+                },
+                true);
             // 2. first traceback, abort without enough consecutive count END
             return;
           }
@@ -1082,7 +1126,7 @@ namespace traceback
             {
               size_t tracer_robot_index;
               size_t traced_robot_index;
-              for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
+              for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
               {
                 if (it->second == tracer_robot)
                 {
@@ -1182,13 +1226,11 @@ namespace traceback
     ROS_DEBUG("Update target poses started.");
 
     std::vector<cv::Point2d> map_origins;
-    std::unordered_map<size_t, std::string> transforms_indexes;
     std::vector<std::vector<cv::Mat>> transforms_vectors;
     std::vector<cv::Point2f> centers;
     std::vector<std::vector<double>> confidences;
     {
       boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
-      transforms_indexes = transforms_indexes_;
       map_origins = map_origins_;
     }
 
@@ -1210,7 +1252,7 @@ namespace traceback
 
     for (size_t i = 0; i < confidences.size(); ++i)
     {
-      std::string robot_name_src = transforms_indexes[i];
+      std::string robot_name_src = transforms_indexes_[i];
       // Find it, filtering accepted tracebacks
       // auto it = max_element(confidences[i].begin(), confidences[i].end());
       std::vector<double>::iterator it = confidences[i].begin();
@@ -1219,13 +1261,13 @@ namespace traceback
       size_t dst = 0;
       for (auto itt = confidences[i].begin(); itt != confidences[i].end(); ++itt)
       {
-        if (pairwise_accept_reject_status_[robot_name_src][transforms_indexes[dst]].accepted)
+        if (pairwise_accept_reject_status_[robot_name_src][transforms_indexes_[dst]].accepted)
         {
           ++dst;
           ROS_INFO("Already accepted.");
           continue;
         }
-        if (pairwise_paused_[robot_name_src][transforms_indexes[dst]])
+        if (pairwise_paused_[robot_name_src][transforms_indexes_[dst]])
         {
           ++dst;
           ROS_INFO("Being paused.");
@@ -1234,7 +1276,7 @@ namespace traceback
         // e.g. if tb3_1 is in traceback, I want tb3_0 to not trace tb3_1 so that
         // it is impossible to have a cyclic condition where no robots will
         // navigate to a new place and every robot is circling around the same place.
-        // if (robots_to_in_traceback_[transforms_indexes[dst]])
+        // if (robots_to_in_traceback_[transforms_indexes_[dst]])
         // {
         //   continue;
         // }
@@ -1254,7 +1296,7 @@ namespace traceback
 
       // Find it END
       size_t max_position = it - confidences[i].begin();
-      std::string robot_name_dst = transforms_indexes[max_position];
+      std::string robot_name_dst = transforms_indexes_[max_position];
 
       // ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
 
@@ -1435,22 +1477,16 @@ namespace traceback
 
   void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
   {
-    std::unordered_map<size_t, std::string> transforms_indexes;
-    {
-      boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
-      transforms_indexes = transforms_indexes_;
-    }
-
     /** Get parameters other than robot names */
     size_t i;
-    for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
+    for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
     {
       if (it->second == robot_name_src)
         i = it->first;
     }
 
     size_t max_position;
-    for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
+    for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
     {
       if (it->second == robot_name_dst)
         max_position = it->first;
@@ -1791,12 +1827,6 @@ namespace traceback
       return;
     }
 
-    std::unordered_map<size_t, std::string> transforms_indexes;
-    {
-      boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
-      transforms_indexes = transforms_indexes_;
-    }
-
     for (auto current : camera_image_processor_.robots_to_current_image_)
     {
       std::string robot_name = current.first;
@@ -1909,7 +1939,7 @@ namespace traceback
 
             size_t self_robot_index;
             size_t second_robot_index;
-            for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
+            for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
             {
               if (it->second == robot_name)
               {
@@ -2024,9 +2054,6 @@ namespace traceback
     std::vector<nav_msgs::OccupancyGridConstPtr> grids;
     grids.reserve(map_subscriptions_size_);
     {
-      boost::lock_guard<boost::shared_mutex> lock(map_subscriptions_mutex_);
-
-      transforms_indexes_.clear();
       resolutions_.clear();
       map_origins_.clear();
 
@@ -2042,7 +2069,6 @@ namespace traceback
           continue;
         }
         grids.push_back(subscription.readonly_map);
-        transforms_indexes_.insert({i, subscription.robot_namespace});
         resolutions_.emplace_back(subscription.readonly_map->info.resolution);
         map_origins_.emplace_back(cv::Point2d(subscription.readonly_map->info.origin.position.x, subscription.readonly_map->info.origin.position.y));
         ++i;
@@ -2180,6 +2206,7 @@ namespace traceback
         {
           std::lock_guard<boost::shared_mutex> lock(map_subscriptions_mutex_);
           map_subscriptions_.emplace_front();
+          transforms_indexes_.insert({map_subscriptions_size_, robot_name});
           ++map_subscriptions_size_;
         }
 

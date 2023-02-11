@@ -449,7 +449,7 @@ namespace traceback
         cv::Mat essential_mat = cv::findEssentialMat(points1, points2, camera_K, cv::RANSAC);
 
         {
-            std::ofstream fw(current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_essential_mat.txt", std::ofstream::out);
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_essential_mat.txt", std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "Camera calibration matrix K:" << std::endl;
@@ -491,7 +491,7 @@ namespace traceback
         cv::Vec3d rot = rotationMatrixToEulerAngles(transform_R);
 
         {
-            std::ofstream fw(current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_R.txt", std::ofstream::out);
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_R.txt", std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "Number of inliers: " << number_of_inliers << std::endl;
@@ -506,7 +506,7 @@ namespace traceback
         }
 
         {
-            std::ofstream fw(current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_t.txt", std::ofstream::out);
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_t.txt", std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "Number of inliers: " << number_of_inliers << std::endl;
