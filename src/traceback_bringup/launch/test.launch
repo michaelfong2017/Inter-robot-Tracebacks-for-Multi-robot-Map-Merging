@@ -30,7 +30,7 @@
         <param name="estimation_mode" value="image" default="image" />
         <!-- In "map" mode, use a confidence of 0.6 to 1.0 -->
         <!-- In "map" mode, use a confidence of 2.0 to 2.5 -->
-        <param name="estimation_confidence" value="2.2" />
+        <param name="estimation_confidence" value="2.1" />
         <param name="camera_image_update_rate" value="0.2" />
         <param name="check_obstacle_nearby_pixel_distance" value="5" />
         <!-- The queue size has to be large enough so that an explored near place can be found -->
@@ -46,7 +46,7 @@
         <param name="reject_count_needed" value="4" />
         <param name="consecutive_abort_count_needed" value="4" />
         <!-- either "triangulation" or "pointcloud" -->
-        <param name="adjustment_mode" value="triangulation" default="pointcloud" />
+        <param name="adjustment_mode" value="pointcloud" default="pointcloud" />
     </node>
 
 
