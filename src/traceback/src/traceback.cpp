@@ -1019,7 +1019,7 @@ namespace traceback
             //
             transform_estimator_.updateBestTransforms(average_adjusted_transform, tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
             //
-
+            cv::Mat world_transform = pairwise_triangulation_result_history_[tracer_robot][traced_robot][0].world_transform;
             {
               std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
               if (fw.is_open())
@@ -1027,7 +1027,6 @@ namespace traceback
                 fw << "Unadjusted transform:" << std::endl;
                 if (history_size != 0)
                 {
-                  cv::Mat world_transform = pairwise_triangulation_result_history_[tracer_robot][traced_robot][0].world_transform;
                   fw << world_transform.at<double>(0, 0) << "\t" << world_transform.at<double>(0, 1) << "\t" << world_transform.at<double>(0, 2) << std::endl;
                   fw << world_transform.at<double>(1, 0) << "\t" << world_transform.at<double>(1, 1) << "\t" << world_transform.at<double>(1, 2) << std::endl;
                   fw << world_transform.at<double>(2, 0) << "\t" << world_transform.at<double>(2, 1) << "\t" << world_transform.at<double>(2, 2) << std::endl;
@@ -1044,6 +1043,8 @@ namespace traceback
                 fw.close();
               }
             }
+
+            evaluateWithGroundTruth(world_transform, average_adjusted_transform, tracer_robot, traced_robot, current_time);
 
             if (has_best_transforms_.size() == resolutions_.size())
             {
