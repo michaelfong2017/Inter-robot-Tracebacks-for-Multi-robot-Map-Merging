@@ -54,6 +54,12 @@ namespace traceback
 
     assert(adjustment_mode_ == "triangulation" || adjustment_mode_ == "pointcloud");
 
+    std::unordered_map<size_t, std::string> transforms_indexes;
+    {
+      boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
+      transforms_indexes = transforms_indexes_;
+    }
+
     if (adjustment_mode_ == "pointcloud")
     {
       std::string tracer_robot = msg->tracer_robot;
@@ -123,7 +129,7 @@ namespace traceback
 
           pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
               ros::Duration(30, 0),
-              [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
+              [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, transforms_indexes](const ros::TimerEvent &)
               {
                 /** just for finding min_it */
                 {
@@ -132,7 +138,7 @@ namespace traceback
 
                   size_t tracer_robot_index;
                   size_t traced_robot_index;
-                  for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+                  for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
                   {
                     if (it->second == tracer_robot)
                     {
@@ -424,7 +430,7 @@ namespace traceback
               {
                 size_t tracer_robot_index;
                 size_t traced_robot_index;
-                for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+                for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
                 {
                   if (it->second == tracer_robot)
                   {
@@ -662,7 +668,7 @@ namespace traceback
 
           // Process cv_ptr->image using OpenCV
           ROS_INFO("Process cv_ptr->image using OpenCV");
-          cv::imwrite(current_time + "_first_traceback_" + tracer_robot.substr(1) + "_tracer.png",
+          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_first_traceback_" + tracer_robot.substr(1) + "_tracer.png",
                       cv_ptr_tracer->image);
 
           //
@@ -683,7 +689,7 @@ namespace traceback
 
           // Process cv_ptr->image using OpenCV
           ROS_INFO("Process cv_ptr->image using OpenCV");
-          cv::imwrite(current_time + "_first_traceback_" + traced_robot.substr(1) + "_traced.png",
+          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_first_traceback_" + traced_robot.substr(1) + "_traced.png",
                       cv_ptr_traced->image);
 
           geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
@@ -853,7 +859,7 @@ namespace traceback
 
         // Process cv_ptr->image using OpenCV
         ROS_INFO("Process cv_ptr->image using OpenCV");
-        cv::imwrite(current_time + "_second_traceback_" + tracer_robot.substr(1) + "_tracer.png",
+        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_second_traceback_" + tracer_robot.substr(1) + "_tracer.png",
                     cv_ptr_tracer->image);
 
         //
@@ -874,7 +880,7 @@ namespace traceback
 
         // Process cv_ptr->image using OpenCV
         ROS_INFO("Process cv_ptr->image using OpenCV");
-        cv::imwrite(current_time + "_second_traceback_" + traced_robot.substr(1) + "_traced.png",
+        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_second_traceback_" + traced_robot.substr(1) + "_traced.png",
                     cv_ptr_traced->image);
 
         geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
@@ -1076,7 +1082,7 @@ namespace traceback
             {
               size_t tracer_robot_index;
               size_t traced_robot_index;
-              for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+              for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
               {
                 if (it->second == tracer_robot)
                 {
@@ -1175,17 +1181,22 @@ namespace traceback
   {
     ROS_DEBUG("Update target poses started.");
 
-    std::vector<std::vector<cv::Mat>> transforms_vectors;
     std::vector<cv::Point2d> map_origins;
+    std::unordered_map<size_t, std::string> transforms_indexes;
+    std::vector<std::vector<cv::Mat>> transforms_vectors;
     std::vector<cv::Point2f> centers;
     std::vector<std::vector<double>> confidences;
+    {
+      boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
+      transforms_indexes = transforms_indexes_;
+      map_origins = map_origins_;
+    }
+
     // Ensure consistency of transforms_vectors_, centers_ and confidences_
     {
       boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
       transforms_vectors = transform_estimator_.getTransformsVectors();
       // transform_estimator_.printTransformsVectors(transforms_vectors);
-
-      map_origins = map_origins_;
 
       centers = transform_estimator_.getCenters();
       for (auto &p : centers)
@@ -1199,7 +1210,7 @@ namespace traceback
 
     for (size_t i = 0; i < confidences.size(); ++i)
     {
-      std::string robot_name_src = transforms_indexes_[i];
+      std::string robot_name_src = transforms_indexes[i];
       // Find it, filtering accepted tracebacks
       // auto it = max_element(confidences[i].begin(), confidences[i].end());
       std::vector<double>::iterator it = confidences[i].begin();
@@ -1208,13 +1219,13 @@ namespace traceback
       size_t dst = 0;
       for (auto itt = confidences[i].begin(); itt != confidences[i].end(); ++itt)
       {
-        if (pairwise_accept_reject_status_[robot_name_src][transforms_indexes_[dst]].accepted)
+        if (pairwise_accept_reject_status_[robot_name_src][transforms_indexes[dst]].accepted)
         {
           ++dst;
           ROS_INFO("Already accepted.");
           continue;
         }
-        if (pairwise_paused_[robot_name_src][transforms_indexes_[dst]])
+        if (pairwise_paused_[robot_name_src][transforms_indexes[dst]])
         {
           ++dst;
           ROS_INFO("Being paused.");
@@ -1223,7 +1234,7 @@ namespace traceback
         // e.g. if tb3_1 is in traceback, I want tb3_0 to not trace tb3_1 so that
         // it is impossible to have a cyclic condition where no robots will
         // navigate to a new place and every robot is circling around the same place.
-        // if (robots_to_in_traceback_[transforms_indexes_[dst]])
+        // if (robots_to_in_traceback_[transforms_indexes[dst]])
         // {
         //   continue;
         // }
@@ -1243,7 +1254,7 @@ namespace traceback
 
       // Find it END
       size_t max_position = it - confidences[i].begin();
-      std::string robot_name_dst = transforms_indexes_[max_position];
+      std::string robot_name_dst = transforms_indexes[max_position];
 
       // ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
 
@@ -1424,16 +1435,22 @@ namespace traceback
 
   void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
   {
+    std::unordered_map<size_t, std::string> transforms_indexes;
+    {
+      boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
+      transforms_indexes = transforms_indexes_;
+    }
+
     /** Get parameters other than robot names */
     size_t i;
-    for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+    for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
     {
       if (it->second == robot_name_src)
         i = it->first;
     }
 
     size_t max_position;
-    for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+    for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
     {
       if (it->second == robot_name_dst)
         max_position = it->first;
@@ -1773,6 +1790,13 @@ namespace traceback
     {
       return;
     }
+
+    std::unordered_map<size_t, std::string> transforms_indexes;
+    {
+      boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
+      transforms_indexes = transforms_indexes_;
+    }
+
     for (auto current : camera_image_processor_.robots_to_current_image_)
     {
       std::string robot_name = current.first;
@@ -1885,7 +1909,7 @@ namespace traceback
 
             size_t self_robot_index;
             size_t second_robot_index;
-            for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+            for (auto it = transforms_indexes.begin(); it != transforms_indexes.end(); ++it)
             {
               if (it->second == robot_name)
               {
@@ -1999,12 +2023,13 @@ namespace traceback
     ROS_DEBUG("Grid pose estimation started.");
     std::vector<nav_msgs::OccupancyGridConstPtr> grids;
     grids.reserve(map_subscriptions_size_);
-    // TODO transforms_indexes_ can have concurrency problem
-    transforms_indexes_.clear();
-    resolutions_.clear();
-    map_origins_.clear();
     {
-      boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
+      boost::lock_guard<boost::shared_mutex> lock(map_subscriptions_mutex_);
+
+      transforms_indexes_.clear();
+      resolutions_.clear();
+      map_origins_.clear();
+
       size_t i = 0;
       for (auto &subscription : map_subscriptions_)
       {
@@ -2427,12 +2452,12 @@ namespace traceback
   {
     // initial poses w.r.t. global frame
     double resolution = 0.05;
-    double init_0_x = -7.0;
+    double init_0_x = -4.0;
     double init_0_y = -1.0;
     double init_0_r = 0.0;
-    double init_1_x = 7.0;
+    double init_1_x = 4.0;
     double init_1_y = -1.0;
-    double init_1_r = 0.0;
+    double init_1_r = 3.14;
     double init_2_x = 0.5;
     double init_2_y = 3.0;
     double init_2_r = 0.785;
