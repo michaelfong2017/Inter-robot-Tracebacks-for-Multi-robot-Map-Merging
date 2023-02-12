@@ -2903,6 +2903,8 @@ namespace traceback
                                 { executeTopicSubscribing(); });
     std::thread receive_camera_image_thr([this]()
                                          { executeReceiveUpdatedCameraImage(); });
+    std::thread data_push_thr([this]()
+                              { executePushData(); });
     std::thread estimation_thr([this]()
                                { executePoseEstimation(); });
     std::thread update_target_thr([this]()
@@ -2910,6 +2912,7 @@ namespace traceback
     ros::spin();
     update_target_thr.join();
     estimation_thr.join();
+    data_push_thr.join();
     receive_camera_image_thr.join();
     subscribing_thr.join();
   }
