@@ -44,6 +44,7 @@ namespace traceback
     private_nh.param<std::string>("camera_point_cloud_topic", robot_camera_point_cloud_topic_, "camera/depth/points");
     private_nh.param("check_obstacle_nearby_pixel_distance", check_obstacle_nearby_pixel_distance_, 3);
     private_nh.param("camera_image_update_rate", camera_image_update_rate_, 0.2); // Too high update rate can result in "continue traceback looping"
+    private_nh.param("data_push_rate", data_push_rate_, 2.0);
     private_nh.param("camera_pose_image_queue_skip_count", camera_pose_image_queue_skip_count_, 20);
     private_nh.param("camera_pose_image_max_queue_size", camera_pose_image_max_queue_size_, 100);
   }
@@ -1839,80 +1840,9 @@ namespace traceback
   {
     ROS_DEBUG("Receive updated camera image started.");
 
-    // Skip when there are obstacles nearby
-    std::unordered_map<std::string, bool> robots_to_skip;
-    boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
-    for (auto &subscription : map_subscriptions_)
-    {
-      robots_to_skip[subscription.robot_namespace] = hasObstacleNearby(subscription, check_obstacle_nearby_pixel_distance_);
-    }
-    //
-
-    for (auto current : camera_image_processor_.robots_to_current_image_)
-    {
-      std::string robot_name = current.first;
-      // Skip when there are obstacles nearby
-      if (robots_to_skip[robot_name])
-      {
-        continue;
-      }
-      //
-      geometry_msgs::Pose pose = camera_image_processor_.robots_to_current_pose_[current.first];
-      sensor_msgs::PointCloud2 point_cloud = camera_image_processor_.robots_to_current_point_cloud_[current.first];
-      PoseImagePair pose_image_pair;
-      pose_image_pair.pose = pose;
-      pose_image_pair.image = current.second;
-      pose_image_pair.point_cloud = point_cloud;
-      pose_image_pair.stamp = ros::Time::now().toNSec();
-
-      auto all = camera_image_processor_.robots_to_all_pose_image_pairs_.find(current.first);
-      if (all != camera_image_processor_.robots_to_all_pose_image_pairs_.end())
-      {
-        if (all->second.size() >= camera_pose_image_max_queue_size_)
-        {
-          {
-            boost::lock_guard<boost::shared_mutex> lock(robots_to_current_it_mutex_[current.first]);
-
-            auto current_it = robots_to_current_it_.find(current.first);
-            if (current_it != robots_to_current_it_.end())
-            {
-              // ROS_INFO("Before erase current_it stamp: %ld", all->second[current_it->second].stamp);
-              if (current_it->second == 0)
-              {
-                all->second.erase(all->second.begin() + camera_pose_image_queue_skip_count_);
-              }
-              else
-              {
-                if (robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ >= all->second.size())
-                {
-                  all->second.erase(all->second.begin() + robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ - all->second.size());
-                }
-                else
-                {
-                  all->second.erase(all->second.begin());
-                }
-                --robots_to_current_it_[current.first];
-              }
-              // ROS_INFO("After erase current_it stamp: %ld", all->second[current_it->second].stamp);
-            }
-          }
-        }
-        //
-        all->second.emplace_back(pose_image_pair);
-        PoseImagePair latestPair = *std::max_element(camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].begin(), camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].end());
-        // ROS_INFO("latestPair.stamp: %ld", latestPair.stamp);
-      }
-      else
-      {
-        camera_image_processor_.robots_to_all_pose_image_pairs_.insert({current.first, {pose_image_pair}});
-      }
-      // ROS_DEBUG("camera_image_processor_.robots_to_all_pose_image_pairs_[%s] size: %zu", all->first.c_str(), all->second.size());
-    }
-
     ////
     // return if in "map" mode, proceed if in "image" mode
     ////
-    // get cv images
     if (estimation_mode_ == "map")
     {
       return;
@@ -2136,6 +2066,79 @@ namespace traceback
           }
         }
       }
+    }
+  }
+
+  void Traceback::pushData()
+  {
+    // Skip when there are obstacles nearby
+    std::unordered_map<std::string, bool> robots_to_skip;
+    boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
+    for (auto &subscription : map_subscriptions_)
+    {
+      robots_to_skip[subscription.robot_namespace] = hasObstacleNearby(subscription, check_obstacle_nearby_pixel_distance_);
+    }
+    //
+
+    for (auto current : camera_image_processor_.robots_to_current_image_)
+    {
+      std::string robot_name = current.first;
+      // Skip when there are obstacles nearby
+      if (robots_to_skip[robot_name])
+      {
+        continue;
+      }
+      //
+      geometry_msgs::Pose pose = camera_image_processor_.robots_to_current_pose_[current.first];
+      sensor_msgs::PointCloud2 point_cloud = camera_image_processor_.robots_to_current_point_cloud_[current.first];
+      PoseImagePair pose_image_pair;
+      pose_image_pair.pose = pose;
+      pose_image_pair.image = current.second;
+      pose_image_pair.point_cloud = point_cloud;
+      pose_image_pair.stamp = ros::Time::now().toNSec();
+
+      auto all = camera_image_processor_.robots_to_all_pose_image_pairs_.find(current.first);
+      if (all != camera_image_processor_.robots_to_all_pose_image_pairs_.end())
+      {
+        if (all->second.size() >= camera_pose_image_max_queue_size_)
+        {
+          {
+            boost::lock_guard<boost::shared_mutex> lock(robots_to_current_it_mutex_[current.first]);
+
+            auto current_it = robots_to_current_it_.find(current.first);
+            if (current_it != robots_to_current_it_.end())
+            {
+              // ROS_INFO("Before erase current_it stamp: %ld", all->second[current_it->second].stamp);
+              if (current_it->second == 0)
+              {
+                all->second.erase(all->second.begin() + camera_pose_image_queue_skip_count_);
+              }
+              else
+              {
+                if (robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ >= all->second.size())
+                {
+                  all->second.erase(all->second.begin() + robots_to_current_it_[current.first] + camera_pose_image_queue_skip_count_ - all->second.size());
+                }
+                else
+                {
+                  all->second.erase(all->second.begin());
+                }
+                --robots_to_current_it_[current.first];
+              }
+              // ROS_INFO("After erase current_it stamp: %ld", all->second[current_it->second].stamp);
+            }
+          }
+        }
+        //
+        all->second.emplace_back(pose_image_pair);
+        PoseImagePair latestPair = *std::max_element(camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].begin(), camera_image_processor_.robots_to_all_pose_image_pairs_[current.first].end());
+        // ROS_INFO("latestPair.stamp: %ld", latestPair.stamp);
+      }
+      else
+      {
+        camera_image_processor_.robots_to_all_pose_image_pairs_.insert({current.first, {pose_image_pair}});
+      }
+      // ROS_DEBUG("camera_image_processor_.robots_to_all_pose_image_pairs_[%s] size: %zu", all->first.c_str(), all->second.size());
     }
   }
 
@@ -2866,6 +2869,16 @@ namespace traceback
     while (node_.ok())
     {
       receiveUpdatedCameraImage();
+      r.sleep();
+    }
+  }
+
+  void Traceback::executePushData()
+  {
+    ros::Rate r(data_push_rate_);
+    while (node_.ok())
+    {
+      pushData();
       r.sleep();
     }
   }

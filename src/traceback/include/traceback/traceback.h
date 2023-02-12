@@ -107,6 +107,7 @@ namespace traceback
     std::string robot_camera_point_cloud_topic_;
     int check_obstacle_nearby_pixel_distance_;
     double camera_image_update_rate_;
+    double data_push_rate_;
     int camera_pose_image_queue_skip_count_;
     int camera_pose_image_max_queue_size_;
 
@@ -195,6 +196,7 @@ namespace traceback
     geometry_msgs::Pose getRobotPose(const std::string &global_frame, const std::string &robot_base_frame, const tf::TransformListener &tf_listener, const double &transform_tolerance);
 
     void receiveUpdatedCameraImage();
+    void pushData();
 
     void poseEstimation();
 
@@ -260,6 +262,7 @@ namespace traceback
     void executeUpdateTargetPoses();
     void executeTopicSubscribing();
     void executeReceiveUpdatedCameraImage();
+    void executePushData();
     void executePoseEstimation();
   };
 } // namespace traceback
