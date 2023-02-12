@@ -2541,6 +2541,11 @@ namespace traceback
     t1.at<double>(2, 1) = 0.0;
     t1.at<double>(2, 2) = 1.0;
 
+    /** Need to invert all transform needed */
+    // Ensure that they are passed by value
+    first_tracer_to_traced_tx *= -1;
+    first_tracer_to_traced_ty *= -1;
+    first_tracer_to_traced_r *= -1;
     cv::Mat adjustment(3, 3, CV_64F);
     adjustment.at<double>(0, 0) = cos(first_tracer_to_traced_r);
     adjustment.at<double>(0, 1) = -sin(first_tracer_to_traced_r);
