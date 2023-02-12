@@ -106,7 +106,7 @@ namespace traceback
           // Allow more time for normal exploration to prevent being stuck at local optimums
           pairwise_paused_[tracer_robot][traced_robot] = true;
           pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-              ros::Duration(30, 0),
+              ros::Duration(60, 0),
               [this, tracer_robot, traced_robot](const ros::TimerEvent &)
               { pairwise_paused_[tracer_robot][traced_robot] = false; },
               true);
@@ -123,7 +123,7 @@ namespace traceback
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. abort without enough consecutive count");
 
           // pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-          //     ros::Duration(30, 0),
+          //     ros::Duration(60, 0),
           //     [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
           //     {
           //       /** just for finding min_it */
@@ -664,7 +664,7 @@ namespace traceback
             // Allow more time for normal exploration to prevent being stuck at local optimums
             pairwise_paused_[tracer_robot][traced_robot] = true;
             pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-                ros::Duration(30, 0),
+                ros::Duration(60, 0),
                 [this, tracer_robot, traced_robot](const ros::TimerEvent &)
                 { pairwise_paused_[tracer_robot][traced_robot] = false; },
                 true);
@@ -681,7 +681,7 @@ namespace traceback
             writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. first traceback, abort without enough consecutive count");
 
             // pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-            //     ros::Duration(30, 0),
+            //     ros::Duration(60, 0),
             //     [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
             //     {
             //       /** just for finding min_it */
@@ -1885,6 +1885,17 @@ namespace traceback
             geometry_msgs::Pose pose1 = robots_to_poses_[robot_name].back();
             geometry_msgs::Pose pose2 = robots_to_poses_[second_robot_name][i];
             ROS_DEBUG("Match!");
+
+            {
+              std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+              std::ofstream fw(robot_name.substr(1) + "_" + second_robot_name.substr(1) + "/" + "Transform_proposed_" + robot_name.substr(1) + "_current_robot_" + second_robot_name.substr(1) + "_target_robot.txt", std::ofstream::app);
+              if (fw.is_open())
+              {
+                fw << "Transform proposed at time " << current_time << " with confidence " << confidence_output << std::endl;
+                fw.close();
+              }
+            }
+
             // TEST with ground truth
             // double init_0_x = -7.0;
             // double init_0_y = -1.0;
@@ -2065,6 +2076,8 @@ namespace traceback
             transform_estimator_.setConfidences(confidences);
           }
         }
+
+        ROS_DEBUG("Robot %s finishes matching with the second robot %s, which has %zu candidates.", robot_name.c_str(), second_robot_name.c_str(), pair.second.size());
       }
     }
   }
