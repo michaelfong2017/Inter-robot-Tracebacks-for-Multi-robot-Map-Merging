@@ -163,7 +163,7 @@ namespace traceback
           //         pose_dst.at<double>(1, 0) -= src_map_origin_y;
 
           //         boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-          //         double threshold_distance = 5.0; // Go to a location at least and minimally threshold_distance far.
+          //         double threshold_distance = 3.0; // Go to a location at least and minimally threshold_distance far.
           //         robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
           //       }
           //       /** just for finding min_it END */
@@ -210,7 +210,7 @@ namespace traceback
             pose_dst.at<double>(1, 0) -= src_map_origin_y;
 
             boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-            double threshold_distance = 5.0; // Go to a location at least and minimally threshold_distance far.
+            double threshold_distance = 3.0; // Go to a location at least and minimally threshold_distance far.
             robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
           }
           /** just for finding min_it END */
@@ -721,7 +721,7 @@ namespace traceback
             //         pose_dst.at<double>(1, 0) -= src_map_origin_y;
 
             //         boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-            //         double threshold_distance = 5.0; // Go to a location at least and minimally threshold_distance far.
+            //         double threshold_distance = 3.0; // Go to a location at least and minimally threshold_distance far.
             //         robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
             //       }
             //       /** just for finding min_it END */
@@ -768,7 +768,7 @@ namespace traceback
               pose_dst.at<double>(1, 0) -= src_map_origin_y;
 
               boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-              double threshold_distance = 5.0; // Go to a location at least and minimally threshold_distance far.
+              double threshold_distance = 3.0; // Go to a location at least and minimally threshold_distance far.
               robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
             }
             /** just for finding min_it END */
