@@ -322,7 +322,7 @@ namespace traceback
         internal::writeDebugMatchingInfo(images, image_features, pairwise_matches, traced_robot, tracer_robot, current_time);
         // #endif
 
-        // Write match score to file
+        double match_score = -1.0; // suppose to be changed
         for (auto &match_info : pairwise_matches)
         {
             if (match_info.H.empty() ||
@@ -330,27 +330,29 @@ namespace traceback
             {
                 continue;
             }
-
-            {
-                std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt", std::ofstream::app);
-                if (fw.is_open())
-                {
-                    if (good_indices.size() == 1)
-                    {
-                        fw << "Does not match at time " << current_time << " with confidence " << match_info.confidence << std::endl;
-                    }
-                    else
-                    {
-                        fw << "Match at time " << current_time << " with confidence " << match_info.confidence << std::endl;
-                    }
-                    fw.close();
-                }
-            }
+            match_score = match_info.confidence;
         }
-        // END
 
         good_indices = cv::detail::leaveBiggestComponent(
             image_features, pairwise_matches, static_cast<float>(confidence));
+
+        // Write match score to file
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+                if (good_indices.size() == 1)
+                {
+                    fw << "Does not match at time " << current_time << " with confidence " << match_score << std::endl;
+                }
+                else
+                {
+                    fw << "Match at time " << current_time << " with confidence " << match_score << std::endl;
+                }
+                fw.close();
+            }
+        }
+        // END
 
         // no match found
         if (good_indices.size() == 1)
@@ -413,7 +415,7 @@ namespace traceback
         internal::writeDebugMatchingInfo(images, image_features, pairwise_matches, traced_robot, tracer_robot, current_time);
         // #endif
 
-        // Write match score to file
+        double match_score = -1.0; // suppose to be changed
         for (auto &match_info : pairwise_matches)
         {
             if (match_info.H.empty() ||
@@ -421,24 +423,8 @@ namespace traceback
             {
                 continue;
             }
-
-            {
-                std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt", std::ofstream::app);
-                if (fw.is_open())
-                {
-                    if (good_indices.size() == 1)
-                    {
-                        fw << "Does not match at time " << current_time << " with confidence " << match_info.confidence << std::endl;
-                    }
-                    else
-                    {
-                        fw << "Match at time " << current_time << " with confidence " << match_info.confidence << std::endl;
-                    }
-                    fw.close();
-                }
-            }
+            match_score = match_info.confidence;
         }
-        // END
 
         /* use only matches that has enough confidence. leave out matches that are not
          * connected (small components) */
@@ -448,6 +434,24 @@ namespace traceback
         so do the transforms 0 and 1 later, which actually correspond to images 1 and 2 too. */
         good_indices = cv::detail::leaveBiggestComponent(
             image_features, pairwise_matches, static_cast<float>(confidence));
+
+        // Write match score to file
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+                if (good_indices.size() == 1)
+                {
+                    fw << "Does not match at time " << current_time << " with confidence " << match_score << std::endl;
+                }
+                else
+                {
+                    fw << "Match at time " << current_time << " with confidence " << match_score << std::endl;
+                }
+                fw.close();
+            }
+        }
+        // END
 
         // no match found
         if (good_indices.size() == 1)
