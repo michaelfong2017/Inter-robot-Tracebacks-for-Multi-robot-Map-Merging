@@ -1515,14 +1515,6 @@ namespace traceback
       // This is only updated here (start/restart traceback)
       robots_src_to_current_transforms_vectors_[robot_name_src] = transforms_vectors;
 
-      // TODO probably change later to store specifically for each pair of robots
-      {
-        // Must be done after setting to robots_src_to_current_transforms_vectors_[robot_name_src]
-        boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
-        transform_estimator_.clearTransformsVectors();
-        transform_estimator_.clearConfidences();
-      }
-
       // Clear triangulation history
       pairwise_triangulation_result_history_[robot_name_src][robot_name_dst].clear();
 
@@ -1534,6 +1526,14 @@ namespace traceback
       /** just for finding min_it END */
 
       startOrContinueTraceback(robot_name_src, robot_name_dst, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+    }
+
+    // TODO probably change later to store specifically for each pair of robots
+    {
+      // Must be done after setting to robots_src_to_current_transforms_vectors_[robot_name_src]
+      boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
+      transform_estimator_.clearTransformsVectors();
+      transform_estimator_.clearConfidences();
     }
   }
 
