@@ -8,4 +8,5 @@ float64 src_map_origin_y
 float64 dst_map_origin_x
 float64 dst_map_origin_y
 bool second_traceback
+int64 abort_timeout
 int64 stamp

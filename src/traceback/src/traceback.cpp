@@ -561,6 +561,21 @@ namespace traceback
             new_pose_stamped.header.stamp = ros::Time::now();
             goal.target_pose = new_pose_stamped;
 
+            // abort timeout
+            double distance_to_goal;
+            int abort_timeout;
+            {
+              geometry_msgs::Pose pose = getRobotPose(tracer_robot);
+              double current_x = pose.position.x;
+              double current_y = pose.position.y;
+              distance_to_goal = sqrt(pow(current_x - new_pose_stamped.pose.position.x, 2) + pow(current_y - new_pose_stamped.pose.position.y, 2));
+            }
+            // Abort timeout allowed based on distance to goal
+            // in seconds
+            // HARDCODE the formula currently
+            abort_timeout = 30 + 5 * distance_to_goal;
+            // abort timeout END
+
             traceback_msgs::GoalAndImage goal_and_image;
             goal_and_image.goal = goal;
             goal_and_image.image = msg->traced_image;
@@ -571,6 +586,7 @@ namespace traceback
             goal_and_image.src_map_origin_y = src_map_origin_y;
             goal_and_image.dst_map_origin_x = dst_map_origin_x;
             goal_and_image.dst_map_origin_y = dst_map_origin_y;
+            goal_and_image.abort_timeout = abort_timeout;
             goal_and_image.stamp = msg->stamp;
             goal_and_image.second_traceback = true;
             ROS_DEBUG("Goal and image to be sent");
@@ -905,6 +921,21 @@ namespace traceback
               new_pose_stamped.header.stamp = ros::Time::now();
               goal.target_pose = new_pose_stamped;
 
+              // abort timeout
+              double distance_to_goal;
+              int abort_timeout;
+              {
+                geometry_msgs::Pose pose = getRobotPose(tracer_robot);
+                double current_x = pose.position.x;
+                double current_y = pose.position.y;
+                distance_to_goal = sqrt(pow(current_x - new_pose_stamped.pose.position.x, 2) + pow(current_y - new_pose_stamped.pose.position.y, 2));
+              }
+              // Abort timeout allowed based on distance to goal
+              // in seconds
+              // HARDCODE the formula currently
+              abort_timeout = 30 + 5 * distance_to_goal;
+              // abort timeout END
+
               traceback_msgs::GoalAndImage goal_and_image;
               goal_and_image.goal = goal;
               goal_and_image.image = msg->traced_image;
@@ -914,6 +945,7 @@ namespace traceback
               goal_and_image.src_map_origin_y = src_map_origin_y;
               goal_and_image.dst_map_origin_x = dst_map_origin_x;
               goal_and_image.dst_map_origin_y = dst_map_origin_y;
+              goal_and_image.abort_timeout = abort_timeout;
               goal_and_image.stamp = msg->stamp;
               goal_and_image.second_traceback = true;
               ROS_DEBUG("Goal and image to be sent");
@@ -1452,13 +1484,6 @@ namespace traceback
         robots_to_in_traceback_[robot_name_src] = true;
       }
 
-      // TODO probably change later to store specifically for each pair of robots
-      {
-        boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
-        transform_estimator_.clearTransformsVectors();
-        transform_estimator_.clearConfidences();
-      }
-
       ROS_INFO("Start traceback process for robot %s", robot_name_src.c_str());
       ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
       ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
@@ -1488,6 +1513,14 @@ namespace traceback
 
       // This is only updated here (start/restart traceback)
       robots_src_to_current_transforms_vectors_[robot_name_src] = transforms_vectors;
+
+      // TODO probably change later to store specifically for each pair of robots
+      {
+        // Must be done after setting to robots_src_to_current_transforms_vectors_[robot_name_src]
+        boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
+        transform_estimator_.clearTransformsVectors();
+        transform_estimator_.clearConfidences();
+      }
 
       // Clear triangulation history
       pairwise_triangulation_result_history_[robot_name_src][robot_name_dst].clear();
@@ -1636,9 +1669,20 @@ namespace traceback
     target_position.y = goal_src.at<double>(1, 0);
     target_position.z = 0.0f;
 
-    // TODO reject goal if it is sure that it is occupied,
-    // may also be more restrictive to disallow obstacles nearby within distance d_goal_near
-    // end
+    // abort timeout and distance to goal for reject
+    double distance_to_goal;
+    int abort_timeout;
+    {
+      geometry_msgs::Pose pose = getRobotPose(robot_name_src);
+      double current_x = pose.position.x;
+      double current_y = pose.position.y;
+      distance_to_goal = sqrt(pow(current_x - target_position.x, 2) + pow(current_y - target_position.y, 2));
+    }
+    // Abort timeout allowed based on distance to goal
+    // in seconds
+    // HARDCODE the formula currently
+    abort_timeout = 30 + 5 * distance_to_goal;
+    // abort timeout END
 
     // Reject when the goal is too far only when the traceback process
     // is about to started
@@ -1646,12 +1690,8 @@ namespace traceback
     bool just_about_to_start = pairwise_accept_reject_status_[robot_name_src][robot_name_dst].accept_count == 0 && pairwise_accept_reject_status_[robot_name_src][robot_name_dst].reject_count == 0 && pairwise_abort_[robot_name_src][robot_name_dst] == 0;
     if (just_about_to_start)
     {
-      geometry_msgs::Pose pose = getRobotPose(robot_name_src);
-      double current_x = pose.position.x;
-      double current_y = pose.position.y;
-      double distance = sqrt(pow(current_x - target_position.x, 2) + pow(current_y - target_position.y, 2));
       // S1. reject since the goal is unreasonably far
-      if (distance >= unreasonable_goal_distance_)
+      if (distance_to_goal >= unreasonable_goal_distance_)
       {
         writeTracebackFeedbackHistory(robot_name_src, robot_name_dst, "S1. reject since the goal is unreasonably far");
         robots_to_in_traceback_[robot_name_src] = false;
@@ -1660,6 +1700,10 @@ namespace traceback
         // S1. reject since the goal is unreasonably far END
       }
     }
+
+    // TODO reject goal if it is sure that it is occupied,
+    // may also be more restrictive to disallow obstacles nearby within distance d_goal_near
+    // end
 
     // Transform rotation
     // Note that due to scaling, the "rotation matrix" values can exceed 1, and therefore need to normalize it.
@@ -1715,6 +1759,7 @@ namespace traceback
     goal_and_image.dst_map_origin_x = dst_map_origin_x;
     goal_and_image.dst_map_origin_y = dst_map_origin_y;
     goal_and_image.second_traceback = false;
+    goal_and_image.abort_timeout = abort_timeout;
     goal_and_image.stamp = current_it.stamp;
     ROS_DEBUG("Goal and image to be sent");
 
