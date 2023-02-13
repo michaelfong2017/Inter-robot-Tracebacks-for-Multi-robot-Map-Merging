@@ -1518,7 +1518,7 @@ namespace traceback
       for (int i = 0; i < transforms_vectors.size(); i++)
       {
         robots_src_to_current_transforms_vectors_[robot_name_src][i].reserve(transforms_vectors[i].size());
-        for (int j = 0; j < robots_src_to_current_transforms_vectors_[robot_name_src][i].size(); j++)
+        for (int j = 0; j < transforms_vectors[i].size(); j++)
         {
           robots_src_to_current_transforms_vectors_[robot_name_src][i][j] = transforms_vectors[i][j];
         }
