@@ -1640,12 +1640,17 @@ namespace traceback
     // may also be more restrictive to disallow obstacles nearby within distance d_goal_near
     // end
 
-    // S1. reject since the goal is unreasonably far
+    // Reject when the goal is too far only when the traceback process
+    // is about to started
+    // a bit hacky way to check for this
+    bool just_about_to_start = pairwise_accept_reject_status_[robot_name_src][robot_name_dst].accept_count == 0 && pairwise_accept_reject_status_[robot_name_src][robot_name_dst].reject_count == 0 && pairwise_abort_[robot_name_src][robot_name_dst] == 0;
+    if (just_about_to_start)
     {
       geometry_msgs::Pose pose = getRobotPose(robot_name_src);
       double current_x = pose.position.x;
       double current_y = pose.position.y;
       double distance = sqrt(pow(current_x - target_position.x, 2) + pow(current_y - target_position.y, 2));
+      // S1. reject since the goal is unreasonably far
       if (distance >= unreasonable_goal_distance_)
       {
         writeTracebackFeedbackHistory(robot_name_src, robot_name_dst, "S1. reject since the goal is unreasonably far");

@@ -26,7 +26,7 @@
         <param name="update_target_rate" value="0.2" />
         <param name="discovery_rate" value="0.05" />
         <param name="estimation_rate" value="0.1" />
-        <param name="unreasonable_goal_distance" value="5.0" />
+        <param name="unreasonable_goal_distance" value="2.0" />
         <!-- either "map" or "image" -->
         <param name="estimation_mode" value="image" default="image" />
         <!-- In "map" mode, use a confidence of 0.6 to 1.0 -->

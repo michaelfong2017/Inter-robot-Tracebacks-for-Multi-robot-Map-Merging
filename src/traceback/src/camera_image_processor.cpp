@@ -322,7 +322,7 @@ namespace traceback
         internal::writeDebugMatchingInfo(images, image_features, pairwise_matches, traced_robot, tracer_robot, current_time);
         // #endif
 
-        double match_score = -1.0; // suppose to be changed
+        double match_score = -1.0; // does not even have match
         for (auto &match_info : pairwise_matches)
         {
             if (match_info.H.empty() ||
