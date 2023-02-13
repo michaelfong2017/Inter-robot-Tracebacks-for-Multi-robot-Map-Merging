@@ -2149,7 +2149,6 @@ namespace traceback
             transforms_vectors[second_robot_index][second_robot_index] = cv::Mat::eye(3, 3, CV_64F);
             transforms_vectors[self_robot_index][second_robot_index] = modified_traceback_transforms[1];
             transforms_vectors[second_robot_index][self_robot_index] = modified_traceback_transforms[1].inv();
-            transform_estimator_.setTransformsVectors(transforms_vectors);
             std::vector<std::vector<double>> confidences;
             confidences.resize(3);
             confidences[0].resize(3);
@@ -2159,7 +2158,12 @@ namespace traceback
             confidences[second_robot_index][second_robot_index] = -1.0;
             confidences[self_robot_index][second_robot_index] = confidence_output;
             confidences[second_robot_index][self_robot_index] = confidence_output;
-            transform_estimator_.setConfidences(confidences);
+
+            {
+              boost::lock_guard<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
+              transform_estimator_.setTransformsVectors(transforms_vectors);
+              transform_estimator_.setConfidences(confidences);
+            }
           }
         }
 
