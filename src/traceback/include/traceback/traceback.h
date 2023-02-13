@@ -107,6 +107,7 @@ namespace traceback
     std::string robot_camera_image_topic_;
     std::string robot_camera_point_cloud_topic_;
     int check_obstacle_nearby_pixel_distance_;
+    double abort_threshold_distance_;
     double camera_image_update_rate_;
     double data_push_rate_;
     int camera_pose_image_queue_skip_count_;
