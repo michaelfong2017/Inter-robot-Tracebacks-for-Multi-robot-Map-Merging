@@ -33,6 +33,7 @@ namespace traceback
         void setTransformsVectors(std::vector<std::vector<cv::Mat>> transforms_vectors);
         void clearTransformsVectors();
         void setConfidences(std::vector<std::vector<double>> confidences);
+        void clearConfidences();
 
         template <typename InputIt>
         void feed(InputIt grids_begin, InputIt grids_end);

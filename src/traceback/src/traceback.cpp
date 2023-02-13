@@ -1453,7 +1453,11 @@ namespace traceback
       }
 
       // TODO probably change later to store specifically for each pair of robots
-      transform_estimator_.clearTransformsVectors();
+      {
+        boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
+        transform_estimator_.clearTransformsVectors();
+        transform_estimator_.clearConfidences();
+      }
 
       ROS_INFO("Start traceback process for robot %s", robot_name_src.c_str());
       ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);

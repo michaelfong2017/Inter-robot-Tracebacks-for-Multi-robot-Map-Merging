@@ -109,6 +109,11 @@ namespace traceback
         confidences_ = confidences;
     }
 
+    void TransformEstimator::clearConfidences()
+    {
+        confidences_.clear();
+    }
+
     bool TransformEstimator::estimateTransforms(FeatureType feature_type,
                                                 double confidence)
     {
