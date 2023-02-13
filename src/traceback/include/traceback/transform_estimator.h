@@ -31,6 +31,7 @@ namespace traceback
         cv::detail::ImageFeatures computeFeatures(const cv::Mat &image, FeatureType feature = FeatureType::ORB);
         double matchTwoFeatures(cv::detail::ImageFeatures &features1, cv::detail::ImageFeatures &features2, double confidence = 1.0);
         void setTransformsVectors(std::vector<std::vector<cv::Mat>> transforms_vectors);
+        void clearTransformsVectors();
         void setConfidences(std::vector<std::vector<double>> confidences);
 
         template <typename InputIt>

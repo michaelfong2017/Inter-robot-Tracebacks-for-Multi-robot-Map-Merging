@@ -91,6 +91,7 @@ namespace traceback
     double discovery_rate_;
     double estimation_rate_;
     double confidence_threshold_;
+    double unreasonable_goal_distance_;
     double essential_mat_confidence_threshold_;
     double point_cloud_match_score_;
     double point_cloud_close_score_;

@@ -24,6 +24,7 @@ namespace traceback
     private_nh.param("update_target_rate", update_target_rate_, 0.2);
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
+    private_nh.param("unreasonable_goal_distance", unreasonable_goal_distance_, 5.0);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
     private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
     private_nh.param("point_cloud_match_score", point_cloud_match_score_, 0.05);
@@ -1330,6 +1331,13 @@ namespace traceback
     {
       boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
       transforms_vectors = transform_estimator_.getTransformsVectors();
+
+      // TODO now different pairs of robots share the same transforms vectors,
+      // which overwrites each other, and the same pair of robots also
+      // overwrites itself if transforms are proposed shortly
+      // but this design works in "map" mode
+      // probably change later to store specifically for each pair of robots
+
       // transform_estimator_.printTransformsVectors(transforms_vectors);
 
       centers = transform_estimator_.getCenters();
@@ -1443,6 +1451,9 @@ namespace traceback
       {
         robots_to_in_traceback_[robot_name_src] = true;
       }
+
+      // TODO probably change later to store specifically for each pair of robots
+      transform_estimator_.clearTransformsVectors();
 
       ROS_INFO("Start traceback process for robot %s", robot_name_src.c_str());
       ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
@@ -1595,16 +1606,6 @@ namespace traceback
     double goal_x = current_it.pose.position.x;
     double goal_y = current_it.pose.position.y;
 
-    /** Visualize goal in dst robot frame */
-    {
-      geometry_msgs::PoseStamped pose_stamped;
-      pose_stamped.pose = current_it.pose;
-      pose_stamped.header.frame_id = robot_name_dst.substr(1) + robot_name_dst + "/map";
-      pose_stamped.header.stamp = ros::Time::now();
-      visualizeGoal(pose_stamped, robot_name_src, false);
-    }
-    /** Visualize goal in dst robot frame END */
-
     // Transform goal from dst frame to src (robot i) frame
     // Same as above, it is required to manually rotate about the bottom-left corner, which
     // is (-20m, -20m) or (-400px, -400px) when the resolution is 0.05.
@@ -1630,6 +1631,26 @@ namespace traceback
     target_position.x = goal_src.at<double>(0, 0);
     target_position.y = goal_src.at<double>(1, 0);
     target_position.z = 0.0f;
+
+    // TODO reject goal if it is sure that it is occupied,
+    // may also be more restrictive to disallow obstacles nearby within distance d_goal_near
+    // end
+
+    // S1. reject since the goal is unreasonably far
+    {
+      geometry_msgs::Pose pose = getRobotPose(robot_name_src);
+      double current_x = pose.position.x;
+      double current_y = pose.position.y;
+      double distance = sqrt(pow(current_x - target_position.x, 2) + pow(current_y - target_position.y, 2));
+      if (distance >= unreasonable_goal_distance_)
+      {
+        writeTracebackFeedbackHistory(robot_name_src, robot_name_dst, "S1. reject since the goal is unreasonably far");
+        robots_to_in_traceback_[robot_name_src] = false;
+
+        return;
+        // S1. reject since the goal is unreasonably far END
+      }
+    }
 
     // Transform rotation
     // Note that due to scaling, the "rotation matrix" values can exceed 1, and therefore need to normalize it.
@@ -1687,6 +1708,16 @@ namespace traceback
     goal_and_image.second_traceback = false;
     goal_and_image.stamp = current_it.stamp;
     ROS_DEBUG("Goal and image to be sent");
+
+    /** Visualize goal in dst robot frame */
+    {
+      geometry_msgs::PoseStamped pose_stamped;
+      pose_stamped.pose = current_it.pose;
+      pose_stamped.header.frame_id = robot_name_dst.substr(1) + robot_name_dst + "/map";
+      pose_stamped.header.stamp = ros::Time::now();
+      visualizeGoal(pose_stamped, robot_name_src, false);
+    }
+    /** Visualize goal in dst robot frame END */
 
     /** Visualize goal in src robot frame */
     visualizeGoal(goal.target_pose, robot_name_src, true);

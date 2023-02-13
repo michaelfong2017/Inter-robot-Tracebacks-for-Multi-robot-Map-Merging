@@ -99,6 +99,11 @@ namespace traceback
         transforms_vectors_ = transforms_vectors;
     }
 
+    void TransformEstimator::clearTransformsVectors()
+    {
+        transforms_vectors_.clear();
+    }
+
     void TransformEstimator::setConfidences(std::vector<std::vector<double>> confidences)
     {
         confidences_ = confidences;
