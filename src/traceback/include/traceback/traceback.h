@@ -99,7 +99,7 @@ namespace traceback
     double point_cloud_close_rotation_;
     int accept_count_needed_;
     int reject_count_needed_;
-    int consecutive_abort_count_needed_;
+    int abort_count_needed_;
     std::string robot_map_topic_;
     std::string robot_map_updates_topic_;
     std::string robot_namespace_;

@@ -33,7 +33,7 @@ namespace traceback
     private_nh.param("point_cloud_close_rotation", point_cloud_close_rotation_, 0.05);
     private_nh.param("accept_count_needed", accept_count_needed_, 8);
     private_nh.param("reject_count_needed", reject_count_needed_, 2);
-    private_nh.param("consecutive_abort_count_needed", consecutive_abort_count_needed_, 3);
+    private_nh.param("abort_count_needed", abort_count_needed_, 3);
     private_nh.param<std::string>("robot_map_topic", robot_map_topic_, "map");
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
@@ -99,7 +99,7 @@ namespace traceback
       if (msg->aborted)
       {
         // 1. abort with enough consecutive count
-        if (++pairwise_abort_[tracer_robot][traced_robot] >= consecutive_abort_count_needed_)
+        if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. abort with enough consecutive count");
 
@@ -226,7 +226,7 @@ namespace traceback
       // 3 or 4 or 5 or 6
       else
       {
-        pairwise_abort_[tracer_robot][traced_robot] = 0;
+        // pairwise_abort_[tracer_robot][traced_robot] = 0;
 
         std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
@@ -606,7 +606,7 @@ namespace traceback
         else
         {
           // 6. reject
-          if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 2 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+          if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count + pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
           {
             writeTracebackFeedbackHistory(tracer_robot, traced_robot, "6. reject");
             pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
@@ -673,7 +673,7 @@ namespace traceback
         if (msg->aborted)
         {
           // 1. first traceback, abort with enough consecutive count
-          if (++pairwise_abort_[tracer_robot][traced_robot] >= consecutive_abort_count_needed_)
+          if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
           {
             writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. first traceback, abort with enough consecutive count");
 
@@ -800,7 +800,7 @@ namespace traceback
         // 3 or 4 or 5
         else
         {
-          pairwise_abort_[tracer_robot][traced_robot] = 0;
+          // pairwise_abort_[tracer_robot][traced_robot] = 0;
 
           // Get cv images and analyze (first traceback, reflect in image filenames)
           std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
@@ -967,7 +967,7 @@ namespace traceback
             // Update AcceptRejectStatus
             // Reject when reject count is at least reject_count_needed_ and reject count is at least two times accept count
             // 4. first traceback, reject
-            if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 2 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+            if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count + pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
             {
               writeTracebackFeedbackHistory(tracer_robot, traced_robot, "4. first traceback, reject");
               pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
@@ -1514,14 +1514,18 @@ namespace traceback
 
       // This is only updated here (start/restart traceback)
       // Copy
-      robots_src_to_current_transforms_vectors_[robot_name_src].reserve(transforms_vectors.size());
-      for (int i = 0; i < transforms_vectors.size(); i++)
       {
-        robots_src_to_current_transforms_vectors_[robot_name_src][i].reserve(transforms_vectors[i].size());
-        for (int j = 0; j < transforms_vectors[i].size(); j++)
+        std::vector<std::vector<cv::Mat>> transforms_vectors_copy;
+        transforms_vectors_copy.resize(transforms_vectors.size());
+        for (size_t j = 0; j < transforms_vectors.size(); j++)
         {
-          robots_src_to_current_transforms_vectors_[robot_name_src][i][j] = transforms_vectors[i][j];
+          for (size_t k = 0; k < transforms_vectors[j].size(); k++)
+          {
+            cv::Mat mat = transforms_vectors[j][k].clone();
+            transforms_vectors_copy[j].push_back(mat);
+          }
         }
+        robots_src_to_current_transforms_vectors_[robot_name_src] = transforms_vectors_copy;
       }
       // Copy END
 
