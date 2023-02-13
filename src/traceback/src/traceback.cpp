@@ -1513,7 +1513,17 @@ namespace traceback
       ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
       // This is only updated here (start/restart traceback)
-      robots_src_to_current_transforms_vectors_[robot_name_src] = transforms_vectors;
+      // Copy
+      robots_src_to_current_transforms_vectors_[robot_name_src].reserve(transforms_vectors.size());
+      for (int i = 0; i < transforms_vectors.size(); i++)
+      {
+        robots_src_to_current_transforms_vectors_[robot_name_src][i].reserve(transforms_vectors[i].size());
+        for (int j = 0; j < robots_src_to_current_transforms_vectors_[robot_name_src][i].size(); j++)
+        {
+          robots_src_to_current_transforms_vectors_[robot_name_src][i][j] = transforms_vectors[i][j];
+        }
+      }
+      // Copy END
 
       // Clear triangulation history
       pairwise_triangulation_result_history_[robot_name_src][robot_name_dst].clear();
