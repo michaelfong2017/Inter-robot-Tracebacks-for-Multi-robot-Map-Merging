@@ -238,7 +238,7 @@ namespace traceback
 
     bool is_first_match_and_collect_ = true;
     std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, size_t>>> pairwise_proposed_count_;
-    void collectProposingData(double pose_x, double pose_y, double predicted_pose_x, double predicted_pose_y, double score, std::string threshold, std::string tracer_robot, std::string traced_robot, std::string current_time);
+    void collectProposingData(double pose_x, double pose_y, double predicted_pose_x, double predicted_pose_y, double score, std::string threshold, std::string tracer_robot, std::string traced_robot, std::string current_time, bool same_interval);
 
     // The below cases are for pointcloud mode.
     // For matching, need to match both images and point clouds.

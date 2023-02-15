@@ -2210,7 +2210,14 @@ namespace traceback
                 std::ostringstream ss;
                 ss << std::fixed << std::setprecision(2) << threshold;
                 std::string threshold_str = ss.str();
-                collectProposingData(pose1.position.x, pose1.position.y, predicted_pose.at<double>(0, 0), predicted_pose.at<double>(1, 0), confidence_output, threshold_str, robot_name, second_robot_name, current_time);
+                collectProposingData(pose1.position.x, pose1.position.y, predicted_pose.at<double>(0, 0), predicted_pose.at<double>(1, 0), confidence_output, threshold_str, robot_name, second_robot_name, current_time, false);
+              }
+              if (confidence_output >= threshold && confidence_output < threshold + 0.1)
+              {
+                std::ostringstream ss;
+                ss << std::fixed << std::setprecision(2) << threshold;
+                std::string threshold_str = ss.str();
+                collectProposingData(pose1.position.x, pose1.position.y, predicted_pose.at<double>(0, 0), predicted_pose.at<double>(1, 0), confidence_output, threshold_str, robot_name, second_robot_name, current_time, true);
               }
             }
 
@@ -3040,7 +3047,7 @@ namespace traceback
       ROS_INFO("proposed:\n%s", s.c_str());
     }
 
-        {
+    {
       std::string s = "";
       for (int y = 0; y < 3; y++)
       {
@@ -3072,17 +3079,29 @@ namespace traceback
     return predicted_pose;
   }
 
-  void Traceback::collectProposingData(double pose_x, double pose_y, double predicted_pose_x, double predicted_pose_y, double score, std::string threshold, std::string tracer_robot, std::string traced_robot, std::string current_time)
+  void Traceback::collectProposingData(double pose_x, double pose_y, double predicted_pose_x, double predicted_pose_y, double score, std::string threshold, std::string tracer_robot, std::string traced_robot, std::string current_time, bool same_interval)
   {
     size_t count = ++pairwise_proposed_count_[tracer_robot][traced_robot][threshold];
 
     double error = sqrt(pow(predicted_pose_x - pose_x, 2) + pow(predicted_pose_y - pose_y, 2));
 
-    std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Cf_" + std::to_string(camera_image_update_rate_) + "_rate_" + threshold + "_threshold_" + tracer_robot.substr(1) + "_current_robot_" + traced_robot.substr(1) + "_target_robot.csv", std::ofstream::app);
-    if (fw.is_open())
+    if (same_interval)
     {
-      fw << current_time << "," << count << "," << score << "," << pose_x << "," << pose_y << "," << predicted_pose_x << "," << predicted_pose_y << "," << error << std::endl;
-      fw.close();
+      std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Error_" + std::to_string(camera_image_update_rate_) + "_rate_" + threshold + "_threshold_" + tracer_robot.substr(1) + "_current_robot_" + traced_robot.substr(1) + "_target_robot.csv", std::ofstream::app);
+      if (fw.is_open())
+      {
+        fw << current_time << "," << count << "," << score << "," << pose_x << "," << pose_y << "," << predicted_pose_x << "," << predicted_pose_y << "," << error << std::endl;
+        fw.close();
+      }
+    }
+    else
+    {
+      std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Cf_" + std::to_string(camera_image_update_rate_) + "_rate_" + threshold + "_threshold_" + tracer_robot.substr(1) + "_current_robot_" + traced_robot.substr(1) + "_target_robot.csv", std::ofstream::app);
+      if (fw.is_open())
+      {
+        fw << current_time << "," << count << "," << score << "," << pose_x << "," << pose_y << "," << predicted_pose_x << "," << predicted_pose_y << "," << error << std::endl;
+        fw.close();
+      }
     }
   }
 
