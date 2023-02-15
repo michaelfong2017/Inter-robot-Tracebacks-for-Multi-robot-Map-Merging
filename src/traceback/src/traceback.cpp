@@ -2005,10 +2005,13 @@ namespace traceback
               double start = 1.0;
               double interval = 0.1;
               double threshold = start + i * interval;
-              std::ostringstream ss;
-              ss << std::fixed << std::setprecision(2) << threshold;
-              std::string threshold_str = ss.str();
-              collectProposingData(confidence_output, threshold_str, robot_name, second_robot_name);
+              if (confidence_output >= threshold)
+              {
+                std::ostringstream ss;
+                ss << std::fixed << std::setprecision(2) << threshold;
+                std::string threshold_str = ss.str();
+                collectProposingData(confidence_output, threshold_str, robot_name, second_robot_name);
+              }
             }
 
             if (test_mode_ == "collect")
