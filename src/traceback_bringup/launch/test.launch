@@ -28,11 +28,14 @@
         <param name="estimation_rate" value="0.1" />
         <param name="unreasonable_goal_distance" value="5.0" /> <!-- Strongly related to the pixel
         distance -->
+        <!-- either "normal" or "collect" -->
+        <param name="test_mode" value="collect" default="normal" />
         <!-- either "map" or "image" -->
         <param name="estimation_mode" value="image" default="image" />
+        <!-- In "collect" test_mode, use a confidence of the lowest test case, like 0.2 -->
         <!-- In "map" mode, use a confidence of 0.6 to 1.0 -->
         <!-- In "map" mode, use a confidence of 2.0 to 2.5 -->
-        <param name="estimation_confidence" value="2.1" />
+        <param name="estimation_confidence" value="0.2" />
         <param name="camera_image_update_rate" value="0.2" />
         <param name="data_push_rate" value="3.0" />
         <param name="check_obstacle_nearby_pixel_distance" value="5" />

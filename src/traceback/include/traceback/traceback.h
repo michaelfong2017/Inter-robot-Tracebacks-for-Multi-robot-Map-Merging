@@ -85,6 +85,7 @@ namespace traceback
     ros::NodeHandle node_;
 
     /* parameters */
+    std::string test_mode_;
     std::string estimation_mode_;
     std::string adjustment_mode_;
     double update_target_rate_;
@@ -232,6 +233,9 @@ namespace traceback
     // (140, -20, 0) for tb3_0, (-140, -20, 0) for tb3_1 and (-10, -60, -0.785) for tb3_2
     // are hardcoded ground truth for evaluation.
     void evaluateWithGroundTruth(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time = "");
+
+    std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, size_t>>> pairwise_proposed_count_;
+    void collectProposingData(double score, std::string threshold, std::string tracer_robot, std::string traced_robot);
 
     // The below cases are for pointcloud mode.
     // For matching, need to match both images and point clouds.

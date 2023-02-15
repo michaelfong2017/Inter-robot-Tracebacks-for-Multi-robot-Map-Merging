@@ -19,6 +19,7 @@ namespace traceback
   {
     ros::NodeHandle private_nh("~");
 
+    private_nh.param<std::string>("test_mode", test_mode_, "normal");
     private_nh.param<std::string>("estimation_mode", estimation_mode_, "image");
     private_nh.param<std::string>("adjustment_mode", adjustment_mode_, "pointcloud");
     private_nh.param("update_target_rate", update_target_rate_, 0.2);
@@ -1986,14 +1987,81 @@ namespace traceback
             geometry_msgs::Pose pose2 = robots_to_poses_[second_robot_name][i];
             ROS_DEBUG("Match!");
 
+            if (test_mode_ != "collect")
             {
-              std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-              std::ofstream fw(robot_name.substr(1) + "_" + second_robot_name.substr(1) + "/" + "Transform_proposed_" + robot_name.substr(1) + "_current_robot_" + second_robot_name.substr(1) + "_target_robot.txt", std::ofstream::app);
-              if (fw.is_open())
               {
-                fw << "Transform proposed at time " << current_time << " with confidence " << confidence_output << std::endl;
-                fw.close();
+                std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+                std::ofstream fw(robot_name.substr(1) + "_" + second_robot_name.substr(1) + "/" + "Transform_proposed_" + robot_name.substr(1) + "_current_robot_" + second_robot_name.substr(1) + "_target_robot.txt", std::ofstream::app);
+                if (fw.is_open())
+                {
+                  fw << "Transform proposed at time " << current_time << " with confidence " << confidence_output << std::endl;
+                  fw.close();
+                }
               }
+            }
+
+            {
+              if (confidence_output >= 0.2)
+              {
+                collectProposingData(confidence_output, "0.2", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 0.4)
+              {
+                collectProposingData(confidence_output, "0.4", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 0.6)
+              {
+                collectProposingData(confidence_output, "0.6", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 0.8)
+              {
+                collectProposingData(confidence_output, "0.8", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 1.0)
+              {
+                collectProposingData(confidence_output, "1.0", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 1.2)
+              {
+                collectProposingData(confidence_output, "1.2", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 1.4)
+              {
+                collectProposingData(confidence_output, "1.4", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 1.6)
+              {
+                collectProposingData(confidence_output, "1.6", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 1.8)
+              {
+                collectProposingData(confidence_output, "1.8", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 2.0)
+              {
+                collectProposingData(confidence_output, "2.0", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 2.2)
+              {
+                collectProposingData(confidence_output, "2.2", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 2.4)
+              {
+                collectProposingData(confidence_output, "2.4", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 2.6)
+              {
+                collectProposingData(confidence_output, "2.6", robot_name, second_robot_name);
+              }
+              if (confidence_output >= 2.8)
+              {
+                collectProposingData(confidence_output, "2.8", robot_name, second_robot_name);
+              }
+            }
+
+            if (test_mode_ == "collect")
+            {
+              continue;
             }
 
             // TEST with ground truth
@@ -2879,6 +2947,19 @@ namespace traceback
         fw << "Error of adjusted is " << sqrt(pow(expected_x - adjusted_estimated_xy.at<double>(0, 0), 2) + pow(expected_y - adjusted_estimated_xy.at<double>(1, 0), 2)) << " pixels translation and " << abs(expected_r - adjusted_estimated_r) << " radians rotation" << std::endl;
         fw.close();
       }
+    }
+  }
+
+  void Traceback::collectProposingData(double score, std::string threshold, std::string tracer_robot, std::string traced_robot)
+  {
+    size_t count = ++pairwise_proposed_count_[tracer_robot][traced_robot][threshold];
+
+    std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+    std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Cf_" + std::to_string(camera_image_update_rate_) + "_rate_" + threshold + "_threshold_" + tracer_robot.substr(1) + "_current_robot_" + traced_robot.substr(1) + "_target_robot.csv", std::ofstream::app);
+    if (fw.is_open())
+    {
+      fw << current_time << "," << count << "," << score << std::endl;
+      fw.close();
     }
   }
 
