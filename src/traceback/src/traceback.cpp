@@ -1939,6 +1939,20 @@ namespace traceback
 
   void Traceback::receiveUpdatedCameraImage()
   {
+    std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+
+    if (is_first_match_and_collect_)
+    {
+      is_first_match_and_collect_ = false;
+      {
+        std::ofstream fw(current_time + ".txt", std::ofstream::app);
+        if (fw.is_open())
+        {
+          fw << "Start matching at " << current_time << std::endl;
+          fw.close();
+        }
+      }
+    }
     // ROS_DEBUG("Receive updated camera image started.");
 
     ////
@@ -1990,7 +2004,6 @@ namespace traceback
             if (test_mode_ != "collect")
             {
               {
-                std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
                 std::ofstream fw(robot_name.substr(1) + "_" + second_robot_name.substr(1) + "/" + "Transform_proposed_" + robot_name.substr(1) + "_current_robot_" + second_robot_name.substr(1) + "_target_robot.txt", std::ofstream::app);
                 if (fw.is_open())
                 {
@@ -1998,25 +2011,6 @@ namespace traceback
                   fw.close();
                 }
               }
-            }
-
-            for (int i = 0; i < 20; ++i)
-            {
-              double start = 1.0;
-              double interval = 0.1;
-              double threshold = start + i * interval;
-              if (confidence_output >= threshold)
-              {
-                std::ostringstream ss;
-                ss << std::fixed << std::setprecision(2) << threshold;
-                std::string threshold_str = ss.str();
-                collectProposingData(confidence_output, threshold_str, robot_name, second_robot_name);
-              }
-            }
-
-            if (test_mode_ == "collect")
-            {
-              continue;
             }
 
             // TEST with ground truth
@@ -2081,16 +2075,22 @@ namespace traceback
             // }
             // TEST with ground truth END
 
-            geometry_msgs::Pose init_pose1 = pose1;
-            init_pose1.position.x *= -1;
-            init_pose1.position.y *= -1;
+            geometry_msgs::Pose init_pose1;
+            init_pose1.position.x = pose1.position.x * -1;
+            init_pose1.position.y = pose1.position.y * -1;
             init_pose1.position.z = 0.0;
-            init_pose1.orientation.z *= -1;
-            geometry_msgs::Pose init_pose2 = pose2;
-            init_pose2.position.x *= -1;
-            init_pose2.position.y *= -1;
+            init_pose1.orientation.z = pose1.orientation.z * -1;
+            init_pose1.orientation.x = 0.0;
+            init_pose1.orientation.y = 0.0;
+            init_pose1.orientation.w = 1.0;
+            geometry_msgs::Pose init_pose2;
+            init_pose2.position.x = pose2.position.x * -1;
+            init_pose2.position.y = pose2.position.y * -1;
             init_pose2.position.z = 0.0;
-            init_pose2.orientation.z *= -1;
+            init_pose2.orientation.z = pose2.orientation.z * -1;
+            init_pose2.orientation.x = 0.0;
+            init_pose2.orientation.y = 0.0;
+            init_pose2.orientation.w = 1.0;
 
             size_t self_robot_index;
             size_t second_robot_index;
@@ -2195,6 +2195,29 @@ namespace traceback
             confidences[second_robot_index][second_robot_index] = -1.0;
             confidences[self_robot_index][second_robot_index] = confidence_output;
             confidences[second_robot_index][self_robot_index] = confidence_output;
+
+            // Evaluate match with current pose of current robot
+            // Note that unmodified transform is used
+            cv::Mat predicted_pose = evaluateMatch(current_traceback_transforms[1], pose1.position.x, pose1.position.y, robot_name, second_robot_name, current_time);
+            //
+            for (int i = 0; i < 20; ++i)
+            {
+              double start = 1.0;
+              double interval = 0.1;
+              double threshold = start + i * interval;
+              if (confidence_output >= threshold)
+              {
+                std::ostringstream ss;
+                ss << std::fixed << std::setprecision(2) << threshold;
+                std::string threshold_str = ss.str();
+                collectProposingData(pose1.position.x, pose1.position.y, predicted_pose.at<double>(0, 0), predicted_pose.at<double>(1, 0), confidence_output, threshold_str, robot_name, second_robot_name, current_time);
+              }
+            }
+
+            if (test_mode_ == "collect")
+            {
+              continue;
+            }
 
             {
               boost::lock_guard<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
@@ -2905,15 +2928,160 @@ namespace traceback
     }
   }
 
-  void Traceback::collectProposingData(double score, std::string threshold, std::string tracer_robot, std::string traced_robot)
+  cv::Mat Traceback::evaluateMatch(cv::Mat &proposed, double pose_x, double pose_y, std::string tracer_robot, std::string traced_robot, std::string current_time)
+  {
+    // initial poses w.r.t. global frame
+    double resolution = 0.05;
+    double init_0_x = -7.0;
+    double init_0_y = -1.0;
+    double init_0_r = 0.0;
+    double init_1_x = 7.0;
+    double init_1_y = -1.0;
+    double init_1_r = 0.0;
+    double init_2_x = 0.5;
+    double init_2_y = 3.0;
+    double init_2_r = 0.785;
+
+    // Compute ground truth pairwise matrix
+    // e.g. from w.r.t frame 0 to w.r.t frame 2:
+    // 0->2 = global->2 * 0->global
+    //      = global->2 * inv(global->0)
+    // Using the above order, initial pose values can be directly used.
+    cv::Mat t_global_0(3, 3, CV_64F);
+    t_global_0.at<double>(0, 0) = cos(-1 * init_0_r);
+    t_global_0.at<double>(0, 1) = -sin(-1 * init_0_r);
+    t_global_0.at<double>(0, 2) = -1 * init_0_x / resolution;
+    t_global_0.at<double>(1, 0) = sin(-1 * init_0_r);
+    t_global_0.at<double>(1, 1) = cos(-1 * init_0_r);
+    t_global_0.at<double>(1, 2) = -1 * init_0_y / resolution;
+    t_global_0.at<double>(2, 0) = 0.0;
+    t_global_0.at<double>(2, 1) = 0.0;
+    t_global_0.at<double>(2, 2) = 1;
+
+    cv::Mat t_global_1(3, 3, CV_64F);
+    t_global_1.at<double>(0, 0) = cos(-1 * init_1_r);
+    t_global_1.at<double>(0, 1) = -sin(-1 * init_1_r);
+    t_global_1.at<double>(0, 2) = -1 * init_1_x / resolution;
+    t_global_1.at<double>(1, 0) = sin(-1 * init_1_r);
+    t_global_1.at<double>(1, 1) = cos(-1 * init_1_r);
+    t_global_1.at<double>(1, 2) = -1 * init_1_y / resolution;
+    t_global_1.at<double>(2, 0) = 0.0;
+    t_global_1.at<double>(2, 1) = 0.0;
+    t_global_1.at<double>(2, 2) = 1;
+
+    cv::Mat t_global_2(3, 3, CV_64F);
+    t_global_2.at<double>(0, 0) = cos(-1 * init_2_r);
+    t_global_2.at<double>(0, 1) = -sin(-1 * init_2_r);
+    t_global_2.at<double>(0, 2) = -1 * init_2_x / resolution;
+    t_global_2.at<double>(1, 0) = sin(-1 * init_2_r);
+    t_global_2.at<double>(1, 1) = cos(-1 * init_2_r);
+    t_global_2.at<double>(1, 2) = -1 * init_2_y / resolution;
+    t_global_2.at<double>(2, 0) = 0.0;
+    t_global_2.at<double>(2, 1) = 0.0;
+    t_global_2.at<double>(2, 2) = 1;
+
+    cv::Mat t_0_1 = t_global_1 * t_global_0.inv();
+    cv::Mat t_0_2 = t_global_2 * t_global_0.inv();
+    cv::Mat t_1_0 = t_0_1.inv();
+    cv::Mat t_1_2 = t_global_2 * t_global_1.inv();
+    cv::Mat t_2_0 = t_0_2.inv();
+    cv::Mat t_2_1 = t_1_2.inv();
+
+    cv::Mat ground_truth_transform, inverse_ground_truth_transform;
+    if (tracer_robot == "/tb3_0" && traced_robot == "/tb3_1")
+    {
+      ground_truth_transform = t_0_1;
+      inverse_ground_truth_transform = t_1_0;
+    }
+    else if (tracer_robot == "/tb3_0" && traced_robot == "/tb3_2")
+    {
+      ground_truth_transform = t_0_2;
+      inverse_ground_truth_transform = t_2_0;
+    }
+    else if (tracer_robot == "/tb3_1" && traced_robot == "/tb3_0")
+    {
+      ground_truth_transform = t_1_0;
+      inverse_ground_truth_transform = t_0_1;
+    }
+    else if (tracer_robot == "/tb3_1" && traced_robot == "/tb3_2")
+    {
+      ground_truth_transform = t_1_2;
+      inverse_ground_truth_transform = t_2_1;
+    }
+    else if (tracer_robot == "/tb3_2" && traced_robot == "/tb3_0")
+    {
+      ground_truth_transform = t_2_0;
+      inverse_ground_truth_transform = t_0_2;
+    }
+    else if (tracer_robot == "/tb3_2" && traced_robot == "/tb3_1")
+    {
+      ground_truth_transform = t_2_1;
+      inverse_ground_truth_transform = t_1_2;
+    }
+    //
+
+    {
+      std::string s = "";
+      for (int y = 0; y < 3; y++)
+      {
+        for (int x = 0; x < 3; x++)
+        {
+          double val = proposed.at<double>(y, x);
+          if (x == 3 - 1)
+          {
+            s += std::to_string(val) + "\n";
+          }
+          else
+          {
+            s += std::to_string(val) + ", ";
+          }
+        }
+      }
+      ROS_INFO("proposed:\n%s", s.c_str());
+    }
+
+        {
+      std::string s = "";
+      for (int y = 0; y < 3; y++)
+      {
+        for (int x = 0; x < 3; x++)
+        {
+          double val = ground_truth_transform.at<double>(y, x);
+          if (x == 3 - 1)
+          {
+            s += std::to_string(val) + "\n";
+          }
+          else
+          {
+            s += std::to_string(val) + ", ";
+          }
+        }
+      }
+      ROS_INFO("ground_truth_transform:\n%s", s.c_str());
+    }
+
+    // global origin object w.r.t. frame 0
+    cv::Mat pose(3, 1, CV_64F);
+    pose.at<double>(0, 0) = pose_x / resolution;
+    pose.at<double>(1, 0) = pose_y / resolution;
+    pose.at<double>(2, 0) = 1.0;
+
+    cv::Mat predicted_pose = inverse_ground_truth_transform * proposed * pose;
+    predicted_pose.at<double>(0, 0) *= resolution;
+    predicted_pose.at<double>(1, 0) *= resolution;
+    return predicted_pose;
+  }
+
+  void Traceback::collectProposingData(double pose_x, double pose_y, double predicted_pose_x, double predicted_pose_y, double score, std::string threshold, std::string tracer_robot, std::string traced_robot, std::string current_time)
   {
     size_t count = ++pairwise_proposed_count_[tracer_robot][traced_robot][threshold];
 
-    std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+    double error = sqrt(pow(predicted_pose_x - pose_x, 2) + pow(predicted_pose_y - pose_y, 2));
+
     std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Cf_" + std::to_string(camera_image_update_rate_) + "_rate_" + threshold + "_threshold_" + tracer_robot.substr(1) + "_current_robot_" + traced_robot.substr(1) + "_target_robot.csv", std::ofstream::app);
     if (fw.is_open())
     {
-      fw << current_time << "," << count << "," << score << std::endl;
+      fw << current_time << "," << count << "," << score << "," << pose_x << "," << pose_y << "," << predicted_pose_x << "," << predicted_pose_y << "," << error << std::endl;
       fw.close();
     }
   }

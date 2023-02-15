@@ -36,7 +36,7 @@
         <!-- In "map" mode, use a confidence of 0.6 to 1.0 -->
         <!-- In "map" mode, use a confidence of 2.0 to 2.5 -->
         <param name="estimation_confidence" value="1.0" />
-        <param name="camera_image_update_rate" value="1.0" />
+        <param name="camera_image_update_rate" value="0.2" />
         <param name="data_push_rate" value="3.0" />
         <param name="check_obstacle_nearby_pixel_distance" value="5" />
         <param name="abort_threshold_distance" value="2.0" />

@@ -234,8 +234,11 @@ namespace traceback
     // are hardcoded ground truth for evaluation.
     void evaluateWithGroundTruth(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time = "");
 
+    cv::Mat evaluateMatch(cv::Mat &proposed, double pose_x, double pose_y, std::string tracer_robot, std::string traced_robot, std::string current_time);
+
+    bool is_first_match_and_collect_ = true;
     std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, size_t>>> pairwise_proposed_count_;
-    void collectProposingData(double score, std::string threshold, std::string tracer_robot, std::string traced_robot);
+    void collectProposingData(double pose_x, double pose_y, double predicted_pose_x, double predicted_pose_y, double score, std::string threshold, std::string tracer_robot, std::string traced_robot, std::string current_time);
 
     // The below cases are for pointcloud mode.
     // For matching, need to match both images and point clouds.
