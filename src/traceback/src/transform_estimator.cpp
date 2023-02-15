@@ -63,22 +63,22 @@ namespace traceback
         }
 
         /* estimate transform */
-        ROS_DEBUG("calculating transforms in global reference frame");
+        // ROS_DEBUG("calculating transforms in global reference frame");
         // note: currently used estimator never fails
         if (!(*estimator)(image_features, pairwise_matches, transforms))
         {
             return -1.0;
         }
 
-        for (auto &match_info : pairwise_matches)
-        {
-            ROS_INFO("match_info %d, %d", match_info.src_img_idx, match_info.dst_img_idx);
-        }
-        for (auto &indice : good_indices)
-        {
-            ROS_INFO("indice %d", indice);
-        }
-        ROS_INFO("transforms size %zu", transforms.size());
+        // for (auto &match_info : pairwise_matches)
+        // {
+        //     ROS_INFO("match_info %d, %d", match_info.src_img_idx, match_info.dst_img_idx);
+        // }
+        // for (auto &indice : good_indices)
+        // {
+        //     ROS_INFO("indice %d", indice);
+        // }
+        // ROS_INFO("transforms size %zu", transforms.size());
 
         for (auto &match_info : pairwise_matches)
         {

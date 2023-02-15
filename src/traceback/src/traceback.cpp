@@ -1939,7 +1939,7 @@ namespace traceback
 
   void Traceback::receiveUpdatedCameraImage()
   {
-    ROS_DEBUG("Receive updated camera image started.");
+    // ROS_DEBUG("Receive updated camera image started.");
 
     ////
     // return if in "map" mode, proceed if in "image" mode
@@ -1985,7 +1985,7 @@ namespace traceback
           {
             geometry_msgs::Pose pose1 = robots_to_poses_[robot_name].back();
             geometry_msgs::Pose pose2 = robots_to_poses_[second_robot_name][i];
-            ROS_DEBUG("Match!");
+            // ROS_DEBUG("Match!");
 
             if (test_mode_ != "collect")
             {
@@ -2000,63 +2000,15 @@ namespace traceback
               }
             }
 
+            for (int i = 0; i < 20; ++i)
             {
-              if (confidence_output >= 0.2)
-              {
-                collectProposingData(confidence_output, "0.2", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 0.4)
-              {
-                collectProposingData(confidence_output, "0.4", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 0.6)
-              {
-                collectProposingData(confidence_output, "0.6", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 0.8)
-              {
-                collectProposingData(confidence_output, "0.8", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 1.0)
-              {
-                collectProposingData(confidence_output, "1.0", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 1.2)
-              {
-                collectProposingData(confidence_output, "1.2", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 1.4)
-              {
-                collectProposingData(confidence_output, "1.4", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 1.6)
-              {
-                collectProposingData(confidence_output, "1.6", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 1.8)
-              {
-                collectProposingData(confidence_output, "1.8", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 2.0)
-              {
-                collectProposingData(confidence_output, "2.0", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 2.2)
-              {
-                collectProposingData(confidence_output, "2.2", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 2.4)
-              {
-                collectProposingData(confidence_output, "2.4", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 2.6)
-              {
-                collectProposingData(confidence_output, "2.6", robot_name, second_robot_name);
-              }
-              if (confidence_output >= 2.8)
-              {
-                collectProposingData(confidence_output, "2.8", robot_name, second_robot_name);
-              }
+              double start = 1.0;
+              double interval = 0.1;
+              double threshold = start + i * interval;
+              std::ostringstream ss;
+              ss << std::fixed << std::setprecision(2) << threshold;
+              std::string threshold_str = ss.str();
+              collectProposingData(confidence_output, threshold_str, robot_name, second_robot_name);
             }
 
             if (test_mode_ == "collect")
