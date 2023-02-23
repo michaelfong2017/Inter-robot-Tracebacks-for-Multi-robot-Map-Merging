@@ -21,7 +21,7 @@
 #include <tf/transform_listener.h>
 
 #include <message_filters/subscriber.h>
-#include <message_filters/synchronizer.h>
+#include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
 #include <forward_list>
@@ -40,8 +40,10 @@ namespace traceback
   struct CameraSubscription
   {
     sensor_msgs::ImageConstPtr readonly_camera_image;
+    sensor_msgs::ImageConstPtr readonly_depth_image;
     sensor_msgs::PointCloud2ConstPtr point_cloud;
     message_filters::Subscriber<sensor_msgs::Image> camera_rgb_sub;
+    message_filters::Subscriber<sensor_msgs::Image> camera_depth_sub;
     message_filters::Subscriber<sensor_msgs::PointCloud2> camera_point_cloud_sub;
     std::string robot_namespace; // e.g /tb3_0
   };
@@ -106,6 +108,7 @@ namespace traceback
     std::string robot_namespace_;
 
     std::string robot_camera_image_topic_;
+    std::string robot_camera_depth_image_topic_;
     std::string robot_camera_point_cloud_topic_;
     int check_obstacle_nearby_pixel_distance_;
     double abort_threshold_distance_;
@@ -205,6 +208,7 @@ namespace traceback
 
     // Do not really synchronize anyway
     void CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg);
+    void CameraDepthImageUpdate(const sensor_msgs::ImageConstPtr &msg);
     void CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr &msg);
 
     void fullMapUpdate(const nav_msgs::OccupancyGrid::ConstPtr &msg,

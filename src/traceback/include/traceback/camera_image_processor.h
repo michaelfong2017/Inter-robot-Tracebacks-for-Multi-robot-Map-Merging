@@ -41,7 +41,8 @@ namespace traceback
     {
         geometry_msgs::Pose pose;
         sensor_msgs::Image image;
-        sensor_msgs::PointCloud2 point_cloud;
+        sensor_msgs::Image depth_image;
+        // sensor_msgs::PointCloud2 point_cloud;
         int64_t stamp;
         bool operator<(const PoseImagePair &rhs) const
         {
@@ -96,6 +97,7 @@ namespace traceback
         std::unordered_map<std::string, std::vector<PoseImagePair>> robots_to_all_pose_image_pairs_;
         std::unordered_map<std::string, std::unordered_set<size_t>> robots_to_all_visited_pose_image_pair_indexes_;
 
+        std::unordered_map<std::string, sensor_msgs::Image> robots_to_current_depth_image_;
         std::unordered_map<std::string, sensor_msgs::PointCloud2> robots_to_current_point_cloud_;
 
         cv::Vec3d rotationMatrixToEulerAngles(cv::Mat &R);

@@ -43,6 +43,7 @@ namespace traceback
     private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
 
     private_nh.param<std::string>("camera_image_topic", robot_camera_image_topic_, "camera/rgb/image_raw"); // Don't use image_raw
+    private_nh.param<std::string>("camera_depth_image_topic", robot_camera_depth_image_topic_, "camera/depth/image_raw");
     private_nh.param<std::string>("camera_point_cloud_topic", robot_camera_point_cloud_topic_, "camera/depth/points");
     private_nh.param("check_obstacle_nearby_pixel_distance", check_obstacle_nearby_pixel_distance_, 3);
     private_nh.param("abort_threshold_distance", abort_threshold_distance_, 2.0);
@@ -269,7 +270,9 @@ namespace traceback
         bool is_image_match = camera_image_processor_.matchImage(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
                                                                  essential_mat_confidence_threshold_, tracer_robot, traced_robot, current_time);
 
-        bool is_point_cloud_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, point_cloud_match_score_, yaw, transform_needed, match_score, tracer_robot, traced_robot, current_time);
+        // TODO solvepnp and update transform_needed
+        // TODO debug save tracer depth image and traced depth image first
+        // bool is_point_cloud_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, point_cloud_match_score_, yaw, transform_needed, match_score, tracer_robot, traced_robot, current_time);
 
         bool is_match = is_image_match;
         {
@@ -299,6 +302,8 @@ namespace traceback
             {
               writeTracebackFeedbackHistory(tracer_robot, traced_robot, "3. accept (match and close)");
               pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
+
+              // TODO LM optimization
 
               // Sort results and only keep the middle values, then take average.
               int history_size = pairwise_triangulation_result_history_[tracer_robot][traced_robot].size();
@@ -581,7 +586,8 @@ namespace traceback
             traceback_msgs::GoalAndImage goal_and_image;
             goal_and_image.goal = goal;
             goal_and_image.image = msg->traced_image;
-            goal_and_image.point_cloud = msg->traced_point_cloud;
+            goal_and_image.depth_image = msg->traced_depth_image;
+            // goal_and_image.point_cloud = msg->traced_point_cloud;
             goal_and_image.tracer_robot = tracer_robot;
             goal_and_image.traced_robot = traced_robot;
             goal_and_image.src_map_origin_x = src_map_origin_x;
@@ -1767,7 +1773,8 @@ namespace traceback
     traceback_msgs::GoalAndImage goal_and_image;
     goal_and_image.goal = goal;
     goal_and_image.image = current_it.image;
-    goal_and_image.point_cloud = current_it.point_cloud;
+    goal_and_image.depth_image = current_it.depth_image;
+    // goal_and_image.point_cloud = current_it.point_cloud;
     goal_and_image.tracer_robot = robot_name_src;
     goal_and_image.traced_robot = robot_name_dst;
     goal_and_image.src_map_origin_x = src_map_origin_x;
@@ -2260,11 +2267,12 @@ namespace traceback
       }
       //
       geometry_msgs::Pose pose = camera_image_processor_.robots_to_current_pose_[current.first];
-      sensor_msgs::PointCloud2 point_cloud = camera_image_processor_.robots_to_current_point_cloud_[current.first];
+      sensor_msgs::Image depth_image = camera_image_processor_.robots_to_current_depth_image_[current.first];
+      // sensor_msgs::PointCloud2 point_cloud = camera_image_processor_.robots_to_current_point_cloud_[current.first];
       PoseImagePair pose_image_pair;
       pose_image_pair.pose = pose;
       pose_image_pair.image = current.second;
-      pose_image_pair.point_cloud = point_cloud;
+      pose_image_pair.depth_image = depth_image;
       pose_image_pair.stamp = ros::Time::now().toNSec();
 
       auto all = camera_image_processor_.robots_to_all_pose_image_pairs_.find(current.first);
@@ -2355,6 +2363,16 @@ namespace traceback
     camera_image_processor_.robots_to_temp_image_[robot_name] = *msg;
   }
 
+  // rgb and depth images may not be synchronized
+  void Traceback::CameraDepthImageUpdate(const sensor_msgs::ImageConstPtr &msg)
+  {
+    std::string frame_id = msg->header.frame_id;
+    std::string robot_name = "/" + frame_id.substr(0, frame_id.find("/"));
+    camera_image_processor_.robots_to_current_depth_image_[robot_name] = *msg;
+    camera_image_processor_.robots_to_current_pose_[robot_name] = getRobotPose(robot_name);
+    camera_image_processor_.robots_to_current_image_[robot_name] = camera_image_processor_.robots_to_temp_image_[robot_name];
+  }
+
   void Traceback::modifyTransformsBasedOnOrigins(
       std::vector<cv::Mat> &transforms, std::vector<cv::Mat> &out,
       std::vector<cv::Point2d> &map_origins, std::vector<float> &resolutions)
@@ -2420,6 +2438,7 @@ namespace traceback
     }
   }
 
+  // Not used now
   void Traceback::CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr &msg)
   {
     std::string frame_id = msg->header.frame_id;
@@ -2508,6 +2527,7 @@ namespace traceback
       else if (isRobotCameraTopic(topic))
       {
         std::string camera_rgb_topic;
+        std::string camera_depth_topic;
         std::string camera_point_cloud_topic;
 
         robot_name = robotNameFromTopic(topic.name);
@@ -2530,12 +2550,14 @@ namespace traceback
 
         /* subscribe callbacks */
         camera_rgb_topic = ros::names::append(robot_name, robot_camera_image_topic_);
-        camera_point_cloud_topic = ros::names::append(robot_name, robot_camera_point_cloud_topic_);
+        camera_depth_topic = ros::names::append(robot_name, robot_camera_depth_image_topic_);
+        // camera_point_cloud_topic = ros::names::append(robot_name, robot_camera_point_cloud_topic_);
 
         subscription.robot_namespace = robot_name;
 
         ROS_INFO("Subscribing to CAMERA rgb topic: %s.", camera_rgb_topic.c_str());
-        ROS_INFO("Subscribing to CAMERA point cloud topic: %s.", camera_point_cloud_topic.c_str());
+        ROS_INFO("Subscribing to CAMERA depth topic: %s.", camera_depth_topic.c_str());
+        // ROS_INFO("Subscribing to CAMERA point cloud topic: %s.", camera_point_cloud_topic.c_str());
 
         // Insert empty std::vector to the map to prevent future error when accessing the map by robot name.
         auto it = camera_image_processor_.robots_to_all_pose_image_pairs_.find(subscription.robot_namespace);
@@ -2547,11 +2569,15 @@ namespace traceback
         subscription.camera_rgb_sub.subscribe(node_,
                                               camera_rgb_topic, 10);
 
-        subscription.camera_point_cloud_sub.subscribe(node_,
-                                                      camera_point_cloud_topic, 10);
+        subscription.camera_depth_sub.subscribe(node_,
+                                                camera_depth_topic, 10);
+
+        // subscription.camera_point_cloud_sub.subscribe(node_,
+        //                                               camera_point_cloud_topic, 10);
 
         subscription.camera_rgb_sub.registerCallback(boost::bind(&Traceback::CameraImageUpdate, this, _1));
-        subscription.camera_point_cloud_sub.registerCallback(boost::bind(&Traceback::CameraPointCloudUpdate, this, _1));
+        subscription.camera_depth_sub.registerCallback(boost::bind(&Traceback::CameraDepthImageUpdate, this, _1));
+        // subscription.camera_point_cloud_sub.registerCallback(boost::bind(&Traceback::CameraPointCloudUpdate, this, _1));
 
         // Synchronizer does not callback for unknown reason.
         // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::PointCloud2> MySyncPolicy;
