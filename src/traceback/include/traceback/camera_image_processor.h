@@ -69,6 +69,9 @@ namespace traceback
 
         bool matchImage(const cv::Mat &tracer_robot_image, const cv::Mat &traced_robot_image, FeatureType feature_type,
                         double confidence, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
+
+        bool matchImageAndSolve(const cv::Mat &tracer_robot_color_image, const cv::Mat &traced_robot_color_image, const cv::Mat &tracer_robot_depth_image, const cv::Mat &traced_robot_depth_image, FeatureType feature_type,
+                                double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
         /*
         Return whether traced image matches tracer image, depending on the confidence.
 

@@ -6,7 +6,6 @@
 #include <fstream>
 
 #include <image_transport/image_transport.h>
-#include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgcodecs.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <sensor_msgs/image_encodings.h>
@@ -233,45 +232,24 @@ namespace traceback
         std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
         // get cv images
-        cv_bridge::CvImageConstPtr cv_ptr_tracer;
-        try
-        {
-          if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
-            cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
-          else
-            cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
-        }
-        catch (cv_bridge::Exception &e)
-        {
-          ROS_ERROR("cv_bridge exception: %s", e.what());
-          return;
-        }
-
-        cv_bridge::CvImageConstPtr cv_ptr_traced;
-        try
-        {
-          if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
-            cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
-          else
-            cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
-        }
-        catch (cv_bridge::Exception &e)
-        {
-          ROS_ERROR("cv_bridge exception: %s", e.what());
-          return;
-        }
+        cv_bridge::CvImageConstPtr cv_ptr_tracer = sensorImageToCvImagePtr(msg->tracer_image);
+        cv_bridge::CvImageConstPtr cv_ptr_traced = sensorImageToCvImagePtr(msg->traced_image);
+        cv_bridge::CvImageConstPtr cv_ptr_depth_tracer = sensorImageToCvImagePtr(msg->tracer_depth_image);
+        cv_bridge::CvImageConstPtr cv_ptr_depth_traced = sensorImageToCvImagePtr(msg->traced_depth_image);
         //
 
         geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
         double yaw = quaternionToYaw(goal_q);
         TransformNeeded transform_needed;
-        double match_score;
+        // double match_score;
         // Need to match both images and point clouds.
-        bool is_image_match = camera_image_processor_.matchImage(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
-                                                                 essential_mat_confidence_threshold_, tracer_robot, traced_robot, current_time);
+        // bool is_image_match = camera_image_processor_.matchImage(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
+        //                                                          essential_mat_confidence_threshold_, tracer_robot, traced_robot, current_time);
 
         // TODO solvepnp and update transform_needed
         // TODO debug save tracer depth image and traced depth image first
+        bool is_image_match = camera_image_processor_.matchImageAndSolve(cv_ptr_tracer->image, cv_ptr_traced->image, cv_ptr_depth_tracer->image, cv_ptr_depth_traced->image, FeatureType::SURF, essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
+
         // bool is_point_cloud_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, point_cloud_match_score_, yaw, transform_needed, match_score, tracer_robot, traced_robot, current_time);
 
         bool is_match = is_image_match;
@@ -291,9 +269,19 @@ namespace traceback
                       cv_ptr_tracer->image);
           cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced.png",
                       cv_ptr_traced->image);
-
-          bool is_close = abs(transform_needed.tx) < point_cloud_close_translation_ && abs(transform_needed.ty) < point_cloud_close_translation_ && abs(transform_needed.r) < point_cloud_close_rotation_;
-          is_close = is_close || match_score < point_cloud_close_score_;
+          cv::Mat colorized_depth_tracer;
+          cv_ptr_depth_tracer->image.convertTo(colorized_depth_tracer, CV_8U, 255.0/5.0);
+          cv::cvtColor(colorized_depth_tracer, colorized_depth_tracer, cv::COLOR_GRAY2BGR);
+          cv::Mat colorized_depth_traced;
+          cv_ptr_depth_traced->image.convertTo(colorized_depth_traced, CV_8U, 255.0/5.0);
+          cv::cvtColor(colorized_depth_traced, colorized_depth_traced, cv::COLOR_GRAY2BGR);
+          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer_depth.png",
+                      colorized_depth_tracer);
+          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced_depth.png",
+                      colorized_depth_traced);
+          // bool is_close = abs(transform_needed.tx) < point_cloud_close_translation_ && abs(transform_needed.ty) < point_cloud_close_translation_ && abs(transform_needed.r) < point_cloud_close_rotation_;
+          // is_close = is_close || match_score < point_cloud_close_score_;
+          bool is_close = true;
           // 3 or 4
           if (is_close)
           {
@@ -2617,6 +2605,24 @@ namespace traceback
         }
       }
     }
+  }
+
+  cv_bridge::CvImageConstPtr Traceback::sensorImageToCvImagePtr(const sensor_msgs::Image &image)
+  {
+    cv_bridge::CvImageConstPtr cv_ptr;
+    try
+    {
+      if (sensor_msgs::image_encodings::isColor(image.encoding))
+        cv_ptr = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::BGR8);
+      else
+        cv_ptr = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::TYPE_32FC1);
+    }
+    catch (cv_bridge::Exception &e)
+    {
+      ROS_ERROR("cv_bridge exception: %s", e.what());
+      return nullptr;
+    }
+    return cv_ptr;
   }
 
   void Traceback::matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q)

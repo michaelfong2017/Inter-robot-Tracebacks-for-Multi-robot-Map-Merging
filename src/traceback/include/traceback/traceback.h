@@ -20,6 +20,8 @@
 #include <tf/tf.h>
 #include <tf/transform_listener.h>
 
+#include <cv_bridge/cv_bridge.h>
+
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -215,6 +217,8 @@ namespace traceback
                        MapSubscription &subscription);
 
     void topicSubscribing();
+
+    cv_bridge::CvImageConstPtr sensorImageToCvImagePtr(const sensor_msgs::Image &image);
 
     void matToQuaternion(cv::Mat &mat, geometry_msgs::Quaternion &q);
 

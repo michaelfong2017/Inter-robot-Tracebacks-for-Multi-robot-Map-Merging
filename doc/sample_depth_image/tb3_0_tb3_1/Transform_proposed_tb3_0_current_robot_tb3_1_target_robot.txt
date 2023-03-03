@@ -1,0 +1,2 @@
+Transform proposed at time 586.650000 with confidence 2.7218
+Transform proposed at time 586.650000 with confidence 2.24956

@@ -363,6 +363,11 @@ namespace traceback
         return true;
     }
 
+    bool CameraImageProcessor::matchImageAndSolve(const cv::Mat &tracer_robot_color_image, const cv::Mat &traced_robot_color_image, const cv::Mat &tracer_robot_depth_image, const cv::Mat &traced_robot_depth_image, FeatureType feature_type, double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
+    {
+        return true;
+    }
+
     bool CameraImageProcessor::findFurtherTransformNeeded(const cv::Mat &tracer_robot_image, const cv::Mat &traced_robot_image, FeatureType feature_type,
                                                           double confidence, double yaw, TransformNeeded &transform_needed, bool &is_unwanted_translation_angle, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {
