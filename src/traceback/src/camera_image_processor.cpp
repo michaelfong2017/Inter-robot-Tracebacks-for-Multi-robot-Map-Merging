@@ -365,6 +365,264 @@ namespace traceback
 
     bool CameraImageProcessor::matchImageAndSolve(const cv::Mat &tracer_robot_color_image, const cv::Mat &traced_robot_color_image, const cv::Mat &tracer_robot_depth_image, const cv::Mat &traced_robot_depth_image, FeatureType feature_type, double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {
+        const std::vector<cv::Mat> &images = {tracer_robot_color_image, traced_robot_color_image};
+        std::vector<cv::detail::ImageFeatures> image_features;
+        std::vector<cv::detail::MatchesInfo> pairwise_matches;
+        std::vector<cv::detail::CameraParams> transforms;
+        std::vector<int> good_indices;
+        // TODO investigate value translation effect on features
+        auto finder = internal::chooseFeatureFinder(feature_type);
+        cv::Ptr<cv::detail::FeaturesMatcher> matcher =
+            cv::makePtr<cv::detail::AffineBestOf2NearestMatcher>();
+
+        if (tracer_robot_color_image.empty() || traced_robot_color_image.empty())
+        {
+            ROS_ERROR("Either traced robot image or tracer robot image is empty, which should not be the case!");
+            return false;
+        }
+
+        image_features.reserve(images.size());
+        for (const cv::Mat &image : images)
+        {
+            image_features.emplace_back();
+            if (!image.empty())
+            {
+#if CV_VERSION_MAJOR >= 4
+                cv::detail::computeImageFeatures(finder, image, image_features.back());
+#else
+                (*finder)(image, image_features.back());
+#endif
+            }
+        }
+        finder = {};
+
+        /* find corespondent features */
+        try
+        {
+            ROS_DEBUG("pairwise matching features");
+            (*matcher)(image_features, pairwise_matches);
+            matcher = {};
+        }
+        catch (std::exception e)
+        {
+            ROS_INFO("Not enough features, catched!");
+            return false;
+        }
+
+        // #ifndef NDEBUG
+        internal::writeDebugMatchingInfo(images, image_features, pairwise_matches, traced_robot, tracer_robot, current_time);
+        // #endif
+
+        double match_score = -1.0; // does not even have match
+        for (auto &match_info : pairwise_matches)
+        {
+            if (match_info.H.empty() ||
+                match_info.src_img_idx >= match_info.dst_img_idx)
+            {
+                continue;
+            }
+            match_score = match_info.confidence;
+        }
+
+        good_indices = cv::detail::leaveBiggestComponent(
+            image_features, pairwise_matches, static_cast<float>(confidence));
+
+        // Write match score to file
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+                if (good_indices.size() == 1)
+                {
+                    fw << "Does not match at time " << current_time << " with confidence " << match_score << std::endl;
+                }
+                else
+                {
+                    fw << "Match at time " << current_time << " with confidence " << match_score << std::endl;
+                }
+                fw.close();
+            }
+        }
+        // END
+
+        // no match found
+        if (good_indices.size() == 1)
+        {
+            return false;
+        }
+
+        std::vector<cv::Point2f> image_points1, image_points2;
+
+        if (image_features.size() == 2)
+        {
+            // std::vector<cv::KeyPoint> keypoints1 = image_features[0].keypoints;
+            // cv::KeyPoint::convert(keypoints1, points1);
+            // std::vector<cv::KeyPoint> keypoints2 = image_features[1].keypoints;
+            // cv::KeyPoint::convert(keypoints2, points2);
+            std::vector<cv::KeyPoint> keypoints1, keypoints2;
+            for (auto &match_info : pairwise_matches)
+            {
+                if (match_info.H.empty() ||
+                    match_info.src_img_idx >= match_info.dst_img_idx)
+                {
+                    continue;
+                }
+
+                for (size_t i = 0; i < match_info.matches.size(); ++i)
+                {
+                    auto match = match_info.matches[i];
+                    if (match_info.inliers_mask[i] == 1)
+                    {
+                        // match.imgIdx is always 0
+                        keypoints1.emplace_back(image_features[0].keypoints[match.queryIdx]);
+                        keypoints2.emplace_back(image_features[1].keypoints[match.trainIdx]);
+                    }
+                }
+            }
+            cv::KeyPoint::convert(keypoints1, image_points1);
+            cv::KeyPoint::convert(keypoints2, image_points2);
+        }
+        else
+        {
+            ROS_ERROR("image_features must be of size 2, matching exactly 2 images!");
+        }
+
+        ROS_INFO("Number of inlier matches is %zu", image_points1.size());
+        // Filter case where match number is too small
+        // DLT algorithm needs at least 6 points for pose estimation from 3D-2D point correspondences. (expected: 'count >= 6')
+        if (image_points1.size() < 6)
+        {
+            return true;
+        }
+
+        float fx = 554.254691191187f;
+        float fy = 554.254691191187f;
+        float cx = 320.5f;
+        float cy = 240.5f;
+
+        std::vector<cv::Point3f> points1;                // nan depth is filtered
+        std::vector<cv::Point2f> filtered_image_points1; // nan depth is filtered
+        std::vector<cv::Point2f> filtered_image_points2; // nan depth is filtered
+        for (size_t i = 0; i < image_points1.size(); ++i)
+        {
+            cv::Point2f image_point = image_points1[i];
+            float depth = tracer_robot_depth_image.at<float>((int)image_point.y, (int)image_point.x);
+            // ROS_DEBUG("depth: %f", depth);
+            if (isnan(depth))
+            {
+                continue;
+            }
+            float x = depth * (image_point.x - cx) / fx;
+            float y = depth * (image_point.y - cy) / fy;
+            float z = depth;
+            points1.emplace_back(cv::Point3f(x, y, z));
+            filtered_image_points1.push_back(image_point);
+            filtered_image_points2.push_back(image_points2[i]);
+        }
+
+        // For the match, write the number of filtered matches to file
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Filtered_number_of_matches" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+                fw << "Number of filtered matches at " << current_time << " is " << points1.size() << std::endl;
+                fw.close();
+            }
+        }
+        //
+
+        // Filter case where filtered (depth != nan) match number is too small
+        if (filtered_image_points1.size() < 6)
+        {
+            // TODO differentiate this case, in which transform needed cannot be calculated
+            return true;
+        }
+
+        // solvepnp
+        float k[9] = {554.254691191187f, 0.0f, 320.5f, 0.0f, 554.254691191187f, 240.5f, 0.0f, 0.0f, 1.0f};
+        cv::Mat camera_K = cv::Mat(3, 3, CV_32F, k);
+        // For "plumb_bob", the 5 parameters are: (k1, k2, t1, t2, k3).
+        float d[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+        cv::Mat camera_D = cv::Mat(5, 1, CV_32F, k);
+
+        cv::Mat rvec1 = cv::Mat(3, 1, CV_32F);
+        cv::Mat tvec1 = cv::Mat(3, 1, CV_32F);
+        // Use init guess
+        rvec1.at<float>(0, 0) = 0.0f;
+        rvec1.at<float>(1, 0) = 0.0f;
+        rvec1.at<float>(2, 0) = 0.0f;
+        tvec1.at<float>(0, 0) = 0.0f;
+        tvec1.at<float>(1, 0) = 0.0f;
+        tvec1.at<float>(2, 0) = 0.0f;
+        // Use init guess END
+        cv::solvePnP(points1, filtered_image_points1, camera_K, camera_D, rvec1, tvec1, true);
+        cv::Mat rvec2 = cv::Mat(3, 1, CV_32F);
+        cv::Mat tvec2 = cv::Mat(3, 1, CV_32F);
+        cv::solvePnP(points1, filtered_image_points2, camera_K, camera_D, rvec2, tvec2, true);
+
+        cv::Mat rmat1;
+        cv::Rodrigues(rvec1, rmat1);
+        cv::Mat rmat2;
+        cv::Rodrigues(rvec2, rmat2);
+
+        // compute C2MC1
+        // R 1 to 2 and t 1 to 2
+        // TODO very large values now
+        cv::Mat transform_R = rmat2 * rmat1.t();
+        cv::Mat transform_t = rmat2 * (-rmat1.t() * tvec1) + tvec2;
+
+        //
+        cv::Vec3d rot = rotationMatrixToEulerAngles(transform_R);
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_R.txt", std::ofstream::out);
+            if (fw.is_open())
+            {
+                fw << "XYZ rotation is: " << rotationMatrixToEulerAngles(rmat1) << std::endl;
+                fw << "Rotation matrix C1MO (O to C1):" << std::endl;
+                fw << rmat1.at<float>(0, 0) << "\t" << rmat1.at<float>(0, 1) << "\t" << rmat1.at<float>(0, 2) << std::endl;
+                fw << rmat1.at<float>(1, 0) << "\t" << rmat1.at<float>(1, 1) << "\t" << rmat1.at<float>(1, 2) << std::endl;
+                fw << rmat1.at<float>(2, 0) << "\t" << rmat1.at<float>(2, 1) << "\t" << rmat1.at<float>(2, 2) << std::endl;
+
+                fw << "XYZ rotation is: " << rotationMatrixToEulerAngles(rmat2) << std::endl;
+                fw << "Rotation matrix C2MO (O to C2):" << std::endl;
+                fw << rmat2.at<float>(0, 0) << "\t" << rmat2.at<float>(0, 1) << "\t" << rmat2.at<float>(0, 2) << std::endl;
+                fw << rmat2.at<float>(1, 0) << "\t" << rmat2.at<float>(1, 1) << "\t" << rmat2.at<float>(1, 2) << std::endl;
+                fw << rmat2.at<float>(2, 0) << "\t" << rmat2.at<float>(2, 1) << "\t" << rmat2.at<float>(2, 2) << std::endl;
+
+                fw << "XYZ rotation is: " << rot << std::endl;
+                fw << "Rotation matrix R:" << std::endl;
+                fw << transform_R.at<float>(0, 0) << "\t" << transform_R.at<float>(0, 1) << "\t" << transform_R.at<float>(0, 2) << std::endl;
+                fw << transform_R.at<float>(1, 0) << "\t" << transform_R.at<float>(1, 1) << "\t" << transform_R.at<float>(1, 2) << std::endl;
+                fw << transform_R.at<float>(2, 0) << "\t" << transform_R.at<float>(2, 1) << "\t" << transform_R.at<float>(2, 2) << std::endl;
+                // fw << std::endl;
+                fw.close();
+            }
+        }
+
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_t.txt", std::ofstream::out);
+            if (fw.is_open())
+            {
+                fw << "Translation matrix C1MO (O to C1):" << std::endl;
+                fw << tvec1.at<float>(0, 0) << std::endl;
+                fw << tvec1.at<float>(1, 0) << std::endl;
+                fw << tvec1.at<float>(2, 0) << std::endl;
+
+                fw << "Translation matrix C2MO (O to C2):" << std::endl;
+                fw << tvec2.at<float>(0, 0) << std::endl;
+                fw << tvec2.at<float>(1, 0) << std::endl;
+                fw << tvec2.at<float>(2, 0) << std::endl;
+
+                fw << "Translation matrix t:" << std::endl;
+                fw << transform_t.at<float>(0, 0) << std::endl;
+                fw << transform_t.at<float>(1, 0) << std::endl;
+                fw << transform_t.at<float>(2, 0) << std::endl;
+                fw.close();
+            }
+        }
+
+        ROS_DEBUG("end");
+
         return true;
     }
 
