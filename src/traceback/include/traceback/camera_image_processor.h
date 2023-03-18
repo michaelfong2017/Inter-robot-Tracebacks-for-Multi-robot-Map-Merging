@@ -109,25 +109,9 @@ namespace traceback
             for (int i = 0; i < x.size(); i++)
             {
                 Eigen::VectorXd xPlus(x);
-                // r (angle) estimation
-                if (i == 2)
-                {
-                    xPlus(i) += epsilon / 10;
-                }
-                else
-                {
-                    xPlus(i) += epsilon;
-                }
+                xPlus(i) += epsilon;
                 Eigen::VectorXd xMinus(x);
-                // r (angle) estimation
-                if (i == 2)
-                {
-                    xMinus(i) -= epsilon / 10;
-                }
-                else
-                {
-                    xMinus(i) -= epsilon;
-                }
+                xMinus(i) -= epsilon;
 
                 Eigen::VectorXd fvecPlus(values());
                 operator()(xPlus, fvecPlus);
@@ -138,6 +122,10 @@ namespace traceback
                 Eigen::VectorXd fvecDiff(values());
                 fvecDiff = (fvecPlus - fvecMinus) / (2.0f * epsilon);
 
+                // r (angle) estimation
+                if (i == 2) {
+                    fvecDiff *= 20;
+                }
                 fjac.block(0, i, values(), 1) = fvecDiff;
             }
 
