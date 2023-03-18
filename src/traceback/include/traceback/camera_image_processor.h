@@ -109,9 +109,25 @@ namespace traceback
             for (int i = 0; i < x.size(); i++)
             {
                 Eigen::VectorXd xPlus(x);
-                xPlus(i) += epsilon;
+                // r (angle) estimation
+                if (i == 2)
+                {
+                    xPlus(i) += epsilon / 10;
+                }
+                else
+                {
+                    xPlus(i) += epsilon;
+                }
                 Eigen::VectorXd xMinus(x);
-                xMinus(i) -= epsilon;
+                // r (angle) estimation
+                if (i == 2)
+                {
+                    xMinus(i) -= epsilon / 10;
+                }
+                else
+                {
+                    xMinus(i) -= epsilon;
+                }
 
                 Eigen::VectorXd fvecPlus(values());
                 operator()(xPlus, fvecPlus);
@@ -151,13 +167,13 @@ namespace traceback
 
         // Return optimized tx, ty and r in order
         std::vector<double> LMOptimize(std::vector<double> x_values,
-                        std::vector<double> y_values,
-                        std::vector<double> tx_values,
-                        std::vector<double> ty_values,
-                        std::vector<double> r_values,
-                        double init_tx,
-                        double init_ty,
-                        double init_r);
+                                       std::vector<double> y_values,
+                                       std::vector<double> tx_values,
+                                       std::vector<double> ty_values,
+                                       std::vector<double> r_values,
+                                       double init_tx,
+                                       double init_ty,
+                                       double init_r);
 
     private:
         // In order to synchronize image and depth image although they don't really do
