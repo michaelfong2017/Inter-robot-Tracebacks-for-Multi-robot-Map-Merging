@@ -489,35 +489,35 @@ namespace traceback
 
         ROS_INFO("Number of inlier matches is %zu", image_points1.size());
         // Filter case where match number is too small
-        // DLT algorithm needs at least 6 points for pose estimation from 3D-2D point correspondences. (expected: 'count >= 6')
-        if (image_points1.size() < 6)
+        // DLT algorithm needs at least 4 points for pose estimation from 3D-2D point correspondences. (expected: 'count >= 6')
+        if (image_points1.size() < 4)
         {
-            return true;
+            return false;
         }
 
-        float fx = 554.254691191187f;
-        float fy = 554.254691191187f;
-        float cx = 320.5f;
-        float cy = 240.5f;
+        double fx = 554.254691191187;
+        double fy = 554.254691191187;
+        double cx = 320.5;
+        double cy = 240.5;
 
-        std::vector<cv::Point3f> points1;                // nan depth is filtered
-        std::vector<cv::Point2f> filtered_image_points1; // nan depth is filtered
-        std::vector<cv::Point2f> filtered_image_points2; // nan depth is filtered
+        std::vector<cv::Point3d> points1;                // nan depth is filtered
+        std::vector<cv::Point2d> filtered_image_points1; // nan depth is filtered
+        std::vector<cv::Point2d> filtered_image_points2; // nan depth is filtered
         for (size_t i = 0; i < image_points1.size(); ++i)
         {
-            cv::Point2f image_point = image_points1[i];
-            float depth = tracer_robot_depth_image.at<float>((int)image_point.y, (int)image_point.x);
+            cv::Point2d image_point = 1.0 * image_points1[i];
+            double depth = 1.0 * tracer_robot_depth_image.at<float>((int)image_point.y, (int)image_point.x);
             // ROS_DEBUG("depth: %f", depth);
             if (isnan(depth))
             {
                 continue;
             }
-            float x = depth * (image_point.x - cx) / fx;
-            float y = depth * (image_point.y - cy) / fy;
-            float z = depth;
-            points1.emplace_back(cv::Point3f(x, y, z));
+            double x = depth * (image_point.x - cx) / fx;
+            double y = depth * (image_point.y - cy) / fy;
+            double z = depth;
+            points1.emplace_back(cv::Point3d(x, y, z));
             filtered_image_points1.push_back(image_point);
-            filtered_image_points2.push_back(image_points2[i]);
+            filtered_image_points2.push_back(1.0 * image_points2[i]);
         }
 
         // For the match, write the number of filtered matches to file
@@ -532,33 +532,39 @@ namespace traceback
         //
 
         // Filter case where filtered (depth != nan) match number is too small
-        if (filtered_image_points1.size() < 6)
+        if (filtered_image_points1.size() < 4)
         {
             // TODO differentiate this case, in which transform needed cannot be calculated
-            return true;
+            return false;
         }
 
         // solvepnp
-        float k[9] = {554.254691191187f, 0.0f, 320.5f, 0.0f, 554.254691191187f, 240.5f, 0.0f, 0.0f, 1.0f};
-        cv::Mat camera_K = cv::Mat(3, 3, CV_32F, k);
+        double k[9] = {554.254691191187, 0.0, 320.5, 0.0, 554.254691191187, 240.5, 0.0, 0.0, 1.0};
+        cv::Mat camera_K = cv::Mat(3, 3, CV_64F, k);
         // For "plumb_bob", the 5 parameters are: (k1, k2, t1, t2, k3).
-        float d[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-        cv::Mat camera_D = cv::Mat(5, 1, CV_32F, k);
+        double d[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
+        cv::Mat camera_D = cv::Mat(5, 1, CV_64F, d);
 
-        cv::Mat rvec1 = cv::Mat(3, 1, CV_32F);
-        cv::Mat tvec1 = cv::Mat(3, 1, CV_32F);
+        cv::Mat rvec1 = cv::Mat(3, 1, CV_64F);
+        cv::Mat tvec1 = cv::Mat(3, 1, CV_64F);
+        cv::Mat rvec2 = cv::Mat(3, 1, CV_64F);
+        cv::Mat tvec2 = cv::Mat(3, 1, CV_64F);
         // Use init guess
-        rvec1.at<float>(0, 0) = 0.0f;
-        rvec1.at<float>(1, 0) = 0.0f;
-        rvec1.at<float>(2, 0) = 0.0f;
-        tvec1.at<float>(0, 0) = 0.0f;
-        tvec1.at<float>(1, 0) = 0.0f;
-        tvec1.at<float>(2, 0) = 0.0f;
+        rvec1.at<double>(0, 0) = 0.0;
+        rvec1.at<double>(1, 0) = 0.0;
+        rvec1.at<double>(2, 0) = 0.0;
+        tvec1.at<double>(0, 0) = 0.0;
+        tvec1.at<double>(1, 0) = 0.0;
+        tvec1.at<double>(2, 0) = 0.0;
+        rvec2.at<double>(0, 0) = 0.0;
+        rvec2.at<double>(1, 0) = 0.0;
+        rvec2.at<double>(2, 0) = 0.0;
+        tvec2.at<double>(0, 0) = 0.0;
+        tvec2.at<double>(1, 0) = 0.0;
+        tvec2.at<double>(2, 0) = 0.0;
         // Use init guess END
-        cv::solvePnP(points1, filtered_image_points1, camera_K, camera_D, rvec1, tvec1, true);
-        cv::Mat rvec2 = cv::Mat(3, 1, CV_32F);
-        cv::Mat tvec2 = cv::Mat(3, 1, CV_32F);
-        cv::solvePnP(points1, filtered_image_points2, camera_K, camera_D, rvec2, tvec2, true);
+        cv::solvePnPRansac(points1, filtered_image_points1, camera_K, camera_D, rvec1, tvec1, true, 100, 0.5f);
+        cv::solvePnPRansac(points1, filtered_image_points2, camera_K, camera_D, rvec2, tvec2, true, 100, 0.5f);
 
         cv::Mat rmat1;
         cv::Rodrigues(rvec1, rmat1);
@@ -579,21 +585,21 @@ namespace traceback
             {
                 fw << "XYZ rotation is: " << rotationMatrixToEulerAngles(rmat1) << std::endl;
                 fw << "Rotation matrix C1MO (O to C1):" << std::endl;
-                fw << rmat1.at<float>(0, 0) << "\t" << rmat1.at<float>(0, 1) << "\t" << rmat1.at<float>(0, 2) << std::endl;
-                fw << rmat1.at<float>(1, 0) << "\t" << rmat1.at<float>(1, 1) << "\t" << rmat1.at<float>(1, 2) << std::endl;
-                fw << rmat1.at<float>(2, 0) << "\t" << rmat1.at<float>(2, 1) << "\t" << rmat1.at<float>(2, 2) << std::endl;
+                fw << rmat1.at<double>(0, 0) << "\t" << rmat1.at<double>(0, 1) << "\t" << rmat1.at<double>(0, 2) << std::endl;
+                fw << rmat1.at<double>(1, 0) << "\t" << rmat1.at<double>(1, 1) << "\t" << rmat1.at<double>(1, 2) << std::endl;
+                fw << rmat1.at<double>(2, 0) << "\t" << rmat1.at<double>(2, 1) << "\t" << rmat1.at<double>(2, 2) << std::endl;
 
                 fw << "XYZ rotation is: " << rotationMatrixToEulerAngles(rmat2) << std::endl;
                 fw << "Rotation matrix C2MO (O to C2):" << std::endl;
-                fw << rmat2.at<float>(0, 0) << "\t" << rmat2.at<float>(0, 1) << "\t" << rmat2.at<float>(0, 2) << std::endl;
-                fw << rmat2.at<float>(1, 0) << "\t" << rmat2.at<float>(1, 1) << "\t" << rmat2.at<float>(1, 2) << std::endl;
-                fw << rmat2.at<float>(2, 0) << "\t" << rmat2.at<float>(2, 1) << "\t" << rmat2.at<float>(2, 2) << std::endl;
+                fw << rmat2.at<double>(0, 0) << "\t" << rmat2.at<double>(0, 1) << "\t" << rmat2.at<double>(0, 2) << std::endl;
+                fw << rmat2.at<double>(1, 0) << "\t" << rmat2.at<double>(1, 1) << "\t" << rmat2.at<double>(1, 2) << std::endl;
+                fw << rmat2.at<double>(2, 0) << "\t" << rmat2.at<double>(2, 1) << "\t" << rmat2.at<double>(2, 2) << std::endl;
 
                 fw << "XYZ rotation is: " << rot << std::endl;
                 fw << "Rotation matrix R:" << std::endl;
-                fw << transform_R.at<float>(0, 0) << "\t" << transform_R.at<float>(0, 1) << "\t" << transform_R.at<float>(0, 2) << std::endl;
-                fw << transform_R.at<float>(1, 0) << "\t" << transform_R.at<float>(1, 1) << "\t" << transform_R.at<float>(1, 2) << std::endl;
-                fw << transform_R.at<float>(2, 0) << "\t" << transform_R.at<float>(2, 1) << "\t" << transform_R.at<float>(2, 2) << std::endl;
+                fw << transform_R.at<double>(0, 0) << "\t" << transform_R.at<double>(0, 1) << "\t" << transform_R.at<double>(0, 2) << std::endl;
+                fw << transform_R.at<double>(1, 0) << "\t" << transform_R.at<double>(1, 1) << "\t" << transform_R.at<double>(1, 2) << std::endl;
+                fw << transform_R.at<double>(2, 0) << "\t" << transform_R.at<double>(2, 1) << "\t" << transform_R.at<double>(2, 2) << std::endl;
                 // fw << std::endl;
                 fw.close();
             }
@@ -604,24 +610,55 @@ namespace traceback
             if (fw.is_open())
             {
                 fw << "Translation matrix C1MO (O to C1):" << std::endl;
-                fw << tvec1.at<float>(0, 0) << std::endl;
-                fw << tvec1.at<float>(1, 0) << std::endl;
-                fw << tvec1.at<float>(2, 0) << std::endl;
+                fw << tvec1.at<double>(0, 0) << std::endl;
+                fw << tvec1.at<double>(1, 0) << std::endl;
+                fw << tvec1.at<double>(2, 0) << std::endl;
 
                 fw << "Translation matrix C2MO (O to C2):" << std::endl;
-                fw << tvec2.at<float>(0, 0) << std::endl;
-                fw << tvec2.at<float>(1, 0) << std::endl;
-                fw << tvec2.at<float>(2, 0) << std::endl;
+                fw << tvec2.at<double>(0, 0) << std::endl;
+                fw << tvec2.at<double>(1, 0) << std::endl;
+                fw << tvec2.at<double>(2, 0) << std::endl;
 
                 fw << "Translation matrix t:" << std::endl;
-                fw << transform_t.at<float>(0, 0) << std::endl;
-                fw << transform_t.at<float>(1, 0) << std::endl;
-                fw << transform_t.at<float>(2, 0) << std::endl;
+                fw << transform_t.at<double>(0, 0) << std::endl;
+                fw << transform_t.at<double>(1, 0) << std::endl;
+                fw << transform_t.at<double>(2, 0) << std::endl;
                 fw.close();
             }
         }
 
-        ROS_DEBUG("end");
+        /*
+        Bear in mind that tracer is the src image and traced is the dst image.
+
+        transform_t is of the form (x, y, z)
+        t.y should be considered 0.
+        If yaw=0, the more positive the t.z is, the more the goal (traced) is behind from the tracer, the more negative x translation is needed
+        to translate from tracer to traced.
+        If yaw=0, the more positive the t.x is, the more the goal (traced) is to the left of the tracer, the more positive y translation is needed
+        to translate from tracer to traced.
+
+        When computing transform_t, must consider the current orientation.
+        The goal is already in the tracer's coordinate frame, and the essential matrix
+        is actually to rotate, then translate from tracer to traced, in the tracer's coordinate frame.
+
+        transform_t probably needs to be scaled (element-wise multiplication) before it can be used.
+
+        For transform_R, only consider the y-axis rotation since this y-axis rotation is the z-axis rotation in the robot world.
+        The more positive this rotation, the more positive z-axis rotation is needed in the robot world.
+
+        transform_R can be directly used.
+        */
+        transform_needed.tx = (-1 * transform_t.at<double>(2, 0) * cos(yaw)) + (-1 * transform_t.at<double>(0, 0) * sin(yaw));
+        transform_needed.ty = transform_t.at<double>(0, 0) * cos(yaw) + (-1 * transform_t.at<double>(2, 0) * sin(yaw));
+        transform_needed.r = rot[1];
+
+        // Filter out match that does not make sense
+        if (abs(transform_needed.tx) > 3.0 || abs(transform_needed.ty) > 3.0) {
+            return false;
+        }
+        //
+
+        ROS_INFO("Debug");
 
         return true;
     }

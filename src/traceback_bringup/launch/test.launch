@@ -49,7 +49,7 @@
         Translation condition (every axis) for two point clouds to be close -->
         <param name="point_cloud_close_rotation" value="0.05" /> <!-- Close condition 2b: Rotation
         condition for two point clouds to be close -->
-        <param name="accept_count_needed" value="13" />
+        <param name="accept_count_needed" value="7" />
         <!-- reject when reject_count >= reject_count_needed && reject_count + abort_count >= accept_count -->
         <param name="reject_count_needed" value="4" />
         <!-- abort when abort_count >= abort_count_needed && abort_count >= accept_count -->
