@@ -1,13 +1,11 @@
 move_base_msgs/MoveBaseGoal goal
 sensor_msgs/Image image
 sensor_msgs/Image depth_image
-# sensor_msgs/PointCloud2 point_cloud
 string tracer_robot
 string traced_robot
 float64 src_map_origin_x
 float64 src_map_origin_y
 float64 dst_map_origin_x
 float64 dst_map_origin_y
-bool second_traceback
 int32 abort_timeout
 int64 stamp

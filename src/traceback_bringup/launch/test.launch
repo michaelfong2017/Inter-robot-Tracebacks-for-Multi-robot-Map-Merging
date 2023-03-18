@@ -44,18 +44,11 @@
         <param name="camera_pose_image_max_queue_size" value="300" />
         <param name="camera_pose_image_queue_skip_count" value="50" />
         <param name="essential_mat_confidence" value="0.3" />
-        <param name="point_cloud_close_score" value="1" /> <!-- Close condition 1 -->
-        <param name="point_cloud_close_translation" value="1" /> <!-- Close condition 2a:
-        Translation condition (every axis) for two point clouds to be close -->
-        <param name="point_cloud_close_rotation" value="0.05" /> <!-- Close condition 2b: Rotation
-        condition for two point clouds to be close -->
         <param name="accept_count_needed" value="7" />
         <!-- reject when reject_count >= reject_count_needed && reject_count + abort_count >= accept_count -->
-        <param name="reject_count_needed" value="4" />
+        <param name="reject_count_needed" value="3" />
         <!-- abort when abort_count >= abort_count_needed && abort_count >= accept_count -->
-        <param name="abort_count_needed" value="4" /> 
-        <!-- either "triangulation" or "pointcloud" -->
-        <param name="adjustment_mode" value="pointcloud" default="pointcloud" />
+        <param name="abort_count_needed" value="2" /> 
     </node>
 
 

@@ -43,10 +43,8 @@ namespace traceback
   {
     sensor_msgs::ImageConstPtr readonly_camera_image;
     sensor_msgs::ImageConstPtr readonly_depth_image;
-    sensor_msgs::PointCloud2ConstPtr point_cloud;
     message_filters::Subscriber<sensor_msgs::Image> camera_rgb_sub;
     message_filters::Subscriber<sensor_msgs::Image> camera_depth_sub;
-    message_filters::Subscriber<sensor_msgs::PointCloud2> camera_point_cloud_sub;
     std::string robot_namespace; // e.g /tb3_0
   };
 
@@ -57,24 +55,14 @@ namespace traceback
     bool accepted;
   };
 
-  struct FirstTracebackResult
-  {
-    double first_x;
-    double first_y;
-    double first_tracer_to_traced_tx;
-    double first_tracer_to_traced_ty;
-    double first_tracer_to_traced_r;
-  };
-
   struct TransformAdjustmentResult
   {
     // For debug
     std::string current_time;
-    // For debug
     TransformNeeded transform_needed;
     // Original, just for debug
     cv::Mat world_transform;
-    // Original transform adjusted by triangulation result
+    // Original transform adjusted by solvepnp result
     cv::Mat adjusted_transform;
   };
 
@@ -91,17 +79,12 @@ namespace traceback
     /* parameters */
     std::string test_mode_;
     std::string estimation_mode_;
-    std::string adjustment_mode_;
     double update_target_rate_;
     double discovery_rate_;
     double estimation_rate_;
     double confidence_threshold_;
     double unreasonable_goal_distance_;
     double essential_mat_confidence_threshold_;
-    double point_cloud_match_score_;
-    double point_cloud_close_score_;
-    double point_cloud_close_translation_;
-    double point_cloud_close_rotation_;
     int accept_count_needed_;
     int reject_count_needed_;
     int abort_count_needed_;
@@ -171,15 +154,7 @@ namespace traceback
     std::unordered_map<std::string, std::unordered_map<std::string, bool>> pairwise_paused_;
     std::unordered_map<std::string, std::unordered_map<std::string, ros::Timer>> pairwise_resume_timer_;
 
-    std::unordered_map<std::string, std::unordered_map<std::string, FirstTracebackResult>> pairwise_first_traceback_result_;
-    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<TransformAdjustmentResult>>> pairwise_triangulation_result_history_;
-
-    // For point cloud mode to store the arrived pose of the first traceback
-    // so that transform needed is later computed from the last close enough arrived pose
-    // and the first arrived pose.
-    std::unordered_map<std::string, std::unordered_map<std::string, geometry_msgs::Pose>> pairwise_first_traceback_arrived_pose_;
-    // 1 means first traceback, 2 means first sub-traceback, etc.
-    std::unordered_map<std::string, std::unordered_map<std::string, size_t>> pairwise_sub_traceback_number_;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<TransformAdjustmentResult>>> pairwise_transform_adjustment_result_history_;
 
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> best_transforms_;
     std::unordered_set<std::string> has_best_transforms_;
@@ -211,7 +186,6 @@ namespace traceback
     // Do not really synchronize anyway
     void CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg);
     void CameraDepthImageUpdate(const sensor_msgs::ImageConstPtr &msg);
-    void CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr &msg);
 
     void fullMapUpdate(const nav_msgs::OccupancyGrid::ConstPtr &msg,
                        MapSubscription &subscription);
@@ -228,7 +202,7 @@ namespace traceback
 
     double findLengthOfTranslationByTriangulation(double first_x, double first_y, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double second_x, double second_y, double second_tracer_to_traced_tx, double second_tracer_to_traced_ty);
 
-    void findAdjustedTransformation(cv::Mat &original, cv::Mat &adjusted, double scale, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double transform_needed_r, double first_x, double first_y, float src_resolution);
+    void findAdjustedTransformation(cv::Mat &original, cv::Mat &adjusted, double transform_needed_tx, double transform_needed_ty, double transform_needed_r, double arrived_x, double arrived_y, float src_resolution);
 
     // Function without parameters.
     // Currently only test with tb3_0, tb3_1 and tb3_2.
@@ -248,28 +222,14 @@ namespace traceback
     std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, size_t>>> pairwise_proposed_count_;
     void collectProposingData(double pose_x, double pose_y, double predicted_pose_x, double predicted_pose_y, double score, std::string threshold, std::string tracer_robot, std::string traced_robot, std::string current_time, bool same_interval);
 
-    // The below cases are for pointcloud mode.
-    // For matching, need to match both images and point clouds.
-    // 1. abort with enough consecutive count      -> Exit traceback process, cooldown
-    // 2. abort without enough consecutive count   -> next goal
-    // 3. accept (match and close)                 -> Exit traceback process, combine all point cloud matching results
-    // 4. match and close but not yet accept       -> next goal, compute and push point cloud matching result
-    // 5. match and not close                      -> same goal repeat, always keep the first arrived pose
-    // 6. reject                                   -> Exit traceback process
-    // 7. does not match but not yet reject        -> next goal
-    //
-    // The below 10 cases are for triangulation mode.
-    // Traceback feedbacks can be
-    // 1. first traceback, abort with enough consecutive count      -> Exit traceback process, cooldown
-    // 2. first traceback, abort without enough consecutive count   -> next goal first traceback
-    // 3. first traceback, match                                    -> same goal second traceback, first half triangulation
-    // 4. first traceback, reject                                   -> Exit traceback process
-    // 5. first traceback, does not match but not yet reject        -> next goal first traceback
-    // 6. second traceback, abort                                   -> next goal first traceback
-    // 7. second traceback, accept                                  -> Exit traceback process, combine all triangulation results
-    // 8. second traceback, match but not yet accept                -> next goal first traceback, push this triangulation result
-    // 9. second traceback, does not match                          -> next goal first traceback
-    // 10. first traceback, match but unwanted translation angle    -> next goal first traceback, do not increment reject count
+    // Traceback feedback can be one of the following 6 cases:
+    // 1. abort with enough count       -> exit traceback process, cooldown
+    // 2. abort without enough count    -> next goal
+    // 3. match and solved and accept               -> exit traceback process, optimize transform
+    // 4. match and solved but not yet accept       -> next goal, increment accept count
+    // 5. match but cannot solved                   -> next goal
+    // 6. does not match and reject                 -> exit traceback process
+    // 7. does not match but not yet reject         -> next goal, increment reject count
     void writeTracebackFeedbackHistory(std::string tracer, std::string traced, std::string feedback);
 
     std::string robotNameFromTopic(const std::string &topic);

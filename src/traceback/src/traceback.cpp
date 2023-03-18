@@ -21,17 +21,12 @@ namespace traceback
 
     private_nh.param<std::string>("test_mode", test_mode_, "normal");
     private_nh.param<std::string>("estimation_mode", estimation_mode_, "image");
-    private_nh.param<std::string>("adjustment_mode", adjustment_mode_, "pointcloud");
     private_nh.param("update_target_rate", update_target_rate_, 0.2);
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
     private_nh.param("unreasonable_goal_distance", unreasonable_goal_distance_, 5.0);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
     private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
-    private_nh.param("point_cloud_match_score", point_cloud_match_score_, 0.05);
-    private_nh.param("point_cloud_close_score", point_cloud_close_score_, 0.005);
-    private_nh.param("point_cloud_close_translation", point_cloud_close_translation_, 0.05);
-    private_nh.param("point_cloud_close_rotation", point_cloud_close_rotation_, 0.05);
     private_nh.param("accept_count_needed", accept_count_needed_, 8);
     private_nh.param("reject_count_needed", reject_count_needed_, 2);
     private_nh.param("abort_count_needed", abort_count_needed_, 3);
@@ -71,131 +66,332 @@ namespace traceback
   {
     ROS_INFO("tracebackImageAndImageUpdate");
 
-    assert(adjustment_mode_ == "triangulation" || adjustment_mode_ == "pointcloud");
+    std::string tracer_robot = msg->tracer_robot;
+    std::string traced_robot = msg->traced_robot;
+    double src_map_origin_x = msg->src_map_origin_x;
+    double src_map_origin_y = msg->src_map_origin_y;
+    double dst_map_origin_x = msg->dst_map_origin_x;
+    double dst_map_origin_y = msg->dst_map_origin_y;
+    geometry_msgs::Pose arrived_pose = msg->arrived_pose;
 
-    if (adjustment_mode_ == "pointcloud")
+    // Mark this min_index as visited so that it will not be repeatedly visited again and again.
+    // Also valid for aborted goal
+    auto all = camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.find(traced_robot);
+    if (all != camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.end())
     {
-      std::string tracer_robot = msg->tracer_robot;
-      std::string traced_robot = msg->traced_robot;
-      double src_map_origin_x = msg->src_map_origin_x;
-      double src_map_origin_y = msg->src_map_origin_y;
-      double dst_map_origin_x = msg->dst_map_origin_x;
-      double dst_map_origin_y = msg->dst_map_origin_y;
-      geometry_msgs::Pose arrived_pose = msg->arrived_pose;
+      all->second.emplace(msg->stamp);
+    }
+    else
+    {
+      camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.insert({traced_robot, {}});
+      camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[traced_robot].emplace(msg->stamp);
+    }
+    // END
 
-      // Mark this min_index as visited so that it will not be repeatedly visited again and again.
-      // Also valid for aborted goal
-      // Only do for the first traceback
-      auto all = camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.find(traced_robot);
-      if (all != camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.end())
+    // Abort is based on the fact that the location cannot be reached
+    // 1 or 2
+    if (msg->aborted)
+    {
+      // 1. abort with enough count
+      if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
       {
-        all->second.emplace(msg->stamp);
+        writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. abort with enough count");
+
+        pairwise_abort_[tracer_robot][traced_robot] = 0;
+
+        // Allow more time for normal exploration to prevent being stuck at local optimums
+        pairwise_paused_[tracer_robot][traced_robot] = true;
+        pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
+            ros::Duration(60, 0),
+            [this, tracer_robot, traced_robot](const ros::TimerEvent &)
+            { pairwise_paused_[tracer_robot][traced_robot] = false; },
+            true);
+
+        pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
+        pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
+        robots_to_in_traceback_[tracer_robot] = false;
+        // 1. abort with enough count END
+        return;
       }
+      // 2. abort without enough count
       else
       {
-        camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.insert({traced_robot, {}});
-        camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[traced_robot].emplace(msg->stamp);
-      }
-      // END
+        writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. abort without enough count");
 
-      // Only for computing the transform needed after sub-traceback
-      if (!msg->second_traceback)
-      {
-        pairwise_first_traceback_arrived_pose_[tracer_robot][traced_robot] = arrived_pose;
-
-        pairwise_sub_traceback_number_[tracer_robot][traced_robot] = 1;
-      }
-      else
-      {
-        ++pairwise_sub_traceback_number_[tracer_robot][traced_robot];
-      }
-
-      // Abort is based on the fact that the location cannot be reached
-      // 1 or 2
-      if (msg->aborted)
-      {
-        // 1. abort with enough consecutive count
-        if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+        /** just for finding min_it */
         {
-          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. abort with enough consecutive count");
+          // Get current pose
+          geometry_msgs::Pose pose = getRobotPose(tracer_robot);
 
-          pairwise_abort_[tracer_robot][traced_robot] = 0;
+          size_t tracer_robot_index;
+          size_t traced_robot_index;
+          for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+          {
+            if (it->second == tracer_robot)
+            {
+              tracer_robot_index = it->first;
+            }
+            else if (it->second == traced_robot)
+            {
+              traced_robot_index = it->first;
+            }
+          }
+          std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
+          cv::Mat mat_transform = mat_transforms[traced_robot_index];
 
-          // Allow more time for normal exploration to prevent being stuck at local optimums
-          pairwise_paused_[tracer_robot][traced_robot] = true;
-          pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-              ros::Duration(60, 0),
-              [this, tracer_robot, traced_robot](const ros::TimerEvent &)
-              { pairwise_paused_[tracer_robot][traced_robot] = false; },
-              true);
+          cv::Mat pose_src(3, 1, CV_64F);
+          pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
+          pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
+          pose_src.at<double>(2, 0) = 1.0;
 
-          pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
-          pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
+          cv::Mat pose_dst = mat_transform * pose_src;
+          pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
+          pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
+          pose_dst.at<double>(0, 0) += src_map_origin_x;
+          pose_dst.at<double>(1, 0) += src_map_origin_y;
+          // Also adjust the difference between the origins
+          pose_dst.at<double>(0, 0) += dst_map_origin_x;
+          pose_dst.at<double>(1, 0) += dst_map_origin_y;
+          pose_dst.at<double>(0, 0) -= src_map_origin_x;
+          pose_dst.at<double>(1, 0) -= src_map_origin_y;
+
+          boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
+          double threshold_distance = abort_threshold_distance_; // Go to a location at least and minimally threshold_distance far.
+          robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
+        }
+        /** just for finding min_it END */
+
+        continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
+        // 2. abort without enough count END
+        return;
+      }
+    }
+    // 3 or 4 or 5 or 6 or 7
+    else
+    {
+      // pairwise_abort_[tracer_robot][traced_robot] = 0;
+
+      std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+
+      // get cv images
+      cv_bridge::CvImageConstPtr cv_ptr_tracer = sensorImageToCvImagePtr(msg->tracer_image);
+      cv_bridge::CvImageConstPtr cv_ptr_traced = sensorImageToCvImagePtr(msg->traced_image);
+      cv_bridge::CvImageConstPtr cv_ptr_depth_tracer = sensorImageToCvImagePtr(msg->tracer_depth_image);
+      cv_bridge::CvImageConstPtr cv_ptr_depth_traced = sensorImageToCvImagePtr(msg->traced_depth_image);
+      //
+
+      geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
+      double yaw = quaternionToYaw(goal_q);
+      TransformNeeded transform_needed;
+      transform_needed.arrived_x = arrived_pose.position.x;
+      transform_needed.arrived_y = arrived_pose.position.y;
+
+      MatchAndSolveResult result = camera_image_processor_.matchAndSolve(cv_ptr_tracer->image, cv_ptr_traced->image, cv_ptr_depth_tracer->image, cv_ptr_depth_traced->image, FeatureType::SURF, essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
+
+      {
+        std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_transform_needed_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+        if (fw.is_open())
+        {
+          fw << "transform_needed in global coordinates (x, y, r) = (" << transform_needed.tx << ", " << transform_needed.ty << ", " << transform_needed.r << ")" << std::endl;
+          fw.close();
+        }
+      }
+
+      // 3 or 4
+      if (result.match && result.solved)
+      {
+        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer.png",
+                    cv_ptr_tracer->image);
+        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced.png",
+                    cv_ptr_traced->image);
+        cv::Mat colorized_depth_tracer;
+        cv_ptr_depth_tracer->image.convertTo(colorized_depth_tracer, CV_8U, 255.0 / 5.0);
+        cv::cvtColor(colorized_depth_tracer, colorized_depth_tracer, cv::COLOR_GRAY2BGR);
+        cv::Mat colorized_depth_traced;
+        cv_ptr_depth_traced->image.convertTo(colorized_depth_traced, CV_8U, 255.0 / 5.0);
+        cv::cvtColor(colorized_depth_traced, colorized_depth_traced, cv::COLOR_GRAY2BGR);
+        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer_depth.png",
+                    colorized_depth_tracer);
+        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced_depth.png",
+                    colorized_depth_traced);
+
+        // 3. match and solved and accept
+        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count >= accept_count_needed_)
+        {
+          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "3. match and solved and accept");
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
+
+          int history_size = pairwise_transform_adjustment_result_history_[tracer_robot][traced_robot].size();
+          for (size_t i = 0; i < history_size; ++i)
+          {
+            TransformAdjustmentResult result = pairwise_transform_adjustment_result_history_[tracer_robot][traced_robot][i];
+            {
+              std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+              if (fw.is_open())
+              {
+                fw << "Index " << i << " transform_needed (tx, ty, r) = (" << result.transform_needed.tx << ", " << result.transform_needed.ty << ", " << result.transform_needed.r << ")" << std::endl;
+                fw.close();
+              }
+            }
+          }
+          for (size_t i = 0; i < history_size; ++i)
+          {
+            TransformAdjustmentResult result = pairwise_transform_adjustment_result_history_[tracer_robot][traced_robot][i];
+            cv::Mat adjusted_transform = result.adjusted_transform;
+            double tx = adjusted_transform.at<double>(0, 2);
+            double ty = adjusted_transform.at<double>(1, 2);
+            double r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
+
+            {
+              std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+              if (fw.is_open())
+              {
+                fw << "Index " << i << " adjusted transform (tx, ty, r) = (" << tx << ", " << ty << ", " << r << ")" << std::endl;
+                fw.close();
+              }
+            }
+          }
+
+          std::vector<double> x_values;
+          std::vector<double> y_values;
+          std::vector<double> tx_values;
+          std::vector<double> ty_values;
+          std::vector<double> r_values;
+          for (size_t i = 0; i < history_size; ++i)
+          {
+            TransformAdjustmentResult result = pairwise_transform_adjustment_result_history_[tracer_robot][traced_robot][i];
+            cv::Mat adjusted_transform = result.adjusted_transform;
+            double arrived_x = result.transform_needed.arrived_x;
+            double arrived_y = result.transform_needed.arrived_y;
+            double tx = adjusted_transform.at<double>(0, 2);
+            double ty = adjusted_transform.at<double>(1, 2);
+            double r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
+
+            x_values.push_back(arrived_x);
+            y_values.push_back(arrived_y);
+            tx_values.push_back(tx);
+            ty_values.push_back(ty);
+            r_values.push_back(r);
+          }
+
+          cv::Mat world_transform = pairwise_transform_adjustment_result_history_[tracer_robot][traced_robot][0].world_transform;
+          double init_tx = world_transform.at<double>(0, 2);
+          double init_ty = world_transform.at<double>(1, 2);
+          double init_r = atan2(world_transform.at<double>(1, 0), world_transform.at<double>(0, 0));
+
+          std::vector<double> optimized_tx_ty_r = camera_image_processor_.LMOptimize(x_values, y_values, tx_values, ty_values, r_values, init_tx, init_ty, init_r);
+
+          double optimized_tx = optimized_tx_ty_r[0];
+          double optimized_ty = optimized_tx_ty_r[1];
+          double optimized_r = optimized_tx_ty_r[2];
+
+          // Compute transformation from optimized (tx, ty, r)
+          cv::Mat optimized_transform(3, 3, CV_64F);
+          optimized_transform.at<double>(0, 0) = cos(optimized_r);
+          optimized_transform.at<double>(0, 1) = -sin(optimized_r);
+          optimized_transform.at<double>(0, 2) = optimized_tx;
+          optimized_transform.at<double>(1, 0) = sin(optimized_r);
+          optimized_transform.at<double>(1, 1) = cos(optimized_r);
+          optimized_transform.at<double>(1, 2) = optimized_ty;
+          optimized_transform.at<double>(2, 0) = 0;
+          optimized_transform.at<double>(2, 1) = 0;
+          optimized_transform.at<double>(2, 2) = 1;
+
+          //
+          transform_estimator_.updateBestTransforms(optimized_transform, tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
+          //
+
+          {
+            std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+              fw << "Unadjusted transform:" << std::endl;
+              if (history_size != 0)
+              {
+                fw << world_transform.at<double>(0, 0) << "\t" << world_transform.at<double>(0, 1) << "\t" << world_transform.at<double>(0, 2) << std::endl;
+                fw << world_transform.at<double>(1, 0) << "\t" << world_transform.at<double>(1, 1) << "\t" << world_transform.at<double>(1, 2) << std::endl;
+                fw << world_transform.at<double>(2, 0) << "\t" << world_transform.at<double>(2, 1) << "\t" << world_transform.at<double>(2, 2) << std::endl;
+              }
+              else
+              {
+                fw << "None because history size is 0, which should not happen!" << std::endl;
+              }
+              fw << "Optimized (tx, ty, r) = (" << optimized_tx << ", " << optimized_ty << ", " << optimized_r << ")" << std::endl;
+              fw << "Optimized transform:" << std::endl;
+              fw << optimized_transform.at<double>(0, 0) << "\t" << optimized_transform.at<double>(0, 1) << "\t" << optimized_transform.at<double>(0, 2) << std::endl;
+              fw << optimized_transform.at<double>(1, 0) << "\t" << optimized_transform.at<double>(1, 1) << "\t" << optimized_transform.at<double>(1, 2) << std::endl;
+              fw << optimized_transform.at<double>(2, 0) << "\t" << optimized_transform.at<double>(2, 1) << "\t" << optimized_transform.at<double>(2, 2) << std::endl;
+              fw.close();
+            }
+          }
+
+          evaluateWithGroundTruth(world_transform, optimized_transform, tracer_robot, traced_robot, current_time);
+
+          if (has_best_transforms_.size() == resolutions_.size())
+          {
+            std::vector<std::string> robot_names;
+            std::vector<double> m_00;
+            std::vector<double> m_01;
+            std::vector<double> m_02;
+            std::vector<double> m_10;
+            std::vector<double> m_11;
+            std::vector<double> m_12;
+            std::vector<double> m_20;
+            std::vector<double> m_21;
+            std::vector<double> m_22;
+            for (auto it = best_transforms_[tracer_robot].begin(); it != best_transforms_[tracer_robot].end(); ++it)
+            {
+              std::string dst_robot = it->first;
+              cv::Mat dst_transform = it->second;
+              robot_names.push_back(dst_robot);
+              m_00.push_back(dst_transform.at<double>(0, 0));
+              m_01.push_back(dst_transform.at<double>(0, 1));
+              m_02.push_back(dst_transform.at<double>(0, 2));
+              m_10.push_back(dst_transform.at<double>(1, 0));
+              m_11.push_back(dst_transform.at<double>(1, 1));
+              m_12.push_back(dst_transform.at<double>(1, 2));
+              m_20.push_back(dst_transform.at<double>(2, 0));
+              m_21.push_back(dst_transform.at<double>(2, 1));
+              m_22.push_back(dst_transform.at<double>(2, 2));
+
+              {
+                std::ofstream fw("Best_transforms_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot.txt", std::ofstream::app);
+                if (fw.is_open())
+                {
+                  fw << "Best transform from " << tracer_robot << " to " << dst_robot << " :" << std::endl;
+                  fw << dst_transform.at<double>(0, 0) << "\t" << dst_transform.at<double>(0, 1) << "\t" << dst_transform.at<double>(0, 2) << std::endl;
+                  fw << dst_transform.at<double>(1, 0) << "\t" << dst_transform.at<double>(1, 1) << "\t" << dst_transform.at<double>(1, 2) << std::endl;
+                  fw << dst_transform.at<double>(2, 0) << "\t" << dst_transform.at<double>(2, 1) << "\t" << dst_transform.at<double>(2, 2) << std::endl;
+                  fw.close();
+                }
+              }
+            }
+
+            traceback_msgs::TracebackTransforms traceback_transforms;
+            traceback_transforms.robot_names = robot_names;
+            traceback_transforms.m_00 = m_00;
+            traceback_transforms.m_01 = m_01;
+            traceback_transforms.m_02 = m_02;
+            traceback_transforms.m_10 = m_10;
+            traceback_transforms.m_11 = m_11;
+            traceback_transforms.m_12 = m_12;
+            traceback_transforms.m_20 = m_20;
+            traceback_transforms.m_21 = m_21;
+            traceback_transforms.m_22 = m_22;
+
+            traceback_transforms_publisher_.publish(traceback_transforms);
+          }
+
           robots_to_in_traceback_[tracer_robot] = false;
-          // 1. abort with enough consecutive count END
+          // 3. match and solved and accept END
           return;
         }
-        // 2. abort without enough consecutive count
+        // 4. match and solved but not yet accept
         else
         {
-          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. abort without enough consecutive count");
+          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "4. match and solved but not yet accept");
 
-          // pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-          //     ros::Duration(60, 0),
-          //     [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
-          //     {
-          //       /** just for finding min_it */
-          //       {
-          //         // Get current pose
-          //         geometry_msgs::Pose pose = getRobotPose(tracer_robot);
-
-          //         size_t tracer_robot_index;
-          //         size_t traced_robot_index;
-          //         for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
-          //         {
-          //           if (it->second == tracer_robot)
-          //           {
-          //             tracer_robot_index = it->first;
-          //           }
-          //           else if (it->second == traced_robot)
-          //           {
-          //             traced_robot_index = it->first;
-          //           }
-          //         }
-          //         std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-          //         cv::Mat mat_transform = mat_transforms[traced_robot_index];
-
-          //         cv::Mat pose_src(3, 1, CV_64F);
-          //         pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
-          //         pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
-          //         pose_src.at<double>(2, 0) = 1.0;
-
-          //         cv::Mat pose_dst = mat_transform * pose_src;
-          //         pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
-          //         pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
-          //         pose_dst.at<double>(0, 0) += src_map_origin_x;
-          //         pose_dst.at<double>(1, 0) += src_map_origin_y;
-          //         // Also adjust the difference between the origins
-          //         pose_dst.at<double>(0, 0) += dst_map_origin_x;
-          //         pose_dst.at<double>(1, 0) += dst_map_origin_y;
-          //         pose_dst.at<double>(0, 0) -= src_map_origin_x;
-          //         pose_dst.at<double>(1, 0) -= src_map_origin_y;
-
-          //         boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-          //         double threshold_distance = 3.0; // Go to a location at least and minimally threshold_distance far.
-          //         robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
-          //       }
-          //       /** just for finding min_it END */
-
-          //       continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
-          //     },
-          //     true);
-
-          /** just for finding min_it */
           {
-            // Get current pose
-            geometry_msgs::Pose pose = getRobotPose(tracer_robot);
-
             size_t tracer_robot_index;
             size_t traced_robot_index;
             for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
@@ -209,1098 +405,58 @@ namespace traceback
                 traced_robot_index = it->first;
               }
             }
+
             std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
+
+            // Convert OpenCV transform to world transform, considering the origins
             cv::Mat mat_transform = mat_transforms[traced_robot_index];
+            cv::Mat world_transform;
+            imageTransformToMapTransform(mat_transform, world_transform, resolutions_[tracer_robot_index], resolutions_[traced_robot_index], src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+            //
 
-            cv::Mat pose_src(3, 1, CV_64F);
-            pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
-            pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
-            pose_src.at<double>(2, 0) = 1.0;
+            double arrived_yaw = quaternionToYaw(arrived_pose.orientation);
 
-            cv::Mat pose_dst = mat_transform * pose_src;
-            pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
-            pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
-            pose_dst.at<double>(0, 0) += src_map_origin_x;
-            pose_dst.at<double>(1, 0) += src_map_origin_y;
-            // Also adjust the difference between the origins
-            pose_dst.at<double>(0, 0) += dst_map_origin_x;
-            pose_dst.at<double>(1, 0) += dst_map_origin_y;
-            pose_dst.at<double>(0, 0) -= src_map_origin_x;
-            pose_dst.at<double>(1, 0) -= src_map_origin_y;
-
-            boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-            double threshold_distance = abort_threshold_distance_; // Go to a location at least and minimally threshold_distance far.
-            robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
+            cv::Mat adjusted_transform;
+            findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, arrived_pose.position.x, arrived_pose.position.y, resolutions_[tracer_robot_index]);
+            TransformAdjustmentResult result;
+            result.current_time = current_time;
+            result.transform_needed = transform_needed;
+            result.world_transform = world_transform;
+            result.adjusted_transform = adjusted_transform;
+            pairwise_transform_adjustment_result_history_[tracer_robot][traced_robot].push_back(result);
           }
-          /** just for finding min_it END */
 
-          continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
-          // 2. abort without enough consecutive count END
+          continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+          // 4. match and solved but not yet accept END
           return;
         }
       }
-      // 3 or 4 or 5 or 6
+      // 5. match but cannot solved
+      else if (result.match && !result.solved)
+      {
+        writeTracebackFeedbackHistory(tracer_robot, traced_robot, "5. match but cannot solved");
+        continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+        // 5. match but cannot solved END
+      }
+      // 6 or 7
       else
       {
-        // pairwise_abort_[tracer_robot][traced_robot] = 0;
-
-        std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-
-        // get cv images
-        cv_bridge::CvImageConstPtr cv_ptr_tracer = sensorImageToCvImagePtr(msg->tracer_image);
-        cv_bridge::CvImageConstPtr cv_ptr_traced = sensorImageToCvImagePtr(msg->traced_image);
-        cv_bridge::CvImageConstPtr cv_ptr_depth_tracer = sensorImageToCvImagePtr(msg->tracer_depth_image);
-        cv_bridge::CvImageConstPtr cv_ptr_depth_traced = sensorImageToCvImagePtr(msg->traced_depth_image);
-        //
-
-        geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
-        double yaw = quaternionToYaw(goal_q);
-        TransformNeeded transform_needed;
-        // double match_score;
-        // Need to match both images and point clouds.
-        // bool is_image_match = camera_image_processor_.matchImage(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
-        //                                                          essential_mat_confidence_threshold_, tracer_robot, traced_robot, current_time);
-
-        // TODO solvepnp and update transform_needed
-        // TODO debug save tracer depth image and traced depth image first
-        bool is_image_match = camera_image_processor_.matchImageAndSolve(cv_ptr_tracer->image, cv_ptr_traced->image, cv_ptr_depth_tracer->image, cv_ptr_depth_traced->image, FeatureType::SURF, essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
-
-        // bool is_point_cloud_match = camera_image_processor_.pointCloudMatching(msg->tracer_point_cloud, msg->traced_point_cloud, point_cloud_match_score_, yaw, transform_needed, match_score, tracer_robot, traced_robot, current_time);
-
-        bool is_match = is_image_match;
+        // 6. does not match and reject
+        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count + pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
         {
-          std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_ICP_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-          if (fw.is_open())
-          {
-            fw << "transform_needed in global coordinates (x, y, r) = (" << transform_needed.tx << ", " << transform_needed.ty << ", " << transform_needed.r << ")" << std::endl;
-            fw.close();
-          }
+          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "6. does not match and reject");
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
+          robots_to_in_traceback_[tracer_robot] = false;
+          // 6. does not match and reject END
+          return;
         }
-
-        // 3 or 4 or 5
-        if (is_match)
-        {
-          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer.png",
-                      cv_ptr_tracer->image);
-          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced.png",
-                      cv_ptr_traced->image);
-          cv::Mat colorized_depth_tracer;
-          cv_ptr_depth_tracer->image.convertTo(colorized_depth_tracer, CV_8U, 255.0 / 5.0);
-          cv::cvtColor(colorized_depth_tracer, colorized_depth_tracer, cv::COLOR_GRAY2BGR);
-          cv::Mat colorized_depth_traced;
-          cv_ptr_depth_traced->image.convertTo(colorized_depth_traced, CV_8U, 255.0 / 5.0);
-          cv::cvtColor(colorized_depth_traced, colorized_depth_traced, cv::COLOR_GRAY2BGR);
-          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer_depth.png",
-                      colorized_depth_tracer);
-          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced_depth.png",
-                      colorized_depth_traced);
-          // bool is_close = abs(transform_needed.tx) < point_cloud_close_translation_ && abs(transform_needed.ty) < point_cloud_close_translation_ && abs(transform_needed.r) < point_cloud_close_rotation_;
-          // is_close = is_close || match_score < point_cloud_close_score_;
-          bool is_close = true;
-          // 3 or 4
-          if (is_close)
-          {
-            // 3. accept (match and close)
-            if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count >= accept_count_needed_)
-            {
-              writeTracebackFeedbackHistory(tracer_robot, traced_robot, "3. accept (match and close)");
-              pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
-
-              // TODO LM optimization
-
-              // Sort results and only keep the middle values, then take average.
-              int history_size = pairwise_triangulation_result_history_[tracer_robot][traced_robot].size();
-              double tx_arr[history_size];
-              double ty_arr[history_size];
-              double r_arr[history_size];
-              for (size_t i = 0; i < history_size; ++i)
-              {
-                TransformAdjustmentResult result = pairwise_triangulation_result_history_[tracer_robot][traced_robot][i];
-                {
-                  std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-                  if (fw.is_open())
-                  {
-                    fw << "Index " << i << " transform_needed (tx, ty, r) = (" << result.transform_needed.tx << ", " << result.transform_needed.ty << ", " << result.transform_needed.r << ")" << std::endl;
-                    fw.close();
-                  }
-                }
-              }
-              for (size_t i = 0; i < history_size; ++i)
-              {
-                TransformAdjustmentResult result = pairwise_triangulation_result_history_[tracer_robot][traced_robot][i];
-                cv::Mat adjusted_transform = result.adjusted_transform;
-                double tx = adjusted_transform.at<double>(0, 2);
-                double ty = adjusted_transform.at<double>(1, 2);
-                double r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
-
-                {
-                  std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-                  if (fw.is_open())
-                  {
-                    fw << "Index " << i << " adjusted transform (tx, ty, r) = (" << tx << ", " << ty << ", " << r << ")" << std::endl;
-                    fw.close();
-                  }
-                }
-
-                tx_arr[i] = tx;
-                ty_arr[i] = ty;
-                r_arr[i] = r;
-              }
-              std::sort(tx_arr, tx_arr + history_size);
-              std::sort(ty_arr, ty_arr + history_size);
-              std::sort(r_arr, r_arr + history_size);
-
-              // e.g. 9: keeps 7, 12: keeps 8.
-              int number_to_discard_per_side = history_size / 6;
-              int number_to_keep = history_size - number_to_discard_per_side * 2;
-              int begin_index = (history_size - number_to_keep) / 2;
-              // inc
-              int end_index = begin_index + number_to_keep - 1;
-
-              double average_tx = 0;
-              double average_ty = 0;
-              double average_r = 0;
-              for (int i = begin_index; i <= end_index; ++i)
-              {
-                average_tx += tx_arr[i];
-                average_ty += ty_arr[i];
-                average_r += r_arr[i];
-              }
-              assert(number_to_keep != 0);
-              average_tx /= number_to_keep;
-              average_ty /= number_to_keep;
-              average_r /= number_to_keep;
-
-              // Compute transformation from average (tx, ty, r)
-              cv::Mat average_adjusted_transform(3, 3, CV_64F);
-              average_adjusted_transform.at<double>(0, 0) = cos(average_r);
-              average_adjusted_transform.at<double>(0, 1) = -sin(average_r);
-              average_adjusted_transform.at<double>(0, 2) = average_tx;
-              average_adjusted_transform.at<double>(1, 0) = sin(average_r);
-              average_adjusted_transform.at<double>(1, 1) = cos(average_r);
-              average_adjusted_transform.at<double>(1, 2) = average_ty;
-              average_adjusted_transform.at<double>(2, 0) = 0;
-              average_adjusted_transform.at<double>(2, 1) = 0;
-              average_adjusted_transform.at<double>(2, 2) = 1;
-
-              //
-              transform_estimator_.updateBestTransforms(average_adjusted_transform, tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
-              //
-
-              cv::Mat world_transform = pairwise_triangulation_result_history_[tracer_robot][traced_robot][0].world_transform;
-              {
-                std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-                if (fw.is_open())
-                {
-                  fw << "Unadjusted transform:" << std::endl;
-                  if (history_size != 0)
-                  {
-                    fw << world_transform.at<double>(0, 0) << "\t" << world_transform.at<double>(0, 1) << "\t" << world_transform.at<double>(0, 2) << std::endl;
-                    fw << world_transform.at<double>(1, 0) << "\t" << world_transform.at<double>(1, 1) << "\t" << world_transform.at<double>(1, 2) << std::endl;
-                    fw << world_transform.at<double>(2, 0) << "\t" << world_transform.at<double>(2, 1) << "\t" << world_transform.at<double>(2, 2) << std::endl;
-                  }
-                  else
-                  {
-                    fw << "None because history size is 0, which should not happen!" << std::endl;
-                  }
-                  fw << "Average (tx, ty, r) = (" << average_tx << ", " << average_ty << ", " << average_r << ")" << std::endl;
-                  fw << "Adjusted transform using average:" << std::endl;
-                  fw << average_adjusted_transform.at<double>(0, 0) << "\t" << average_adjusted_transform.at<double>(0, 1) << "\t" << average_adjusted_transform.at<double>(0, 2) << std::endl;
-                  fw << average_adjusted_transform.at<double>(1, 0) << "\t" << average_adjusted_transform.at<double>(1, 1) << "\t" << average_adjusted_transform.at<double>(1, 2) << std::endl;
-                  fw << average_adjusted_transform.at<double>(2, 0) << "\t" << average_adjusted_transform.at<double>(2, 1) << "\t" << average_adjusted_transform.at<double>(2, 2) << std::endl;
-                  fw.close();
-                }
-              }
-
-              evaluateWithGroundTruth(world_transform, average_adjusted_transform, tracer_robot, traced_robot, current_time);
-
-              if (has_best_transforms_.size() == resolutions_.size())
-              {
-                std::vector<std::string> robot_names;
-                std::vector<double> m_00;
-                std::vector<double> m_01;
-                std::vector<double> m_02;
-                std::vector<double> m_10;
-                std::vector<double> m_11;
-                std::vector<double> m_12;
-                std::vector<double> m_20;
-                std::vector<double> m_21;
-                std::vector<double> m_22;
-                for (auto it = best_transforms_[tracer_robot].begin(); it != best_transforms_[tracer_robot].end(); ++it)
-                {
-                  std::string dst_robot = it->first;
-                  cv::Mat dst_transform = it->second;
-                  robot_names.push_back(dst_robot);
-                  m_00.push_back(dst_transform.at<double>(0, 0));
-                  m_01.push_back(dst_transform.at<double>(0, 1));
-                  m_02.push_back(dst_transform.at<double>(0, 2));
-                  m_10.push_back(dst_transform.at<double>(1, 0));
-                  m_11.push_back(dst_transform.at<double>(1, 1));
-                  m_12.push_back(dst_transform.at<double>(1, 2));
-                  m_20.push_back(dst_transform.at<double>(2, 0));
-                  m_21.push_back(dst_transform.at<double>(2, 1));
-                  m_22.push_back(dst_transform.at<double>(2, 2));
-
-                  {
-                    std::ofstream fw("Best_transforms_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot.txt", std::ofstream::app);
-                    if (fw.is_open())
-                    {
-                      fw << "Best transform from " << tracer_robot << " to " << dst_robot << " :" << std::endl;
-                      fw << dst_transform.at<double>(0, 0) << "\t" << dst_transform.at<double>(0, 1) << "\t" << dst_transform.at<double>(0, 2) << std::endl;
-                      fw << dst_transform.at<double>(1, 0) << "\t" << dst_transform.at<double>(1, 1) << "\t" << dst_transform.at<double>(1, 2) << std::endl;
-                      fw << dst_transform.at<double>(2, 0) << "\t" << dst_transform.at<double>(2, 1) << "\t" << dst_transform.at<double>(2, 2) << std::endl;
-                      fw.close();
-                    }
-                  }
-                }
-
-                traceback_msgs::TracebackTransforms traceback_transforms;
-                traceback_transforms.robot_names = robot_names;
-                traceback_transforms.m_00 = m_00;
-                traceback_transforms.m_01 = m_01;
-                traceback_transforms.m_02 = m_02;
-                traceback_transforms.m_10 = m_10;
-                traceback_transforms.m_11 = m_11;
-                traceback_transforms.m_12 = m_12;
-                traceback_transforms.m_20 = m_20;
-                traceback_transforms.m_21 = m_21;
-                traceback_transforms.m_22 = m_22;
-
-                traceback_transforms_publisher_.publish(traceback_transforms);
-              }
-
-              robots_to_in_traceback_[tracer_robot] = false;
-              // 3. accept (match and close) END
-              return;
-            }
-            // 4. match and close but not yet accept
-            else
-            {
-              writeTracebackFeedbackHistory(tracer_robot, traced_robot, "4. match and close but not yet accept");
-
-              {
-                size_t tracer_robot_index;
-                size_t traced_robot_index;
-                for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
-                {
-                  if (it->second == tracer_robot)
-                  {
-                    tracer_robot_index = it->first;
-                  }
-                  else if (it->second == traced_robot)
-                  {
-                    traced_robot_index = it->first;
-                  }
-                }
-
-                std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-
-                // Convert OpenCV transform to world transform, considering the origins
-                cv::Mat mat_transform = mat_transforms[traced_robot_index];
-                cv::Mat world_transform;
-                imageTransformToMapTransform(mat_transform, world_transform, resolutions_[tracer_robot_index], resolutions_[traced_robot_index], src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-                //
-
-                // Compute transform needed by the difference between current arrived pose and the
-                // first arrived pose, plus the transform_needed (which is already small).
-                geometry_msgs::Pose first_pose = pairwise_first_traceback_arrived_pose_[tracer_robot][traced_robot];
-                double arrived_yaw = quaternionToYaw(arrived_pose.orientation);
-                double first_yaw = quaternionToYaw(first_pose.orientation);
-
-                double pose_difference_x = arrived_pose.position.x - first_pose.position.x;
-                double pose_difference_y = arrived_pose.position.y - first_pose.position.y;
-                double pose_difference_r = arrived_yaw - first_yaw;
-                double tx = pose_difference_x + transform_needed.tx;
-                double ty = pose_difference_y + transform_needed.ty;
-                double r = pose_difference_r + transform_needed.r;
-                TransformNeeded total_transform_needed;
-                total_transform_needed.tx = tx;
-                total_transform_needed.ty = ty;
-                total_transform_needed.r = r;
-
-                double length_of_translation = sqrt(tx * tx + ty * ty);
-                cv::Mat adjusted_transform;
-                findAdjustedTransformation(world_transform, adjusted_transform, length_of_translation, tx / length_of_translation, ty / length_of_translation, r, first_pose.position.x, first_pose.position.y, resolutions_[tracer_robot_index]);
-                TransformAdjustmentResult result;
-                result.current_time = current_time;
-                result.transform_needed = total_transform_needed;
-                result.world_transform = world_transform;
-                result.adjusted_transform = adjusted_transform;
-                pairwise_triangulation_result_history_[tracer_robot][traced_robot].push_back(result);
-              }
-
-              continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-              // 4. match and close but not yet accept END
-              return;
-            }
-          }
-          // 5. match and not close
-          else
-          {
-            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "5. match and not close - traceback number " + std::to_string(pairwise_sub_traceback_number_[tracer_robot][traced_robot]) + " - " + "arrived_pose (x, y, r) = (" + std::to_string(arrived_pose.position.x) + ", " + std::to_string(arrived_pose.position.y) + ", " + std::to_string(quaternionToYaw(arrived_pose.orientation)) + ")");
-
-            move_base_msgs::MoveBaseGoal goal;
-            geometry_msgs::PoseStamped new_pose_stamped;
-            new_pose_stamped.pose = arrived_pose;
-
-            // Walk for a shorter distance
-            double walk_factor = 1.0;
-
-            // Rotate by r degree
-            geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
-            geometry_msgs::Quaternion transform_q;
-            tf2::Quaternion tf2_goal_q;
-            tf2_goal_q.setW(goal_q.w);
-            tf2_goal_q.setX(goal_q.x);
-            tf2_goal_q.setY(goal_q.y);
-            tf2_goal_q.setZ(goal_q.z);
-            tf2::Quaternion tf2_transform_q;
-            tf2_transform_q.setRPY(0.0, 0.0, transform_needed.r * walk_factor);
-            tf2::Quaternion tf2_new_q = tf2_transform_q * tf2_goal_q;
-            geometry_msgs::Quaternion new_q;
-            new_q.w = tf2_new_q.w();
-            new_q.x = tf2_new_q.x();
-            new_q.y = tf2_new_q.y();
-            new_q.z = tf2_new_q.z();
-            new_pose_stamped.pose.orientation = new_q;
-            //
-
-            new_pose_stamped.pose.position.x += transform_needed.tx * walk_factor;
-            new_pose_stamped.pose.position.y += transform_needed.ty * walk_factor;
-            new_pose_stamped.header.frame_id = tracer_robot.substr(1) + tracer_robot + "/map";
-            new_pose_stamped.header.stamp = ros::Time::now();
-            goal.target_pose = new_pose_stamped;
-
-            // abort timeout
-            double distance_to_goal;
-            int abort_timeout;
-            {
-              geometry_msgs::Pose pose = getRobotPose(tracer_robot);
-              double current_x = pose.position.x;
-              double current_y = pose.position.y;
-              distance_to_goal = sqrt(pow(current_x - new_pose_stamped.pose.position.x, 2) + pow(current_y - new_pose_stamped.pose.position.y, 2));
-            }
-            // Abort timeout allowed based on distance to goal
-            // in seconds
-            // HARDCODE the formula currently
-            abort_timeout = 30 + 5 * distance_to_goal;
-            // abort timeout END
-
-            traceback_msgs::GoalAndImage goal_and_image;
-            goal_and_image.goal = goal;
-            goal_and_image.image = msg->traced_image;
-            goal_and_image.depth_image = msg->traced_depth_image;
-            // goal_and_image.point_cloud = msg->traced_point_cloud;
-            goal_and_image.tracer_robot = tracer_robot;
-            goal_and_image.traced_robot = traced_robot;
-            goal_and_image.src_map_origin_x = src_map_origin_x;
-            goal_and_image.src_map_origin_y = src_map_origin_y;
-            goal_and_image.dst_map_origin_x = dst_map_origin_x;
-            goal_and_image.dst_map_origin_y = dst_map_origin_y;
-            goal_and_image.abort_timeout = abort_timeout;
-            goal_and_image.stamp = msg->stamp;
-            goal_and_image.second_traceback = true;
-            ROS_DEBUG("Goal and image to be sent");
-
-            /** Visualize goal in src robot frame */
-            visualizeGoal(new_pose_stamped, tracer_robot);
-            /** Visualize goal in src robot frame END */
-            robots_to_goal_and_image_publisher_[tracer_robot].publish(goal_and_image);
-
-            // 5. match and not close END
-            return;
-          }
-        }
-        // Does not match
-        // 6 or 7
+        // 7. does not match but not yet reject
         else
         {
-          // 6. reject
-          if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count + pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
-          {
-            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "6. reject");
-            pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
-            pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
-            robots_to_in_traceback_[tracer_robot] = false;
-            // 6. reject END
-            return;
-          }
-          // 7. does not match but not yet reject
-          else
-          {
-            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "7. does not match but not yet reject");
-            continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-            // 7. does not match but not yet reject END
-            return;
-          }
-        }
-      }
-    }
-    /*
-
-
-
-
-    */
-    else if (adjustment_mode_ == "triangulation")
-    {
-      std::string tracer_robot = msg->tracer_robot;
-      std::string traced_robot = msg->traced_robot;
-      double src_map_origin_x = msg->src_map_origin_x;
-      double src_map_origin_y = msg->src_map_origin_y;
-      double dst_map_origin_x = msg->dst_map_origin_x;
-      double dst_map_origin_y = msg->dst_map_origin_y;
-      geometry_msgs::Pose arrived_pose = msg->arrived_pose;
-
-      // 1 or 2 or 3 or 4 or 5
-      if (!msg->second_traceback)
-      {
-        ROS_INFO("First traceback done for tracer %s", tracer_robot.c_str());
-        ROS_INFO("Abort = %s", msg->aborted ? "true" : "false");
-
-        {
-          ROS_DEBUG("Arrived position (x, y) = (%f, %f)", arrived_pose.position.x, arrived_pose.position.y);
-          ROS_DEBUG("Arrived orientation (x, y, z, w) = (%f, %f, %f, %f)", arrived_pose.orientation.x, arrived_pose.orientation.y, arrived_pose.orientation.z, arrived_pose.orientation.w);
-        }
-
-        // Mark this min_index as visited so that it will not be repeatedly visited again and again.
-        // Also valid for aborted goal
-        // Only do for the first traceback
-        auto all = camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.find(traced_robot);
-        if (all != camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.end())
-        {
-          all->second.emplace(msg->stamp);
-        }
-        else
-        {
-          camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_.insert({traced_robot, {}});
-          camera_image_processor_.robots_to_all_visited_pose_image_pair_indexes_[traced_robot].emplace(msg->stamp);
-        }
-        // END
-
-        // Abort is based on the fact that the location cannot be reached
-        // 1 or 2
-        if (msg->aborted)
-        {
-          // 1. first traceback, abort with enough consecutive count
-          if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
-          {
-            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. first traceback, abort with enough consecutive count");
-
-            pairwise_abort_[tracer_robot][traced_robot] = 0;
-
-            // Allow more time for normal exploration to prevent being stuck at local optimums
-            pairwise_paused_[tracer_robot][traced_robot] = true;
-            pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-                ros::Duration(60, 0),
-                [this, tracer_robot, traced_robot](const ros::TimerEvent &)
-                { pairwise_paused_[tracer_robot][traced_robot] = false; },
-                true);
-
-            pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
-            pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
-            robots_to_in_traceback_[tracer_robot] = false;
-            // 1. first traceback, abort with enough consecutive count END
-            return;
-          }
-          // 2. first traceback, abort without enough consecutive count
-          else
-          {
-            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "2. first traceback, abort without enough consecutive count");
-
-            // pairwise_resume_timer_[tracer_robot][traced_robot] = node_.createTimer(
-            //     ros::Duration(60, 0),
-            //     [this, tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y](const ros::TimerEvent &)
-            //     {
-            //       /** just for finding min_it */
-            //       {
-            //         // Get current pose
-            //         geometry_msgs::Pose pose = getRobotPose(tracer_robot);
-
-            //         size_t tracer_robot_index;
-            //         size_t traced_robot_index;
-            //         for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
-            //         {
-            //           if (it->second == tracer_robot)
-            //           {
-            //             tracer_robot_index = it->first;
-            //           }
-            //           else if (it->second == traced_robot)
-            //           {
-            //             traced_robot_index = it->first;
-            //           }
-            //         }
-            //         std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-            //         cv::Mat mat_transform = mat_transforms[traced_robot_index];
-
-            //         cv::Mat pose_src(3, 1, CV_64F);
-            //         pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
-            //         pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
-            //         pose_src.at<double>(2, 0) = 1.0;
-
-            //         cv::Mat pose_dst = mat_transform * pose_src;
-            //         pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
-            //         pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
-            //         pose_dst.at<double>(0, 0) += src_map_origin_x;
-            //         pose_dst.at<double>(1, 0) += src_map_origin_y;
-            //         // Also adjust the difference between the origins
-            //         pose_dst.at<double>(0, 0) += dst_map_origin_x;
-            //         pose_dst.at<double>(1, 0) += dst_map_origin_y;
-            //         pose_dst.at<double>(0, 0) -= src_map_origin_x;
-            //         pose_dst.at<double>(1, 0) -= src_map_origin_y;
-
-            //         boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-            //         double threshold_distance = 3.0; // Go to a location at least and minimally threshold_distance far.
-            //         robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
-            //       }
-            //       /** just for finding min_it END */
-
-            //       continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
-            //     },
-            //     true);
-
-            /** just for finding min_it */
-            {
-              // Get current pose
-              geometry_msgs::Pose pose = getRobotPose(tracer_robot);
-
-              size_t tracer_robot_index;
-              size_t traced_robot_index;
-              for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
-              {
-                if (it->second == tracer_robot)
-                {
-                  tracer_robot_index = it->first;
-                }
-                else if (it->second == traced_robot)
-                {
-                  traced_robot_index = it->first;
-                }
-              }
-              std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-              cv::Mat mat_transform = mat_transforms[traced_robot_index];
-
-              cv::Mat pose_src(3, 1, CV_64F);
-              pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
-              pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
-              pose_src.at<double>(2, 0) = 1.0;
-
-              cv::Mat pose_dst = mat_transform * pose_src;
-              pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
-              pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
-              pose_dst.at<double>(0, 0) += src_map_origin_x;
-              pose_dst.at<double>(1, 0) += src_map_origin_y;
-              // Also adjust the difference between the origins
-              pose_dst.at<double>(0, 0) += dst_map_origin_x;
-              pose_dst.at<double>(1, 0) += dst_map_origin_y;
-              pose_dst.at<double>(0, 0) -= src_map_origin_x;
-              pose_dst.at<double>(1, 0) -= src_map_origin_y;
-
-              boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[traced_robot]);
-              double threshold_distance = abort_threshold_distance_; // Go to a location at least and minimally threshold_distance far.
-              robots_to_current_it_[tracer_robot] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[traced_robot], threshold_distance, traced_robot, pose_dst);
-            }
-            /** just for finding min_it END */
-
-            continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y, true);
-            // 2. first traceback, abort without enough consecutive count END
-            return;
-          }
-        }
-        // 3 or 4 or 5
-        else
-        {
-          // pairwise_abort_[tracer_robot][traced_robot] = 0;
-
-          // Get cv images and analyze (first traceback, reflect in image filenames)
-          std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-
-          cv_bridge::CvImageConstPtr cv_ptr_tracer;
-          try
-          {
-            if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
-              cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
-            else
-              cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
-          }
-          catch (cv_bridge::Exception &e)
-          {
-            ROS_ERROR("cv_bridge exception: %s", e.what());
-            return;
-          }
-
-          // Process cv_ptr->image using OpenCV
-          ROS_INFO("Process cv_ptr->image using OpenCV");
-          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_first_traceback_" + tracer_robot.substr(1) + "_tracer.png",
-                      cv_ptr_tracer->image);
-
-          //
-          //
-          cv_bridge::CvImageConstPtr cv_ptr_traced;
-          try
-          {
-            if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
-              cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
-            else
-              cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
-          }
-          catch (cv_bridge::Exception &e)
-          {
-            ROS_ERROR("cv_bridge exception: %s", e.what());
-            return;
-          }
-
-          // Process cv_ptr->image using OpenCV
-          ROS_INFO("Process cv_ptr->image using OpenCV");
-          cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_first_traceback_" + traced_robot.substr(1) + "_traced.png",
-                      cv_ptr_traced->image);
-
-          geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
-          tf2::Quaternion tf_q;
-          tf_q.setW(goal_q.w);
-          tf_q.setX(goal_q.x);
-          tf_q.setY(goal_q.y);
-          tf_q.setZ(goal_q.z);
-          tf2::Matrix3x3 m(tf_q);
-          double roll, pitch, yaw;
-          m.getRPY(roll, pitch, yaw);
-
-          TransformNeeded transform_needed;
-          bool is_unwanted_translation_angle = false;
-          bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
-                                                                             essential_mat_confidence_threshold_, yaw, transform_needed, is_unwanted_translation_angle, tracer_robot, traced_robot, current_time);
-          // Get cv images and analyze END
-
-          if (is_match)
-          {
-            // 10. first traceback, match but unwanted translation angle
-            if (is_unwanted_translation_angle)
-            {
-              writeTracebackFeedbackHistory(tracer_robot, traced_robot, "10. first traceback, match but unwanted translation angle");
-              continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-              // 10. first traceback, match but unwanted translation angle END
-              return;
-            }
-            // 3. first traceback, match
-            else
-            {
-              writeTracebackFeedbackHistory(tracer_robot, traced_robot, "3. first traceback, match");
-              // Set new triangulation first result
-              {
-                FirstTracebackResult result;
-                result.first_x = arrived_pose.position.x;
-                result.first_y = arrived_pose.position.y;
-                result.first_tracer_to_traced_tx = transform_needed.tx;
-                result.first_tracer_to_traced_ty = transform_needed.ty;
-                result.first_tracer_to_traced_r = transform_needed.r;
-                pairwise_first_traceback_result_[tracer_robot][traced_robot] = result;
-              }
-
-              // Second traceback: after each match, navigate to a nearby location in order to
-              // estimate the absolute scale
-
-              move_base_msgs::MoveBaseGoal goal;
-              geometry_msgs::PoseStamped new_pose_stamped;
-              new_pose_stamped.pose = arrived_pose;
-
-              // Rotate by 30 degree
-              // geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
-              // geometry_msgs::Quaternion transform_q;
-              // tf2::Quaternion tf2_goal_q;
-              // tf2_goal_q.setW(goal_q.w);
-              // tf2_goal_q.setX(goal_q.x);
-              // tf2_goal_q.setY(goal_q.y);
-              // tf2_goal_q.setZ(goal_q.z);
-              // tf2::Quaternion tf2_transform_q;
-              // tf2_transform_q.setW(0.9659258 );
-              // tf2_transform_q.setX(0.0);
-              // tf2_transform_q.setY(0.0);
-              // tf2_transform_q.setZ(0.258819);
-              // tf2::Quaternion tf2_new_q = tf2_transform_q * tf2_goal_q;
-              // geometry_msgs::Quaternion new_q;
-              // new_q.w = tf2_new_q.w();
-              // new_q.x = tf2_new_q.x();
-              // new_q.y = tf2_new_q.y();
-              // new_q.z = tf2_new_q.z();
-              // new_pose_stamped.pose.orientation = new_q;
-              //
-
-              double distance = 0.25;
-              new_pose_stamped.pose.position.x -= cos(yaw) * distance;
-              new_pose_stamped.pose.position.y -= sin(yaw) * distance;
-              new_pose_stamped.header.frame_id = tracer_robot.substr(1) + tracer_robot + "/map";
-              new_pose_stamped.header.stamp = ros::Time::now();
-              goal.target_pose = new_pose_stamped;
-
-              // abort timeout
-              double distance_to_goal;
-              int abort_timeout;
-              {
-                geometry_msgs::Pose pose = getRobotPose(tracer_robot);
-                double current_x = pose.position.x;
-                double current_y = pose.position.y;
-                distance_to_goal = sqrt(pow(current_x - new_pose_stamped.pose.position.x, 2) + pow(current_y - new_pose_stamped.pose.position.y, 2));
-              }
-              // Abort timeout allowed based on distance to goal
-              // in seconds
-              // HARDCODE the formula currently
-              abort_timeout = 30 + 5 * distance_to_goal;
-              // abort timeout END
-
-              traceback_msgs::GoalAndImage goal_and_image;
-              goal_and_image.goal = goal;
-              goal_and_image.image = msg->traced_image;
-              goal_and_image.tracer_robot = tracer_robot;
-              goal_and_image.traced_robot = traced_robot;
-              goal_and_image.src_map_origin_x = src_map_origin_x;
-              goal_and_image.src_map_origin_y = src_map_origin_y;
-              goal_and_image.dst_map_origin_x = dst_map_origin_x;
-              goal_and_image.dst_map_origin_y = dst_map_origin_y;
-              goal_and_image.abort_timeout = abort_timeout;
-              goal_and_image.stamp = msg->stamp;
-              goal_and_image.second_traceback = true;
-              ROS_DEBUG("Goal and image to be sent");
-
-              /** Visualize goal in src robot frame */
-              visualizeGoal(new_pose_stamped, tracer_robot);
-              /** Visualize goal in src robot frame END */
-              robots_to_goal_and_image_publisher_[tracer_robot].publish(goal_and_image);
-
-              // 3. first traceback, match END
-              return;
-            }
-          }
-          // Reject if first traceback does not match
-          // 4 or 5
-          else
-          {
-            // Update AcceptRejectStatus
-            // Reject when reject count is at least reject_count_needed_ and reject count is at least two times accept count
-            // 4. first traceback, reject
-            if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count + pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
-            {
-              writeTracebackFeedbackHistory(tracer_robot, traced_robot, "4. first traceback, reject");
-              pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
-              pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
-              robots_to_in_traceback_[tracer_robot] = false;
-              // 4. first traceback, reject END
-              return;
-            }
-            else
-            {
-              writeTracebackFeedbackHistory(tracer_robot, traced_robot, "5. first traceback, does not match but not yet reject");
-              // Assume does not have to pop_front the list first
-              // 5. first traceback, does not match but not yet reject
-              continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-              // 5. first traceback, does not match but not yet reject END
-              return;
-            }
-          }
-        }
-      }
-      // 6 or 7 or 8 or 9
-      else
-      {
-        ROS_INFO("Second traceback done for tracer %s", tracer_robot.c_str());
-        ROS_INFO("Abort = %s", msg->aborted ? "true" : "false");
-
-        {
-          ROS_DEBUG("Arrived position (x, y) = (%f, %f)", arrived_pose.position.x, arrived_pose.position.y);
-          ROS_DEBUG("Arrived orientation (x, y, z, w) = (%f, %f, %f, %f)", arrived_pose.orientation.x, arrived_pose.orientation.y, arrived_pose.orientation.z, arrived_pose.orientation.w);
-        }
-
-        // 6. second traceback, abort
-        if (msg->aborted)
-        {
-          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "6. second traceback, abort");
+          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "7. does not match but not yet reject");
           continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-          // 6. second traceback, abort END
-          return;
-        }
-        // 7 or 8 or 9
-
-        // Get cv images and analyze (second traceback, reflect in image filenames)
-        std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-
-        cv_bridge::CvImageConstPtr cv_ptr_tracer;
-        try
-        {
-          if (sensor_msgs::image_encodings::isColor(msg->tracer_image.encoding))
-            cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::BGR8);
-          else
-            cv_ptr_tracer = cv_bridge::toCvCopy(msg->tracer_image, sensor_msgs::image_encodings::MONO8);
-        }
-        catch (cv_bridge::Exception &e)
-        {
-          ROS_ERROR("cv_bridge exception: %s", e.what());
-          return;
-        }
-
-        // Process cv_ptr->image using OpenCV
-        ROS_INFO("Process cv_ptr->image using OpenCV");
-        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_second_traceback_" + tracer_robot.substr(1) + "_tracer.png",
-                    cv_ptr_tracer->image);
-
-        //
-        //
-        cv_bridge::CvImageConstPtr cv_ptr_traced;
-        try
-        {
-          if (sensor_msgs::image_encodings::isColor(msg->traced_image.encoding))
-            cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::BGR8);
-          else
-            cv_ptr_traced = cv_bridge::toCvCopy(msg->traced_image, sensor_msgs::image_encodings::MONO8);
-        }
-        catch (cv_bridge::Exception &e)
-        {
-          ROS_ERROR("cv_bridge exception: %s", e.what());
-          return;
-        }
-
-        // Process cv_ptr->image using OpenCV
-        ROS_INFO("Process cv_ptr->image using OpenCV");
-        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_second_traceback_" + traced_robot.substr(1) + "_traced.png",
-                    cv_ptr_traced->image);
-
-        geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
-        tf2::Quaternion tf_q;
-        tf_q.setW(goal_q.w);
-        tf_q.setX(goal_q.x);
-        tf_q.setY(goal_q.y);
-        tf_q.setZ(goal_q.z);
-        tf2::Matrix3x3 m(tf_q);
-        double roll, pitch, yaw;
-        m.getRPY(roll, pitch, yaw);
-
-        TransformNeeded transform_needed;
-        bool is_unwanted_translation_angle = false;
-        bool is_match = camera_image_processor_.findFurtherTransformNeeded(cv_ptr_tracer->image, cv_ptr_traced->image, FeatureType::SURF,
-                                                                           essential_mat_confidence_threshold_, yaw, transform_needed, is_unwanted_translation_angle, tracer_robot, traced_robot, current_time);
-        // Get cv images and analyze END
-
-        // 7 or 8
-        if (is_match)
-        {
-          // If accepted, no further traceback is needed for this ordered pair,
-          // but remember to enable other tracebacks for the same tracer
-          // 7. second traceback, accept
-          if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count >= accept_count_needed_)
-          {
-            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "7. second traceback, accept");
-            pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
-
-            // Sort results and only keep the middle values, then take average.
-            int history_size = pairwise_triangulation_result_history_[tracer_robot][traced_robot].size();
-            double tx_arr[history_size];
-            double ty_arr[history_size];
-            double r_arr[history_size];
-            for (size_t i = 0; i < history_size; ++i)
-            {
-              TransformAdjustmentResult result = pairwise_triangulation_result_history_[tracer_robot][traced_robot][i];
-              cv::Mat adjusted_transform = result.adjusted_transform;
-              double tx = adjusted_transform.at<double>(0, 2);
-              double ty = adjusted_transform.at<double>(1, 2);
-              double r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
-
-              {
-                std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-                if (fw.is_open())
-                {
-                  fw << "Index " << i << " adjusted transform (tx, ty, r) = (" << tx << ", " << ty << ", " << r << ")" << std::endl;
-                  fw.close();
-                }
-              }
-
-              tx_arr[i] = tx;
-              ty_arr[i] = ty;
-              r_arr[i] = r;
-            }
-            std::sort(tx_arr, tx_arr + history_size);
-            std::sort(ty_arr, ty_arr + history_size);
-            std::sort(r_arr, r_arr + history_size);
-
-            // e.g. 9: keeps 5, 10: keeps 6.
-            int number_to_keep = history_size / 2 + 1;
-            int begin_index = (history_size - number_to_keep) / 2;
-            // inc
-            int end_index = begin_index + number_to_keep - 1;
-
-            double average_tx = 0;
-            double average_ty = 0;
-            double average_r = 0;
-            for (int i = begin_index; i <= end_index; ++i)
-            {
-              average_tx += tx_arr[i];
-              average_ty += ty_arr[i];
-              average_r += r_arr[i];
-            }
-            assert(number_to_keep != 0);
-            average_tx /= number_to_keep;
-            average_ty /= number_to_keep;
-            average_r /= number_to_keep;
-
-            // Compute transformation from average (tx, ty, r)
-            cv::Mat average_adjusted_transform(3, 3, CV_64F);
-            average_adjusted_transform.at<double>(0, 0) = cos(average_r);
-            average_adjusted_transform.at<double>(0, 1) = -sin(average_r);
-            average_adjusted_transform.at<double>(0, 2) = average_tx;
-            average_adjusted_transform.at<double>(1, 0) = sin(average_r);
-            average_adjusted_transform.at<double>(1, 1) = cos(average_r);
-            average_adjusted_transform.at<double>(1, 2) = average_ty;
-            average_adjusted_transform.at<double>(2, 0) = 0;
-            average_adjusted_transform.at<double>(2, 1) = 0;
-            average_adjusted_transform.at<double>(2, 2) = 1;
-
-            //
-            transform_estimator_.updateBestTransforms(average_adjusted_transform, tracer_robot, traced_robot, best_transforms_, has_best_transforms_);
-            //
-            cv::Mat world_transform = pairwise_triangulation_result_history_[tracer_robot][traced_robot][0].world_transform;
-            {
-              std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-              if (fw.is_open())
-              {
-                fw << "Unadjusted transform:" << std::endl;
-                if (history_size != 0)
-                {
-                  fw << world_transform.at<double>(0, 0) << "\t" << world_transform.at<double>(0, 1) << "\t" << world_transform.at<double>(0, 2) << std::endl;
-                  fw << world_transform.at<double>(1, 0) << "\t" << world_transform.at<double>(1, 1) << "\t" << world_transform.at<double>(1, 2) << std::endl;
-                  fw << world_transform.at<double>(2, 0) << "\t" << world_transform.at<double>(2, 1) << "\t" << world_transform.at<double>(2, 2) << std::endl;
-                }
-                else
-                {
-                  fw << "None because history size is 0, which should not happen!" << std::endl;
-                }
-                fw << "Average (tx, ty, r) = (" << average_tx << ", " << average_ty << ", " << average_r << ")" << std::endl;
-                fw << "Adjusted transform using average:" << std::endl;
-                fw << average_adjusted_transform.at<double>(0, 0) << "\t" << average_adjusted_transform.at<double>(0, 1) << "\t" << average_adjusted_transform.at<double>(0, 2) << std::endl;
-                fw << average_adjusted_transform.at<double>(1, 0) << "\t" << average_adjusted_transform.at<double>(1, 1) << "\t" << average_adjusted_transform.at<double>(1, 2) << std::endl;
-                fw << average_adjusted_transform.at<double>(2, 0) << "\t" << average_adjusted_transform.at<double>(2, 1) << "\t" << average_adjusted_transform.at<double>(2, 2) << std::endl;
-                fw.close();
-              }
-            }
-
-            evaluateWithGroundTruth(world_transform, average_adjusted_transform, tracer_robot, traced_robot, current_time);
-
-            if (has_best_transforms_.size() == resolutions_.size())
-            {
-              std::vector<std::string> robot_names;
-              std::vector<double> m_00;
-              std::vector<double> m_01;
-              std::vector<double> m_02;
-              std::vector<double> m_10;
-              std::vector<double> m_11;
-              std::vector<double> m_12;
-              std::vector<double> m_20;
-              std::vector<double> m_21;
-              std::vector<double> m_22;
-              for (auto it = best_transforms_[tracer_robot].begin(); it != best_transforms_[tracer_robot].end(); ++it)
-              {
-                std::string dst_robot = it->first;
-                cv::Mat dst_transform = it->second;
-                robot_names.push_back(dst_robot);
-                m_00.push_back(dst_transform.at<double>(0, 0));
-                m_01.push_back(dst_transform.at<double>(0, 1));
-                m_02.push_back(dst_transform.at<double>(0, 2));
-                m_10.push_back(dst_transform.at<double>(1, 0));
-                m_11.push_back(dst_transform.at<double>(1, 1));
-                m_12.push_back(dst_transform.at<double>(1, 2));
-                m_20.push_back(dst_transform.at<double>(2, 0));
-                m_21.push_back(dst_transform.at<double>(2, 1));
-                m_22.push_back(dst_transform.at<double>(2, 2));
-
-                {
-                  std::ofstream fw("Best_transforms_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot.txt", std::ofstream::app);
-                  if (fw.is_open())
-                  {
-                    fw << "Best transform from " << tracer_robot << " to " << dst_robot << " :" << std::endl;
-                    fw << dst_transform.at<double>(0, 0) << "\t" << dst_transform.at<double>(0, 1) << "\t" << dst_transform.at<double>(0, 2) << std::endl;
-                    fw << dst_transform.at<double>(1, 0) << "\t" << dst_transform.at<double>(1, 1) << "\t" << dst_transform.at<double>(1, 2) << std::endl;
-                    fw << dst_transform.at<double>(2, 0) << "\t" << dst_transform.at<double>(2, 1) << "\t" << dst_transform.at<double>(2, 2) << std::endl;
-                    fw.close();
-                  }
-                }
-              }
-
-              traceback_msgs::TracebackTransforms traceback_transforms;
-              traceback_transforms.robot_names = robot_names;
-              traceback_transforms.m_00 = m_00;
-              traceback_transforms.m_01 = m_01;
-              traceback_transforms.m_02 = m_02;
-              traceback_transforms.m_10 = m_10;
-              traceback_transforms.m_11 = m_11;
-              traceback_transforms.m_12 = m_12;
-              traceback_transforms.m_20 = m_20;
-              traceback_transforms.m_21 = m_21;
-              traceback_transforms.m_22 = m_22;
-
-              traceback_transforms_publisher_.publish(traceback_transforms);
-            }
-            // TEST HARDCODE sending traceback transforms END
-
-            robots_to_in_traceback_[tracer_robot] = false;
-            // 7. second traceback, accept END
-            return;
-          }
-          // Add this triangulation result to triangulation result history
-          // 8. second traceback, match but not yet accept
-          else
-          {
-            writeTracebackFeedbackHistory(tracer_robot, traced_robot, "8. second traceback, match but not yet accept");
-
-            FirstTracebackResult result = pairwise_first_traceback_result_[tracer_robot][traced_robot];
-            double first_x = result.first_x;
-            double first_y = result.first_y;
-            double first_tracer_to_traced_tx = result.first_tracer_to_traced_tx;
-            double first_tracer_to_traced_ty = result.first_tracer_to_traced_ty;
-            double second_x = arrived_pose.position.x;
-            double second_y = arrived_pose.position.y;
-            double second_tracer_to_traced_tx = transform_needed.tx;
-            double second_tracer_to_traced_ty = transform_needed.ty;
-
-            double length_of_translation = findLengthOfTranslationByTriangulation(first_x, first_y, first_tracer_to_traced_tx, first_tracer_to_traced_ty, second_x, second_y, second_tracer_to_traced_tx, second_tracer_to_traced_ty);
-            double first_tracer_to_traced_r = result.first_tracer_to_traced_r;
-            {
-              size_t tracer_robot_index;
-              size_t traced_robot_index;
-              for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
-              {
-                if (it->second == tracer_robot)
-                {
-                  tracer_robot_index = it->first;
-                }
-                else if (it->second == traced_robot)
-                {
-                  traced_robot_index = it->first;
-                }
-              }
-
-              std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-
-              // Convert OpenCV transform to world transform, considering the origins
-              cv::Mat mat_transform = mat_transforms[traced_robot_index];
-              cv::Mat world_transform;
-              imageTransformToMapTransform(mat_transform, world_transform, resolutions_[tracer_robot_index], resolutions_[traced_robot_index], src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-              //
-
-              cv::Mat adjusted_transform;
-              findAdjustedTransformation(world_transform, adjusted_transform, length_of_translation, first_tracer_to_traced_tx, first_tracer_to_traced_ty, first_tracer_to_traced_r, first_x, first_y, resolutions_[tracer_robot_index]);
-              TransformAdjustmentResult result;
-              result.world_transform = world_transform;
-              result.adjusted_transform = adjusted_transform;
-              pairwise_triangulation_result_history_[tracer_robot][traced_robot].push_back(result);
-            }
-
-            continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-            // 8. second traceback, match but not yet accept END
-            return;
-          }
-        }
-        // 9. second traceback, does not match
-        else
-        {
-          writeTracebackFeedbackHistory(tracer_robot, traced_robot, "9. second traceback, does not match");
-          continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-          // 9. second traceback, does not match END
+          // 7. does not match but not yet reject END
           return;
         }
       }
@@ -1540,7 +696,7 @@ namespace traceback
       // Copy END
 
       // Clear triangulation history
-      pairwise_triangulation_result_history_[robot_name_src][robot_name_dst].clear();
+      pairwise_transform_adjustment_result_history_[robot_name_src][robot_name_dst].clear();
 
       /** just for finding min_it */
       {
@@ -1784,7 +940,6 @@ namespace traceback
     goal_and_image.src_map_origin_y = src_map_origin_y;
     goal_and_image.dst_map_origin_x = dst_map_origin_x;
     goal_and_image.dst_map_origin_y = dst_map_origin_y;
-    goal_and_image.second_traceback = false;
     goal_and_image.abort_timeout = abort_timeout;
     goal_and_image.stamp = current_it.stamp;
     ROS_DEBUG("Goal and image to be sent");
@@ -2441,16 +1596,6 @@ namespace traceback
     }
   }
 
-  // Not used now
-  void Traceback::CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr &msg)
-  {
-    std::string frame_id = msg->header.frame_id;
-    std::string robot_name = "/" + frame_id.substr(0, frame_id.find("/"));
-    camera_image_processor_.robots_to_current_point_cloud_[robot_name] = *msg;
-    camera_image_processor_.robots_to_current_pose_[robot_name] = getRobotPose(robot_name);
-    camera_image_processor_.robots_to_current_image_[robot_name] = camera_image_processor_.robots_to_temp_image_[robot_name];
-  }
-
   void Traceback::fullMapUpdate(const nav_msgs::OccupancyGrid::ConstPtr &msg,
                                 MapSubscription &subscription)
   {
@@ -2705,74 +1850,31 @@ namespace traceback
     map = t2 * image * t1;
   }
 
-  double Traceback::findLengthOfTranslationByTriangulation(double first_x, double first_y, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double second_x, double second_y, double second_tracer_to_traced_tx, double second_tracer_to_traced_ty)
-  {
-    double first_transformation_distance = sqrt(first_tracer_to_traced_tx * first_tracer_to_traced_tx + first_tracer_to_traced_ty * first_tracer_to_traced_ty);
-    double second_transformation_distance = sqrt(second_tracer_to_traced_tx * second_tracer_to_traced_tx + second_tracer_to_traced_ty * second_tracer_to_traced_ty);
-    double angle_between_two_camera_transformations = acos((first_tracer_to_traced_tx * second_tracer_to_traced_tx + first_tracer_to_traced_ty * second_tracer_to_traced_ty) / (first_transformation_distance * second_transformation_distance));
-    double second_to_first_x = first_x - second_x;
-    double second_to_first_y = first_y - second_y;
-    double movement_distance = sqrt(second_to_first_x * second_to_first_x + second_to_first_y * second_to_first_y);
-    double angle_between_movement_and_second_camera_transformation = acos((second_to_first_x * second_tracer_to_traced_tx + second_to_first_y * second_tracer_to_traced_ty) / (movement_distance * second_transformation_distance));
-
-    // sine formula
-    double length = movement_distance / sin(angle_between_two_camera_transformations) * sin(angle_between_movement_and_second_camera_transformation);
-    std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-
-    // {
-    //   std::ofstream fw("Find_length_" + current_time + "_.txt", std::ofstream::out);
-    //   if (fw.is_open())
-    //   {
-    //     fw << "first_x: " << first_x << std::endl;
-    //     fw << "first_y: " << first_y << std::endl;
-    //     fw << "first_tracer_to_traced_tx: " << first_tracer_to_traced_tx << std::endl;
-    //     fw << "first_tracer_to_traced_ty: " << first_tracer_to_traced_ty << std::endl;
-    //     fw << "second_x: " << second_x << std::endl;
-    //     fw << "second_y: " << second_y << std::endl;
-    //     fw << "second_tracer_to_traced_tx: " << second_tracer_to_traced_tx << std::endl;
-    //     fw << "second_tracer_to_traced_ty: " << second_tracer_to_traced_ty << std::endl;
-    //     fw << std::endl;
-    //     fw << "first_transformation_distance: " << first_transformation_distance << std::endl;
-    //     fw << "second_transformation_distance: " << second_transformation_distance << std::endl;
-    //     fw << "angle_between_two_camera_transformations: " << angle_between_two_camera_transformations << std::endl;
-    //     fw << "second_to_first_x: " << second_to_first_x << std::endl;
-    //     fw << "second_to_first_y: " << second_to_first_y << std::endl;
-    //     fw << "movement_distance: " << movement_distance << std::endl;
-    //     fw << "angle_between_movement_and_second_camera_transformation: " << angle_between_movement_and_second_camera_transformation << std::endl;
-    //     fw << std::endl;
-    //     fw << "length: " << length << std::endl;
-    //     fw.close();
-    //   }
-    // }
-
-    return length;
-  }
-
-  void Traceback::findAdjustedTransformation(cv::Mat &original, cv::Mat &adjusted, double scale, double first_tracer_to_traced_tx, double first_tracer_to_traced_ty, double first_tracer_to_traced_r, double first_x, double first_y, float src_resolution)
+  void Traceback::findAdjustedTransformation(cv::Mat &original, cv::Mat &adjusted, double transform_needed_tx, double transform_needed_ty, double transform_needed_r, double arrived_x, double arrived_y, float src_resolution)
   {
     cv::Mat t1(3, 3, CV_64F);
     t1.at<double>(0, 0) = 1.0;
     t1.at<double>(0, 1) = 0.0;
-    t1.at<double>(0, 2) = -1 * first_x / src_resolution;
+    t1.at<double>(0, 2) = -1 * arrived_x / src_resolution;
     t1.at<double>(1, 0) = 0.0;
     t1.at<double>(1, 1) = 1.0;
-    t1.at<double>(1, 2) = -1 * first_y / src_resolution;
+    t1.at<double>(1, 2) = -1 * arrived_y / src_resolution;
     t1.at<double>(2, 0) = 0.0;
     t1.at<double>(2, 1) = 0.0;
     t1.at<double>(2, 2) = 1.0;
 
     /** Need to invert all transform needed */
     // Ensure that they are passed by value
-    first_tracer_to_traced_tx *= -1;
-    first_tracer_to_traced_ty *= -1;
-    first_tracer_to_traced_r *= -1;
+    transform_needed_tx *= -1;
+    transform_needed_ty *= -1;
+    transform_needed_r *= -1;
     cv::Mat adjustment(3, 3, CV_64F);
-    adjustment.at<double>(0, 0) = cos(first_tracer_to_traced_r);
-    adjustment.at<double>(0, 1) = -sin(first_tracer_to_traced_r);
-    adjustment.at<double>(0, 2) = first_tracer_to_traced_tx * scale / src_resolution;
-    adjustment.at<double>(1, 0) = sin(first_tracer_to_traced_r);
-    adjustment.at<double>(1, 1) = cos(first_tracer_to_traced_r);
-    adjustment.at<double>(1, 2) = first_tracer_to_traced_ty * scale / src_resolution;
+    adjustment.at<double>(0, 0) = cos(transform_needed_r);
+    adjustment.at<double>(0, 1) = -sin(transform_needed_r);
+    adjustment.at<double>(0, 2) = transform_needed_tx / src_resolution;
+    adjustment.at<double>(1, 0) = sin(transform_needed_r);
+    adjustment.at<double>(1, 1) = cos(transform_needed_r);
+    adjustment.at<double>(1, 2) = transform_needed_ty / src_resolution;
     adjustment.at<double>(2, 0) = 0.0;
     adjustment.at<double>(2, 1) = 0.0;
     adjustment.at<double>(2, 2) = 1.0;
@@ -2780,10 +1882,10 @@ namespace traceback
     cv::Mat t2(3, 3, CV_64F);
     t2.at<double>(0, 0) = 1.0;
     t2.at<double>(0, 1) = 0.0;
-    t2.at<double>(0, 2) = first_x / src_resolution;
+    t2.at<double>(0, 2) = arrived_x / src_resolution;
     t2.at<double>(1, 0) = 0.0;
     t2.at<double>(1, 1) = 1.0;
-    t2.at<double>(1, 2) = first_y / src_resolution;
+    t2.at<double>(1, 2) = arrived_y / src_resolution;
     t2.at<double>(2, 0) = 0.0;
     t2.at<double>(2, 1) = 0.0;
     t2.at<double>(2, 2) = 1.0;
