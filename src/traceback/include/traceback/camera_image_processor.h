@@ -31,6 +31,13 @@ namespace traceback
         }
     };
 
+    struct FeaturesDepthsPose
+    {
+        cv::detail::ImageFeatures features;
+        std::vector<double> depths;
+        geometry_msgs::Pose pose;
+    };
+
     // In robot world coordinates
     // tx and ty are in meters, r is in radian
     // Any length
@@ -123,7 +130,8 @@ namespace traceback
                 fvecDiff = (fvecPlus - fvecMinus) / (2.0f * epsilon);
 
                 // r (angle) estimation
-                if (i == 2) {
+                if (i == 2)
+                {
                     fvecDiff *= 20;
                 }
                 fjac.block(0, i, values(), 1) = fvecDiff;
@@ -149,6 +157,11 @@ namespace traceback
     {
     public:
         friend class Traceback;
+
+        bool computeFeaturesAndDepths(cv::detail::ImageFeatures &out_features, std::vector<double> &out_depths, const cv::Mat &image, FeatureType feature_type, const cv::Mat &depth_image);
+
+        MatchAndSolveResult matchAndSolveWithFeaturesAndDepths(cv::detail::ImageFeatures &tracer_robot_features, cv::detail::ImageFeatures &traced_robot_features, std::vector<double> tracer_robot_depths, std::vector<double> traced_robot_depths,
+                                                               double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");
 
         MatchAndSolveResult matchAndSolve(const cv::Mat &tracer_robot_color_image, const cv::Mat &traced_robot_color_image, const cv::Mat &tracer_robot_depth_image, const cv::Mat &traced_robot_depth_image, FeatureType feature_type,
                                           double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot = "", std::string traced_robot = "", std::string current_time = "");

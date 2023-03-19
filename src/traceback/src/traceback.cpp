@@ -136,15 +136,15 @@ namespace traceback
               traced_robot_index = it->first;
             }
           }
-          std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-          cv::Mat mat_transform = mat_transforms[traced_robot_index];
+
+          cv::Mat transform = robot_to_robot_traceback_in_progress_transform_[tracer_robot][traced_robot];
 
           cv::Mat pose_src(3, 1, CV_64F);
           pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[tracer_robot_index];
           pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[tracer_robot_index];
           pose_src.at<double>(2, 0) = 1.0;
 
-          cv::Mat pose_dst = mat_transform * pose_src;
+          cv::Mat pose_dst = transform * pose_src;
           pose_dst.at<double>(0, 0) *= resolutions_[traced_robot_index];
           pose_dst.at<double>(1, 0) *= resolutions_[traced_robot_index];
           pose_dst.at<double>(0, 0) += src_map_origin_x;
@@ -406,15 +406,11 @@ namespace traceback
               }
             }
 
-            std::vector<cv::Mat> mat_transforms = robots_src_to_current_transforms_vectors_[tracer_robot][tracer_robot_index];
-
             // Convert OpenCV transform to world transform, considering the origins
-            cv::Mat mat_transform = mat_transforms[traced_robot_index];
+            cv::Mat transform = robot_to_robot_traceback_in_progress_transform_[tracer_robot][traced_robot];
             cv::Mat world_transform;
-            imageTransformToMapTransform(mat_transform, world_transform, resolutions_[tracer_robot_index], resolutions_[traced_robot_index], src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
+            imageTransformToMapTransform(transform, world_transform, resolutions_[tracer_robot_index], resolutions_[traced_robot_index], src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
             //
-
-            double arrived_yaw = quaternionToYaw(arrived_pose.orientation);
 
             cv::Mat adjusted_transform;
             findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, arrived_pose.position.x, arrived_pose.position.y, resolutions_[tracer_robot_index]);
@@ -518,92 +514,63 @@ namespace traceback
     ROS_DEBUG("Update target poses started.");
 
     std::vector<cv::Point2d> map_origins;
-    std::vector<std::vector<cv::Mat>> transforms_vectors;
-    std::vector<cv::Point2f> centers;
-    std::vector<std::vector<double>> confidences;
+
     {
       boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
       map_origins = map_origins_;
     }
 
-    // Ensure consistency of transforms_vectors_, centers_ and confidences_
-    {
-      boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
-      transforms_vectors = transform_estimator_.getTransformsVectors();
+    size_t number_of_robots = map_origins.size();
 
-      // TODO now different pairs of robots share the same transforms vectors,
-      // which overwrites each other, and the same pair of robots also
-      // overwrites itself if transforms are proposed shortly
-      // but this design works in "map" mode
-      // probably change later to store specifically for each pair of robots
-
-      // transform_estimator_.printTransformsVectors(transforms_vectors);
-
-      centers = transform_estimator_.getCenters();
-      for (auto &p : centers)
-      {
-        // ROS_INFO("center = (%f, %f)", p.x, p.y);
-      }
-
-      confidences = transform_estimator_.getConfidences();
-      // transform_estimator_.printConfidences(confidences);
-    }
-
-    for (size_t i = 0; i < confidences.size(); ++i)
+    for (size_t i = 0; i < number_of_robots; ++i)
     {
       std::string robot_name_src = transforms_indexes_[i];
-      // Find it, filtering accepted tracebacks
-      // auto it = max_element(confidences[i].begin(), confidences[i].end());
-      std::vector<double>::iterator it = confidences[i].begin();
-      bool found = false;
-      double max_confidence = -1.0;
-      size_t dst = 0;
-      for (auto itt = confidences[i].begin(); itt != confidences[i].end(); ++itt)
+      std::string robot_name_dst = "";
+      size_t max_position;
+
+      // Select robot_name_dst
+      for (size_t j = 0; j < number_of_robots; ++j)
       {
-        if (pairwise_accept_reject_status_[robot_name_src][transforms_indexes_[dst]].accepted)
+        if (i == j)
         {
-          ++dst;
-          ROS_INFO("Already accepted.");
           continue;
         }
-        if (pairwise_paused_[robot_name_src][transforms_indexes_[dst]])
+        std::string dst = transforms_indexes_[j];
+
+        cv::Mat t;
+        cv::Mat i;
+        bool hasOptimizedTransform = readOptimizedTransform(t, i, robot_name_src, dst);
+
+        if (hasOptimizedTransform)
         {
-          ++dst;
-          ROS_INFO("Being paused.");
-          continue;
+          if (robot_name_dst == "")
+          {
+            robot_name_dst = dst;
+            max_position = j;
+          }
+          else
+          {
+            if (robot_to_robot_traceback_complete_count_[robot_name_src][dst] < robot_to_robot_traceback_complete_count_[robot_name_src][robot_name_dst])
+            {
+              robot_name_dst = dst;
+              max_position = j;
+            }
+          }
         }
-        // e.g. if tb3_1 is in traceback, I want tb3_0 to not trace tb3_1 so that
-        // it is impossible to have a cyclic condition where no robots will
-        // navigate to a new place and every robot is circling around the same place.
-        // if (robots_to_in_traceback_[transforms_indexes_[dst]])
-        // {
-        //   continue;
-        // }
-        if (*itt > max_confidence)
-        {
-          it = itt;
-          max_confidence = *itt;
-          found = true;
-        }
-        ++dst;
       }
 
-      if (!found)
+      if (robot_name_dst == "")
       {
         continue;
       }
 
-      // Find it END
-      size_t max_position = it - confidences[i].begin();
-      std::string robot_name_dst = transforms_indexes_[max_position];
+      assert(transforms_indexes_[i] == robot_name_src);
+      assert(transforms_indexes_[max_position] == robot_name_dst);
+      // Select robot_name_dst END
 
-      // ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
-
-      // No transform that passes confidence_threshold_ exists
-      if (abs(max_confidence - 0.0) < transform_estimator_.ZERO_ERROR)
-      {
-        continue;
-      }
+      cv::Mat transform;
+      cv::Mat inv_transform;
+      bool hasOptimizedTransform = readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
 
       // Get current pose
       geometry_msgs::Pose pose = getRobotPose(robot_name_src);
@@ -629,7 +596,7 @@ namespace traceback
       pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[i];
       pose_src.at<double>(2, 0) = 1.0;
 
-      cv::Mat pose_dst = transforms_vectors[i][max_position] * pose_src;
+      cv::Mat pose_dst = transform * pose_src;
       pose_dst.at<double>(0, 0) *= resolutions_[max_position];
       pose_dst.at<double>(1, 0) *= resolutions_[max_position];
       pose_dst.at<double>(0, 0) += src_map_origin_x;
@@ -652,19 +619,18 @@ namespace traceback
       }
 
       ROS_INFO("Start traceback process for robot %s", robot_name_src.c_str());
-      ROS_INFO("confidences[%zu] (max_position, max_confidence) = (%zu, %f)", i, max_position, max_confidence);
       ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
 
-      ROS_INFO("transforms[%s][%s] (width, height) = (%d, %d)", robot_name_src.c_str(), robot_name_dst.c_str(), transforms_vectors[i][max_position].cols, transforms_vectors[i][max_position].rows);
+      ROS_INFO("transforms[%s][%s] (width, height) = (%d, %d)", robot_name_src.c_str(), robot_name_dst.c_str(), transform.cols, transform.rows);
 
-      int width = transforms_vectors[i][max_position].cols;
-      int height = transforms_vectors[i][max_position].rows;
+      int width = transform.cols;
+      int height = transform.rows;
       std::string s = "";
       for (int y = 0; y < height; y++)
       {
         for (int x = 0; x < width; x++)
         {
-          double val = transforms_vectors[i][max_position].at<double>(y, x);
+          double val = transform.at<double>(y, x);
           if (x == width - 1)
           {
             s += std::to_string(val) + "\n";
@@ -678,26 +644,6 @@ namespace traceback
       ROS_INFO("matrix:\n%s", s.c_str());
       ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
-      // This is only updated here (start/restart traceback)
-      // Copy
-      {
-        std::vector<std::vector<cv::Mat>> transforms_vectors_copy;
-        transforms_vectors_copy.resize(transforms_vectors.size());
-        for (size_t j = 0; j < transforms_vectors.size(); j++)
-        {
-          for (size_t k = 0; k < transforms_vectors[j].size(); k++)
-          {
-            cv::Mat mat = transforms_vectors[j][k].clone();
-            transforms_vectors_copy[j].push_back(mat);
-          }
-        }
-        robots_src_to_current_transforms_vectors_[robot_name_src] = transforms_vectors_copy;
-      }
-      // Copy END
-
-      // Clear triangulation history
-      pairwise_transform_adjustment_result_history_[robot_name_src][robot_name_dst].clear();
-
       /** just for finding min_it */
       {
         boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[robot_name_dst]);
@@ -706,14 +652,6 @@ namespace traceback
       /** just for finding min_it END */
 
       startOrContinueTraceback(robot_name_src, robot_name_dst, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-    }
-
-    // TODO probably change later to store specifically for each pair of robots
-    {
-      // Must be done after setting to robots_src_to_current_transforms_vectors_[robot_name_src]
-      boost::shared_lock<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
-      transform_estimator_.clearTransformsVectors();
-      transform_estimator_.clearConfidences();
     }
   }
 
@@ -798,7 +736,6 @@ namespace traceback
 
   void Traceback::startOrContinueTraceback(std::string robot_name_src, std::string robot_name_dst, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y)
   {
-    /** Get parameters other than robot names */
     size_t i;
     for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
     {
@@ -816,8 +753,19 @@ namespace traceback
     ROS_DEBUG("startOrContinueTraceback i = %zu", i);
     ROS_DEBUG("startOrContinueTraceback max_position = %zu", max_position);
 
-    std::vector<std::vector<cv::Mat>> transforms_vectors = robots_src_to_current_transforms_vectors_[robot_name_src];
-    /** Get parameters other than robot names END */
+    cv::Mat transform;
+    cv::Mat inv_transform;
+    bool hasOptimizedTransform = readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
+
+    if (!hasOptimizedTransform)
+    {
+      ROS_ERROR("startOrContinueTraceback but do not have optimized transform. This should not happen!");
+      return;
+    }
+
+    // Keep this traceback transform for later calculating the loop closure constraint correctly
+    robot_to_robot_traceback_in_progress_transform_[robot_name_src][robot_name_dst] = transform.clone();
+    //
 
     PoseImagePair current_it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][robots_to_current_it_[robot_name_src]];
 
@@ -832,7 +780,7 @@ namespace traceback
     goal_dst.at<double>(1, 0) = (goal_y - dst_map_origin_y) / resolutions_[max_position];
     goal_dst.at<double>(2, 0) = 1.0;
 
-    cv::Mat goal_src = transforms_vectors[max_position][i] * goal_dst;
+    cv::Mat goal_src = inv_transform * goal_dst;
     goal_src.at<double>(0, 0) *= resolutions_[i];
     goal_src.at<double>(1, 0) *= resolutions_[i];
     goal_src.at<double>(0, 0) += dst_map_origin_x;
@@ -890,8 +838,7 @@ namespace traceback
     // Note that due to scaling, the "rotation matrix" values can exceed 1, and therefore need to normalize it.
     geometry_msgs::Quaternion goal_q = current_it.pose.orientation;
     geometry_msgs::Quaternion transform_q;
-    cv::Mat transform = transforms_vectors[max_position][i];
-    matToQuaternion(transform, transform_q);
+    matToQuaternion(inv_transform, transform_q);
     tf2::Quaternion tf2_goal_q;
     tf2_goal_q.setW(goal_q.w);
     tf2_goal_q.setX(goal_q.x);
@@ -1132,24 +1079,23 @@ namespace traceback
     {
       std::string robot_name = current.first;
 
-      cv_bridge::CvImageConstPtr cv_ptr;
-      try
-      {
-        if (sensor_msgs::image_encodings::isColor(current.second.encoding))
-          cv_ptr = cv_bridge::toCvCopy(current.second, sensor_msgs::image_encodings::BGR8);
-        else
-          cv_ptr = cv_bridge::toCvCopy(current.second, sensor_msgs::image_encodings::MONO8);
-      }
-      catch (cv_bridge::Exception &e)
-      {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
-        return;
-      }
+      sensor_msgs::Image depth_image = camera_image_processor_.robots_to_current_depth_image_[robot_name];
 
-      robots_to_image_features_[robot_name].emplace_back(transform_estimator_.computeFeatures(cv_ptr->image, FeatureType::ORB));
-      robots_to_poses_[robot_name].emplace_back(getRobotPose(robot_name));
+      // get cv images
+      cv_bridge::CvImageConstPtr cv_ptr = sensorImageToCvImagePtr(current.second);
+      cv_bridge::CvImageConstPtr cv_ptr_depth = sensorImageToCvImagePtr(depth_image);
+      //
 
-      for (auto &pair : robots_to_image_features_)
+      FeaturesDepthsPose features_depths_pose;
+      bool hasFeaturesAndDepths = camera_image_processor_.computeFeaturesAndDepths(features_depths_pose.features, features_depths_pose.depths, cv_ptr->image, FeatureType::ORB, cv_ptr_depth->image);
+      if (!hasFeaturesAndDepths)
+      {
+        continue;
+      }
+      features_depths_pose.pose = getRobotPose(robot_name);
+      robots_to_image_features_depths_pose_[robot_name].push_back(features_depths_pose);
+
+      for (auto &pair : robots_to_image_features_depths_pose_)
       {
         std::string second_robot_name = pair.first;
         if (robot_name == second_robot_name)
@@ -1159,11 +1105,16 @@ namespace traceback
 
         for (size_t i = 0; i < pair.second.size(); ++i)
         {
-          double confidence_output = transform_estimator_.matchTwoFeatures(robots_to_image_features_[robot_name].back(), pair.second[i], confidence_threshold_);
+          cv::detail::ImageFeatures features1 = robots_to_image_features_depths_pose_[robot_name].back().features;
+          cv::detail::ImageFeatures features2 = pair.second[i].features;
+
+          double confidence_output = transform_estimator_.matchTwoFeatures(features1, features2, confidence_threshold_);
           if (confidence_output > 0.0)
           {
-            geometry_msgs::Pose pose1 = robots_to_poses_[robot_name].back();
-            geometry_msgs::Pose pose2 = robots_to_poses_[second_robot_name][i];
+            geometry_msgs::Pose pose1 = robots_to_image_features_depths_pose_[robot_name].back().pose;
+            geometry_msgs::Pose pose2 = pair.second[i].pose;
+            std::vector<double> depths1 = robots_to_image_features_depths_pose_[robot_name].back().depths;
+            std::vector<double> depths2 = pair.second[i].depths;
             // ROS_DEBUG("Match!");
 
             if (test_mode_ != "collect")
@@ -1314,6 +1265,21 @@ namespace traceback
             }
             current_traceback_transforms = temp;
 
+            //
+            // Up to now, current_traceback_transforms[1] is robot->second_robot world transform in pixels.
+            //
+            std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+
+            geometry_msgs::Quaternion goal_q = pose1.orientation;
+            double yaw = quaternionToYaw(goal_q);
+            TransformNeeded transform_needed;
+            transform_needed.arrived_x = pose1.position.x;
+            transform_needed.arrived_y = pose1.position.y;
+            MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
+
+            // TODO adjust with transform_needed (pixel version)
+            
+
             std::vector<cv::Point2d> local_origins = {map_origins_[self_robot_index], map_origins_[second_robot_index]};
             std::vector<float> local_resolutions = {resolutions_[self_robot_index], resolutions_[second_robot_index]};
             std::vector<cv::Mat> modified_traceback_transforms;
@@ -1389,12 +1355,6 @@ namespace traceback
             if (test_mode_ == "collect")
             {
               continue;
-            }
-
-            {
-              boost::lock_guard<boost::shared_mutex> lock(transform_estimator_.updates_mutex_);
-              transform_estimator_.setTransformsVectors(transforms_vectors);
-              transform_estimator_.setConfidences(confidences);
             }
           }
         }
@@ -1762,9 +1722,33 @@ namespace traceback
           pairwise_abort_[robot_name][it->first] = 0;
           pairwise_paused_[it->first][robot_name] = false;
           pairwise_paused_[robot_name][it->first] = false;
+
+          robot_to_robot_traceback_complete_count_[it->first][robot_name] = 0;
+          robot_to_robot_traceback_complete_count_[robot_name][it->first] = 0;
         }
       }
     }
+  }
+
+  bool Traceback::readOptimizedTransform(cv::Mat &transform, cv::Mat &inv_transform, std::string from, std::string to)
+  {
+    if (from < to)
+    {
+      transform = robot_to_robot_optimized_transform_[from][to];
+      inv_transform = transform.inv();
+    }
+    else
+    {
+      inv_transform = robot_to_robot_optimized_transform_[to][from];
+      transform = inv_transform.inv();
+    }
+
+    if (transform.empty() || inv_transform.empty())
+    {
+      return false;
+    }
+
+    return true;
   }
 
   cv_bridge::CvImageConstPtr Traceback::sensorImageToCvImagePtr(const sensor_msgs::Image &image)

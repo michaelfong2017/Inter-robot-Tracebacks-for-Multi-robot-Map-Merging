@@ -48,6 +48,20 @@ namespace traceback
     std::string robot_namespace; // e.g /tb3_0
   };
 
+  struct LoopClosureConstraint
+  {
+    // x-position of "from" robot where the loop closure is found
+    double x;
+    // y-position of "from" robot where the loop closure is found
+    double y;
+    // x-translation from "from" robot to "to" robot, in pixels
+    double tx;
+    // y-translation from "from" robot to "to" robot, in pixels
+    double ty;
+    // rotation from "from" robot to "to" robot, in radians
+    double r;
+  };
+
   struct AcceptRejectStatus
   {
     int accept_count;
@@ -125,8 +139,7 @@ namespace traceback
 
     CameraImageProcessor camera_image_processor_;
 
-    std::unordered_map<std::string, std::vector<cv::detail::ImageFeatures>> robots_to_image_features_;
-    std::unordered_map<std::string, std::vector<geometry_msgs::Pose>> robots_to_poses_;
+    std::unordered_map<std::string, std::vector<FeaturesDepthsPose>> robots_to_image_features_depths_pose_;
     void modifyTransformsBasedOnOrigins(std::vector<cv::Mat> &transforms,
                                         std::vector<cv::Mat> &out,
                                         std::vector<cv::Point2d> &map_origins,
@@ -141,7 +154,18 @@ namespace traceback
     std::unordered_map<std::string, size_t> robots_to_current_it_;
     std::unordered_map<std::string, boost::shared_mutex> robots_to_current_it_mutex_;
 
-    std::unordered_map<std::string, std::vector<std::vector<cv::Mat>>> robots_src_to_current_transforms_vectors_;
+    // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<LoopClosureConstraint>>> robot_to_robot_loop_closure_constraints_;
+    // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
+    std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> robot_to_robot_optimized_transform_;
+
+    bool readOptimizedTransform(cv::Mat &transform, cv::Mat &inv_transform, std::string from, std::string to);
+
+    // "from" can be alphabetically smaller or greater than "to"
+    std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> robot_to_robot_traceback_in_progress_transform_;
+    // Number of traceback processes started, can be accepted, rejected or aborted
+    // "from" can be alphabetically smaller or greater than "to"
+    std::unordered_map<std::string, std::unordered_map<std::string, size_t>> robot_to_robot_traceback_complete_count_;
 
     ros::Publisher traceback_transforms_publisher_;
     std::string traceback_transforms_topic_ = "/traceback/traceback_transforms";
@@ -153,8 +177,6 @@ namespace traceback
     std::unordered_map<std::string, std::unordered_map<std::string, int>> pairwise_abort_;
     std::unordered_map<std::string, std::unordered_map<std::string, bool>> pairwise_paused_;
     std::unordered_map<std::string, std::unordered_map<std::string, ros::Timer>> pairwise_resume_timer_;
-
-    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<TransformAdjustmentResult>>> pairwise_transform_adjustment_result_history_;
 
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> best_transforms_;
     std::unordered_set<std::string> has_best_transforms_;

@@ -11,6 +11,105 @@
 
 namespace traceback
 {
+    bool CameraImageProcessor::computeFeaturesAndDepths(cv::detail::ImageFeatures &out_features, std::vector<double> &out_depths, const cv::Mat &image, FeatureType feature_type, const cv::Mat &depth_image)
+    {
+        auto finder = internal::chooseFeatureFinder(feature_type);
+
+        cv::detail::computeImageFeatures(finder, image, out_features);
+
+        std::vector<cv::KeyPoint> keypoints;
+        std::vector<cv::Point2f> image_points;
+        for (auto &keypoint : out_features.keypoints)
+        {
+            keypoints.push_back(keypoint);
+        }
+        cv::KeyPoint::convert(keypoints, image_points);
+
+        out_depths.clear();
+        for (auto &point : image_points)
+        {
+            out_depths.emplace_back(1.0 * depth_image.at<float>((int)point.y, (int)point.x));
+        }
+
+        if (out_features.keypoints.size() == 0 || out_depths.size() == 0)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    MatchAndSolveResult CameraImageProcessor::matchAndSolveWithFeaturesAndDepths(cv::detail::ImageFeatures &tracer_robot_features, cv::detail::ImageFeatures &traced_robot_features, std::vector<double> tracer_robot_depths, std::vector<double> traced_robot_depths, double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
+    {
+        std::vector<cv::detail::ImageFeatures> image_features;
+        std::vector<cv::detail::MatchesInfo> pairwise_matches;
+        std::vector<int> good_indices;
+        cv::Ptr<cv::detail::FeaturesMatcher> matcher =
+            cv::makePtr<cv::detail::AffineBestOf2NearestMatcher>();
+
+        try
+        {
+            ROS_DEBUG("pairwise matching features");
+            (*matcher)(image_features, pairwise_matches);
+            matcher = {};
+        }
+        catch (std::exception e)
+        {
+            ROS_INFO("Not enough features, catched!");
+            {
+                MatchAndSolveResult result;
+                result.match = false;
+                result.solved = false;
+                return result;
+            }
+        }
+
+        double match_score = -1.0; // does not even have match
+        for (auto &match_info : pairwise_matches)
+        {
+            if (match_info.H.empty() ||
+                match_info.src_img_idx >= match_info.dst_img_idx)
+            {
+                continue;
+            }
+            match_score = match_info.confidence;
+        }
+
+        good_indices = cv::detail::leaveBiggestComponent(
+            image_features, pairwise_matches, static_cast<float>(confidence));
+
+        // Write match score to file
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+                if (good_indices.size() == 1)
+                {
+                    fw << "Does not match at time " << current_time << " with confidence " << match_score << std::endl;
+                }
+                else
+                {
+                    fw << "Match at time " << current_time << " with confidence " << match_score << std::endl;
+                }
+                fw.close();
+            }
+        }
+        // END
+
+        // no match found
+        if (good_indices.size() == 1)
+        {
+            {
+                MatchAndSolveResult result;
+                result.match = false;
+                result.solved = false;
+                return result;
+            }
+        }
+
+        // TODO
+    }
+
     MatchAndSolveResult CameraImageProcessor::matchAndSolve(const cv::Mat &tracer_robot_color_image, const cv::Mat &traced_robot_color_image, const cv::Mat &tracer_robot_depth_image, const cv::Mat &traced_robot_depth_image, FeatureType feature_type, double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {
         const std::vector<cv::Mat> &images = {tracer_robot_color_image, traced_robot_color_image};
@@ -379,7 +478,7 @@ namespace traceback
         Eigen::VectorXd x(n);
         x(0) = init_tx; // initial value for 'a'
         x(1) = init_ty; // initial value for 'b'
-        x(2) = init_r; // initial value for 'c'
+        x(2) = init_r;  // initial value for 'c'
 
         //
         // Run the LM optimization
