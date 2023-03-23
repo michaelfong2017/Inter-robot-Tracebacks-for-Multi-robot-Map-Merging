@@ -1797,9 +1797,6 @@ namespace traceback
 
           robot_to_robot_loop_closure_constraints_[it->first][robot_name] = {};
           robot_to_robot_loop_closure_constraints_[robot_name][it->first] = {};
-
-          robot_to_robot_optimized_transform_[it->first][robot_name] = cv::Mat(3, 3, CV_64F);
-          robot_to_robot_optimized_transform_[robot_name][it->first] = cv::Mat(3, 3, CV_64F);
         }
       }
     }
@@ -1810,11 +1807,17 @@ namespace traceback
     if (from < to)
     {
       transform = robot_to_robot_optimized_transform_[from][to];
+      if (transform.empty()) {
+        return false;
+      }
       inv_transform = transform.inv();
     }
     else
     {
       inv_transform = robot_to_robot_optimized_transform_[to][from];
+      if (inv_transform.empty()) {
+        return false;
+      }
       transform = inv_transform.inv();
     }
 
