@@ -592,20 +592,20 @@ namespace traceback
       double dst_map_origin_y = map_origins[max_position].y;
 
       cv::Mat pose_src(3, 1, CV_64F);
-      pose_src.at<double>(0, 0) = (pose.position.x - src_map_origin_x) / resolutions_[i];
-      pose_src.at<double>(1, 0) = (pose.position.y - src_map_origin_y) / resolutions_[i];
+      pose_src.at<double>(0, 0) = pose.position.x / resolutions_[i];
+      pose_src.at<double>(1, 0) = pose.position.y / resolutions_[i];
       pose_src.at<double>(2, 0) = 1.0;
 
       cv::Mat pose_dst = transform * pose_src;
       pose_dst.at<double>(0, 0) *= resolutions_[max_position];
       pose_dst.at<double>(1, 0) *= resolutions_[max_position];
-      pose_dst.at<double>(0, 0) += src_map_origin_x;
-      pose_dst.at<double>(1, 0) += src_map_origin_y;
-      // Also adjust the difference between the origins
-      pose_dst.at<double>(0, 0) += dst_map_origin_x;
-      pose_dst.at<double>(1, 0) += dst_map_origin_y;
-      pose_dst.at<double>(0, 0) -= src_map_origin_x;
-      pose_dst.at<double>(1, 0) -= src_map_origin_y;
+      // pose_dst.at<double>(0, 0) += src_map_origin_x;
+      // pose_dst.at<double>(1, 0) += src_map_origin_y;
+      // // Also adjust the difference between the origins
+      // pose_dst.at<double>(0, 0) += dst_map_origin_x;
+      // pose_dst.at<double>(1, 0) += dst_map_origin_y;
+      // pose_dst.at<double>(0, 0) -= src_map_origin_x;
+      // pose_dst.at<double>(1, 0) -= src_map_origin_y;
 
       // ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
@@ -776,20 +776,21 @@ namespace traceback
     // Same as above, it is required to manually rotate about the bottom-left corner, which
     // is (-20m, -20m) or (-400px, -400px) when the resolution is 0.05.
     cv::Mat goal_dst(3, 1, CV_64F);
-    goal_dst.at<double>(0, 0) = (goal_x - dst_map_origin_x) / resolutions_[max_position];
-    goal_dst.at<double>(1, 0) = (goal_y - dst_map_origin_y) / resolutions_[max_position];
+    // Change to not consider map origin
+    goal_dst.at<double>(0, 0) = goal_x / resolutions_[max_position];
+    goal_dst.at<double>(1, 0) = goal_y / resolutions_[max_position];
     goal_dst.at<double>(2, 0) = 1.0;
 
     cv::Mat goal_src = inv_transform * goal_dst;
     goal_src.at<double>(0, 0) *= resolutions_[i];
     goal_src.at<double>(1, 0) *= resolutions_[i];
-    goal_src.at<double>(0, 0) += dst_map_origin_x;
-    goal_src.at<double>(1, 0) += dst_map_origin_y;
-    // Also adjust the difference between the origins
-    goal_src.at<double>(0, 0) += src_map_origin_x;
-    goal_src.at<double>(1, 0) += src_map_origin_y;
-    goal_src.at<double>(0, 0) -= dst_map_origin_x;
-    goal_src.at<double>(1, 0) -= dst_map_origin_y;
+    // goal_src.at<double>(0, 0) += dst_map_origin_x;
+    // goal_src.at<double>(1, 0) += dst_map_origin_y;
+    // // Also adjust the difference between the origins
+    // goal_src.at<double>(0, 0) += src_map_origin_x;
+    // goal_src.at<double>(1, 0) += src_map_origin_y;
+    // goal_src.at<double>(0, 0) -= dst_map_origin_x;
+    // goal_src.at<double>(1, 0) -= dst_map_origin_y;
 
     ROS_INFO("transformed goal_src (x, y) = (%f, %f)", goal_src.at<double>(0, 0), goal_src.at<double>(1, 0));
 
@@ -1098,7 +1099,9 @@ namespace traceback
       for (auto &pair : robots_to_image_features_depths_pose_)
       {
         std::string second_robot_name = pair.first;
-        if (robot_name == second_robot_name)
+        // Ensure robot_name < second_robot_name so that the same pair will not be done twice
+        // Later only need to insert the transform (loop closure constraint) for this pair (no need inv_transform)
+        if (robot_name >= second_robot_name)
         {
           continue;
         }
@@ -1249,24 +1252,11 @@ namespace traceback
               current_traceback_transforms.push_back(t_global_i);
             }
 
-            std::vector<cv::Mat> temp;
-            for (size_t i = 0; i < transforms.size(); ++i)
-            {
-              if (i == 0)
-              {
-                temp.emplace_back(cv::Mat::eye(3, 3, CV_64F));
-              }
-              // e.g. 0->1 = t_global_1 * inv(t_global_0)
-              else
-              {
-                temp.push_back(current_traceback_transforms[i] *
-                               current_traceback_transforms[0].inv());
-              }
-            }
-            current_traceback_transforms = temp;
+            cv::Mat world_transform = current_traceback_transforms[i] *
+                                      current_traceback_transforms[0].inv();
 
             //
-            // Up to now, current_traceback_transforms[1] is robot->second_robot world transform in pixels.
+            // Up to now, world_transform is robot->second_robot world transform in pixels.
             //
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
@@ -1277,55 +1267,63 @@ namespace traceback
             transform_needed.arrived_y = pose1.position.y;
             MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
 
-            // TODO adjust with transform_needed (pixel version)
-            
+            // TODO adjust with transform_needed
+            cv::Mat adjusted_transform;
+            findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, transform_needed.arrived_x, transform_needed.arrived_y, resolutions_[self_robot_index]);
 
-            std::vector<cv::Point2d> local_origins = {map_origins_[self_robot_index], map_origins_[second_robot_index]};
-            std::vector<float> local_resolutions = {resolutions_[self_robot_index], resolutions_[second_robot_index]};
-            std::vector<cv::Mat> modified_traceback_transforms;
-            modifyTransformsBasedOnOrigins(current_traceback_transforms,
-                                           modified_traceback_transforms,
-                                           local_origins, local_resolutions);
+            // std::vector<cv::Point2d> local_origins = {map_origins_[self_robot_index], map_origins_[second_robot_index]};
+            // std::vector<float> local_resolutions = {resolutions_[self_robot_index], resolutions_[second_robot_index]};
+            // std::vector<cv::Mat> modified_traceback_transforms;
+            // modifyTransformsBasedOnOrigins(current_traceback_transforms,
+            //                                modified_traceback_transforms,
+            //                                local_origins, local_resolutions);
 
-            for (auto &transform : modified_traceback_transforms)
+            std::string s = "";
+            for (int y = 0; y < 3; y++)
             {
-              std::string s = "";
-              for (int y = 0; y < 3; y++)
+              for (int x = 0; x < 3; x++)
               {
-                for (int x = 0; x < 3; x++)
+                double val = adjusted_transform.at<double>(y, x);
+                if (x == 3 - 1)
                 {
-                  double val = transform.at<double>(y, x);
-                  if (x == 3 - 1)
-                  {
-                    s += std::to_string(val) + "\n";
-                  }
-                  else
-                  {
-                    s += std::to_string(val) + ", ";
-                  }
+                  s += std::to_string(val) + "\n";
+                }
+                else
+                {
+                  s += std::to_string(val) + ", ";
                 }
               }
-              ROS_INFO("matrix:\n%s", s.c_str());
             }
-            ROS_INFO("Continue");
-            std::vector<std::vector<cv::Mat>> transforms_vectors;
-            transforms_vectors.resize(3);
-            transforms_vectors[0].resize(3);
-            transforms_vectors[1].resize(3);
-            transforms_vectors[2].resize(3);
-            transforms_vectors[self_robot_index][self_robot_index] = cv::Mat::eye(3, 3, CV_64F);
-            transforms_vectors[second_robot_index][second_robot_index] = cv::Mat::eye(3, 3, CV_64F);
-            transforms_vectors[self_robot_index][second_robot_index] = modified_traceback_transforms[1];
-            transforms_vectors[second_robot_index][self_robot_index] = modified_traceback_transforms[1].inv();
-            std::vector<std::vector<double>> confidences;
-            confidences.resize(3);
-            confidences[0].resize(3);
-            confidences[1].resize(3);
-            confidences[2].resize(3);
-            confidences[self_robot_index][self_robot_index] = -1.0;
-            confidences[second_robot_index][second_robot_index] = -1.0;
-            confidences[self_robot_index][second_robot_index] = confidence_output;
-            confidences[second_robot_index][self_robot_index] = confidence_output;
+            ROS_INFO("matrix:\n%s", s.c_str());
+
+            if (robot_name < second_robot_name)
+            {
+              LoopClosureConstraint loop_closure_constraint;
+              loop_closure_constraint.x = transform_needed.arrived_x;
+              loop_closure_constraint.y = transform_needed.arrived_y;
+              loop_closure_constraint.tx = adjusted_transform.at<double>(0, 2);
+              loop_closure_constraint.ty = adjusted_transform.at<double>(1, 2);
+              loop_closure_constraint.r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
+              robot_to_robot_loop_closure_constraints_[robot_name][second_robot_name].push_back(loop_closure_constraint);
+            }
+            else
+            {
+              LoopClosureConstraint loop_closure_constraint;
+              cv::Mat src(3, 1, CV_64F);
+              src.at<double>(0, 0) = transform_needed.arrived_x;
+              src.at<double>(1, 0) = transform_needed.arrived_y;
+              src.at<double>(2, 0);
+              cv::Mat dst = adjusted_transform * src;
+              double inv_x = dst.at<double>(0, 0);
+              double inv_y = dst.at<double>(1, 0);
+              loop_closure_constraint.x = inv_x;
+              loop_closure_constraint.y = inv_y;
+              cv::Mat inv_adjusted_transform = adjusted_transform.inv();
+              loop_closure_constraint.tx = inv_adjusted_transform.at<double>(0, 2);
+              loop_closure_constraint.ty = inv_adjusted_transform.at<double>(1, 2);
+              loop_closure_constraint.r = atan2(inv_adjusted_transform.at<double>(1, 0), inv_adjusted_transform.at<double>(0, 0));
+              robot_to_robot_loop_closure_constraints_[second_robot_name][robot_name].push_back(loop_closure_constraint);
+            }
 
             // Evaluate match with current pose of current robot
             // Note that unmodified transform is used

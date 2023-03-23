@@ -41,7 +41,7 @@ namespace traceback
 
     MatchAndSolveResult CameraImageProcessor::matchAndSolveWithFeaturesAndDepths(cv::detail::ImageFeatures &tracer_robot_features, cv::detail::ImageFeatures &traced_robot_features, std::vector<double> tracer_robot_depths, std::vector<double> traced_robot_depths, double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
     {
-        std::vector<cv::detail::ImageFeatures> image_features;
+        std::vector<cv::detail::ImageFeatures> image_features = {tracer_robot_features, traced_robot_features};
         std::vector<cv::detail::MatchesInfo> pairwise_matches;
         std::vector<int> good_indices;
         cv::Ptr<cv::detail::FeaturesMatcher> matcher =
@@ -107,7 +107,240 @@ namespace traceback
             }
         }
 
-        // TODO
+        std::vector<cv::Point2f> image_points1, image_points2;
+        std::vector<double> matched_depths1, matched_depths2;
+
+        if (image_features.size() == 2)
+        {
+            // std::vector<cv::KeyPoint> keypoints1 = image_features[0].keypoints;
+            // cv::KeyPoint::convert(keypoints1, points1);
+            // std::vector<cv::KeyPoint> keypoints2 = image_features[1].keypoints;
+            // cv::KeyPoint::convert(keypoints2, points2);
+            std::vector<cv::KeyPoint> keypoints1, keypoints2;
+            for (auto &match_info : pairwise_matches)
+            {
+                if (match_info.H.empty() ||
+                    match_info.src_img_idx >= match_info.dst_img_idx)
+                {
+                    continue;
+                }
+
+                for (size_t i = 0; i < match_info.matches.size(); ++i)
+                {
+                    auto match = match_info.matches[i];
+                    if (match_info.inliers_mask[i] == 1)
+                    {
+                        // match.imgIdx is always 0
+                        keypoints1.emplace_back(image_features[0].keypoints[match.queryIdx]);
+                        keypoints2.emplace_back(image_features[1].keypoints[match.trainIdx]);
+
+                        matched_depths1.emplace_back(tracer_robot_depths[match.queryIdx]);
+                        matched_depths2.emplace_back(traced_robot_depths[match.trainIdx]);
+                    }
+                }
+            }
+            cv::KeyPoint::convert(keypoints1, image_points1);
+            cv::KeyPoint::convert(keypoints2, image_points2);
+        }
+        else
+        {
+            ROS_ERROR("image_features must be of size 2, matching exactly 2 images!");
+        }
+
+        ROS_INFO("Number of inlier matches is %zu", image_points1.size());
+        // Filter case where match number is too small
+        // DLT algorithm needs at least 4 points for pose estimation from 3D-2D point correspondences. (expected: 'count >= 6')
+        if (image_points1.size() < 4)
+        {
+            {
+                MatchAndSolveResult result;
+                result.match = true;
+                result.solved = false;
+                return result;
+            }
+        }
+
+        double fx = 554.254691191187;
+        double fy = 554.254691191187;
+        double cx = 320.5;
+        double cy = 240.5;
+
+        std::vector<cv::Point3d> points1;                // nan depth is filtered
+        std::vector<cv::Point2d> filtered_image_points1; // nan depth is filtered
+        std::vector<cv::Point2d> filtered_image_points2; // nan depth is filtered
+        for (size_t i = 0; i < image_points1.size(); ++i)
+        {
+            cv::Point2d image_point = 1.0 * image_points1[i];
+            double depth = matched_depths1[i];
+            // ROS_DEBUG("depth: %f", depth);
+            if (isnan(depth))
+            {
+                continue;
+            }
+            double x = depth * (image_point.x - cx) / fx;
+            double y = depth * (image_point.y - cy) / fy;
+            double z = depth;
+            points1.emplace_back(cv::Point3d(x, y, z));
+            filtered_image_points1.push_back(image_point);
+            filtered_image_points2.push_back(1.0 * image_points2[i]);
+        }
+
+        // Below is the same as matchAndSolve
+        // For the match, write the number of filtered matches to file
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Filtered_number_of_matches" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+                fw << "Number of filtered matches at " << current_time << " is " << points1.size() << std::endl;
+                fw.close();
+            }
+        }
+        //
+
+        // Filter case where filtered (depth != nan) match number is too small
+        if (filtered_image_points1.size() < 4)
+        {
+            {
+                MatchAndSolveResult result;
+                result.match = true;
+                result.solved = false;
+                return result;
+            }
+        }
+
+        // solvepnp
+        double k[9] = {554.254691191187, 0.0, 320.5, 0.0, 554.254691191187, 240.5, 0.0, 0.0, 1.0};
+        cv::Mat camera_K = cv::Mat(3, 3, CV_64F, k);
+        // For "plumb_bob", the 5 parameters are: (k1, k2, t1, t2, k3).
+        double d[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
+        cv::Mat camera_D = cv::Mat(5, 1, CV_64F, d);
+
+        cv::Mat rvec1 = cv::Mat(3, 1, CV_64F);
+        cv::Mat tvec1 = cv::Mat(3, 1, CV_64F);
+        cv::Mat rvec2 = cv::Mat(3, 1, CV_64F);
+        cv::Mat tvec2 = cv::Mat(3, 1, CV_64F);
+        // Use init guess
+        rvec1.at<double>(0, 0) = 0.0;
+        rvec1.at<double>(1, 0) = 0.0;
+        rvec1.at<double>(2, 0) = 0.0;
+        tvec1.at<double>(0, 0) = 0.0;
+        tvec1.at<double>(1, 0) = 0.0;
+        tvec1.at<double>(2, 0) = 0.0;
+        rvec2.at<double>(0, 0) = 0.0;
+        rvec2.at<double>(1, 0) = 0.0;
+        rvec2.at<double>(2, 0) = 0.0;
+        tvec2.at<double>(0, 0) = 0.0;
+        tvec2.at<double>(1, 0) = 0.0;
+        tvec2.at<double>(2, 0) = 0.0;
+        // Use init guess END
+        cv::solvePnPRansac(points1, filtered_image_points1, camera_K, camera_D, rvec1, tvec1, true, 100, 0.5f);
+        cv::solvePnPRansac(points1, filtered_image_points2, camera_K, camera_D, rvec2, tvec2, true, 100, 0.5f);
+
+        cv::Mat rmat1;
+        cv::Rodrigues(rvec1, rmat1);
+        cv::Mat rmat2;
+        cv::Rodrigues(rvec2, rmat2);
+
+        // compute C2MC1
+        // R 1 to 2 and t 1 to 2
+        cv::Mat transform_R = rmat2 * rmat1.t();
+        cv::Mat transform_t = rmat2 * (-rmat1.t() * tvec1) + tvec2;
+
+        //
+        cv::Vec3d rot = rotationMatrixToEulerAngles(transform_R);
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_R.txt", std::ofstream::out);
+            if (fw.is_open())
+            {
+                fw << "XYZ rotation is: " << rotationMatrixToEulerAngles(rmat1) << std::endl;
+                fw << "Rotation matrix C1MO (O to C1):" << std::endl;
+                fw << rmat1.at<double>(0, 0) << "\t" << rmat1.at<double>(0, 1) << "\t" << rmat1.at<double>(0, 2) << std::endl;
+                fw << rmat1.at<double>(1, 0) << "\t" << rmat1.at<double>(1, 1) << "\t" << rmat1.at<double>(1, 2) << std::endl;
+                fw << rmat1.at<double>(2, 0) << "\t" << rmat1.at<double>(2, 1) << "\t" << rmat1.at<double>(2, 2) << std::endl;
+
+                fw << "XYZ rotation is: " << rotationMatrixToEulerAngles(rmat2) << std::endl;
+                fw << "Rotation matrix C2MO (O to C2):" << std::endl;
+                fw << rmat2.at<double>(0, 0) << "\t" << rmat2.at<double>(0, 1) << "\t" << rmat2.at<double>(0, 2) << std::endl;
+                fw << rmat2.at<double>(1, 0) << "\t" << rmat2.at<double>(1, 1) << "\t" << rmat2.at<double>(1, 2) << std::endl;
+                fw << rmat2.at<double>(2, 0) << "\t" << rmat2.at<double>(2, 1) << "\t" << rmat2.at<double>(2, 2) << std::endl;
+
+                fw << "XYZ rotation is: " << rot << std::endl;
+                fw << "Rotation matrix R:" << std::endl;
+                fw << transform_R.at<double>(0, 0) << "\t" << transform_R.at<double>(0, 1) << "\t" << transform_R.at<double>(0, 2) << std::endl;
+                fw << transform_R.at<double>(1, 0) << "\t" << transform_R.at<double>(1, 1) << "\t" << transform_R.at<double>(1, 2) << std::endl;
+                fw << transform_R.at<double>(2, 0) << "\t" << transform_R.at<double>(2, 1) << "\t" << transform_R.at<double>(2, 2) << std::endl;
+                // fw << std::endl;
+                fw.close();
+            }
+        }
+
+        {
+            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_transform_t.txt", std::ofstream::out);
+            if (fw.is_open())
+            {
+                fw << "Translation matrix C1MO (O to C1):" << std::endl;
+                fw << tvec1.at<double>(0, 0) << std::endl;
+                fw << tvec1.at<double>(1, 0) << std::endl;
+                fw << tvec1.at<double>(2, 0) << std::endl;
+
+                fw << "Translation matrix C2MO (O to C2):" << std::endl;
+                fw << tvec2.at<double>(0, 0) << std::endl;
+                fw << tvec2.at<double>(1, 0) << std::endl;
+                fw << tvec2.at<double>(2, 0) << std::endl;
+
+                fw << "Translation matrix t:" << std::endl;
+                fw << transform_t.at<double>(0, 0) << std::endl;
+                fw << transform_t.at<double>(1, 0) << std::endl;
+                fw << transform_t.at<double>(2, 0) << std::endl;
+                fw.close();
+            }
+        }
+
+        /*
+        Bear in mind that tracer is the src image and traced is the dst image.
+
+        transform_t is of the form (x, y, z)
+        t.y should be considered 0.
+        If yaw=0, the more positive the t.z is, the more the goal (traced) is behind from the tracer, the more negative x translation is needed
+        to translate from tracer to traced.
+        If yaw=0, the more positive the t.x is, the more the goal (traced) is to the left of the tracer, the more positive y translation is needed
+        to translate from tracer to traced.
+
+        When computing transform_t, must consider the current orientation.
+        The goal is already in the tracer's coordinate frame, and the essential matrix
+        is actually to rotate, then translate from tracer to traced, in the tracer's coordinate frame.
+
+        transform_t probably needs to be scaled (element-wise multiplication) before it can be used.
+
+        For transform_R, only consider the y-axis rotation since this y-axis rotation is the z-axis rotation in the robot world.
+        The more positive this rotation, the more positive z-axis rotation is needed in the robot world.
+
+        transform_R can be directly used.
+        */
+        transform_needed.tx = (-1 * transform_t.at<double>(2, 0) * cos(yaw)) + (-1 * transform_t.at<double>(0, 0) * sin(yaw));
+        transform_needed.ty = transform_t.at<double>(0, 0) * cos(yaw) + (-1 * transform_t.at<double>(2, 0) * sin(yaw));
+        transform_needed.r = rot[1];
+
+        // Regard as does not match when solvepnp returns result that does not make sense
+        if (abs(transform_needed.tx) > 3.0 || abs(transform_needed.ty) > 3.0)
+        {
+            {
+                MatchAndSolveResult result;
+                result.match = false;
+                result.solved = false;
+                return result;
+            }
+        }
+        //
+
+        ROS_INFO("Debug");
+
+        {
+            MatchAndSolveResult result;
+            result.match = true;
+            result.solved = true;
+            return result;
+        }
     }
 
     MatchAndSolveResult CameraImageProcessor::matchAndSolve(const cv::Mat &tracer_robot_color_image, const cv::Mat &traced_robot_color_image, const cv::Mat &tracer_robot_depth_image, const cv::Mat &traced_robot_depth_image, FeatureType feature_type, double confidence, double yaw, TransformNeeded &transform_needed, std::string tracer_robot, std::string traced_robot, std::string current_time)
