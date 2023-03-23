@@ -1807,7 +1807,8 @@ namespace traceback
     if (from < to)
     {
       transform = robot_to_robot_optimized_transform_[from][to];
-      if (transform.empty()) {
+      if (transform.empty())
+      {
         return false;
       }
       inv_transform = transform.inv();
@@ -1815,7 +1816,8 @@ namespace traceback
     else
     {
       inv_transform = robot_to_robot_optimized_transform_[to][from];
-      if (inv_transform.empty()) {
+      if (inv_transform.empty())
+      {
         return false;
       }
       transform = inv_transform.inv();
@@ -2110,6 +2112,26 @@ namespace traceback
       inverse_ground_truth_transform = t_1_2;
     }
     //
+    {
+      std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+      if (fw.is_open())
+      {
+        double optimized_tx = adjusted.at<double>(0, 2);
+        double optimized_ty = adjusted.at<double>(1, 2);
+        double optimized_r = atan2(adjusted.at<double>(1, 0), adjusted.at<double>(0, 0));
+        fw << "Unadjusted transform:" << std::endl;
+        fw << original.at<double>(0, 0) << "\t" << original.at<double>(0, 1) << "\t" << original.at<double>(0, 2) << std::endl;
+        fw << original.at<double>(1, 0) << "\t" << original.at<double>(1, 1) << "\t" << original.at<double>(1, 2) << std::endl;
+        fw << original.at<double>(2, 0) << "\t" << original.at<double>(2, 1) << "\t" << original.at<double>(2, 2) << std::endl;
+        fw << "Optimized (tx, ty, r) = (" << optimized_tx << ", " << optimized_ty << ", " << optimized_r << ")" << std::endl;
+        fw << "Optimized transform:" << std::endl;
+        fw << adjusted.at<double>(0, 0) << "\t" << adjusted.at<double>(0, 1) << "\t" << adjusted.at<double>(0, 2) << std::endl;
+        fw << adjusted.at<double>(1, 0) << "\t" << adjusted.at<double>(1, 1) << "\t" << adjusted.at<double>(1, 2) << std::endl;
+        fw << adjusted.at<double>(2, 0) << "\t" << adjusted.at<double>(2, 1) << "\t" << adjusted.at<double>(2, 2) << std::endl;
+        fw.close();
+      }
+    }
+
     {
       std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
       if (fw.is_open())
