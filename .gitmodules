@@ -6,10 +6,6 @@
 	path = src/m-explore
 	url = https://github.com/michaelfong2017/m-explore.git
 	branch = traceback_explore
-[submodule "src/mongodb_store"]
-	path = src/mongodb_store
-	url = https://github.com/michaelfong2017/mongodb_store.git
-	branch = noetic-devel
 [submodule "src/aws_robomaker_small_warehouse_world"]
 	path = src/aws_robomaker_small_warehouse_world
 	url = https://github.com/michaelfong2017/aws-robomaker-small-warehouse-world.git
