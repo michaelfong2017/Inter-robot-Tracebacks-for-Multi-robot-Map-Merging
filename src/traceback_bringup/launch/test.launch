@@ -26,6 +26,7 @@
         <param name="update_target_rate" value="0.2" />
         <param name="discovery_rate" value="0.05" />
         <param name="estimation_rate" value="0.1" />
+        <param name="transform_optimization_rate" value="0.2" />
         <param name="unreasonable_goal_distance" value="5.0" /> <!-- Strongly related to the pixel
         distance -->
         <!-- either "normal" or "collect" -->

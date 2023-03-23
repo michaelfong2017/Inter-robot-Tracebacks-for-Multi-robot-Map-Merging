@@ -96,6 +96,7 @@ namespace traceback
     double update_target_rate_;
     double discovery_rate_;
     double estimation_rate_;
+
     double confidence_threshold_;
     double unreasonable_goal_distance_;
     double essential_mat_confidence_threshold_;
@@ -108,13 +109,17 @@ namespace traceback
 
     std::string robot_camera_image_topic_;
     std::string robot_camera_depth_image_topic_;
-    std::string robot_camera_point_cloud_topic_;
     int check_obstacle_nearby_pixel_distance_;
     double abort_threshold_distance_;
     double camera_image_update_rate_;
     double data_push_rate_;
     int camera_pose_image_queue_skip_count_;
     int camera_pose_image_max_queue_size_;
+
+    // For every pair of robots, do LM optimization
+    // read loop closure constraints, but not necessary to lock it
+    double transform_optimization_rate_;
+    int last_total_loop_constraint_count_;
 
     const tf::TransformListener tf_listener_; ///< @brief Used for transforming
     double transform_tolerance_;              ///< timeout before transform errors
@@ -203,6 +208,10 @@ namespace traceback
     void receiveUpdatedCameraImage();
     void pushData();
 
+    void addLoopClosureConstraint(cv::Mat &adjusted_transform, double src_x, double src_y, std::string src_robot, std::string dst_robot);
+
+    void transformOptimization();
+
     void poseEstimation();
 
     // Do not really synchronize anyway
@@ -263,6 +272,7 @@ namespace traceback
     void executeReceiveUpdatedCameraImage();
     void executePushData();
     void executePoseEstimation();
+    void executeTransformOptimization();
   };
 } // namespace traceback
 #endif
