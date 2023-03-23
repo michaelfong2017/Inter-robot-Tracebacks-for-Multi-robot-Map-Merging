@@ -1150,7 +1150,7 @@ namespace traceback
               current_traceback_transforms.push_back(t_global_i);
             }
 
-            cv::Mat world_transform = current_traceback_transforms[i] *
+            cv::Mat world_transform = current_traceback_transforms[1] *
                                       current_traceback_transforms[0].inv();
 
             //

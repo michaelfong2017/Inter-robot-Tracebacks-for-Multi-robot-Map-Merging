@@ -130,10 +130,10 @@ namespace traceback
                 fvecDiff = (fvecPlus - fvecMinus) / (2.0f * epsilon);
 
                 // r (angle) estimation
-                if (i == 2)
-                {
-                    fvecDiff *= 20;
-                }
+                // if (i == 2)
+                // {
+                //     fvecDiff *= 20;
+                // }
                 fjac.block(0, i, values(), 1) = fvecDiff;
             }
 
