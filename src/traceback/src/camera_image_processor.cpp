@@ -208,6 +208,17 @@ namespace traceback
             }
         }
 
+        // HARDCODE currently
+        if (filtered_image_points1.size() < 20)
+        {
+            {
+                MatchAndSolveResult result;
+                result.match = true;
+                result.solved = false;
+                return result;
+            }
+        }
+
         // solvepnp
         double k[9] = {554.254691191187, 0.0, 320.5, 0.0, 554.254691191187, 240.5, 0.0, 0.0, 1.0};
         cv::Mat camera_K = cv::Mat(3, 3, CV_64F, k);
@@ -533,6 +544,17 @@ namespace traceback
 
         // Filter case where filtered (depth != nan) match number is too small
         if (filtered_image_points1.size() < 4)
+        {
+            {
+                MatchAndSolveResult result;
+                result.match = true;
+                result.solved = false;
+                return result;
+            }
+        }
+
+        // HARDCODE currently
+        if (filtered_image_points1.size() < 20)
         {
             {
                 MatchAndSolveResult result;
