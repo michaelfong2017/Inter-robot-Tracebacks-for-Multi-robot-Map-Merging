@@ -110,6 +110,12 @@ namespace traceback
         pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
         pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
         robots_to_in_traceback_[tracer_robot] = false;
+
+        {
+          std::string src_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
+          std::string dst_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
+          robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot].clear();
+        }
         // 1. abort with enough count END
         return;
       }
@@ -215,70 +221,72 @@ namespace traceback
         cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced_depth.png",
                     colorized_depth_traced);
 
+        // Compute loop closure constraint
+        size_t tracer_robot_index;
+        size_t traced_robot_index;
+        for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
+        {
+          if (it->second == tracer_robot)
+          {
+            tracer_robot_index = it->first;
+          }
+          else if (it->second == traced_robot)
+          {
+            traced_robot_index = it->first;
+          }
+        }
+
+        cv::Mat world_transform = robot_to_robot_traceback_in_progress_transform_[tracer_robot][traced_robot];
+
+        cv::Mat adjusted_transform;
+        findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, arrived_pose.position.x, arrived_pose.position.y, resolutions_[tracer_robot_index]);
+
+        // TransformAdjustmentResult result;
+        // result.current_time = current_time;
+        // result.transform_needed = transform_needed;
+        // result.world_transform = world_transform;
+        // result.adjusted_transform = adjusted_transform;
+
+        size_t traceback_accept_count = tracer_robot < traced_robot ? robot_to_robot_traceback_accept_count_[tracer_robot][traced_robot] : robot_to_robot_traceback_accept_count_[traced_robot][tracer_robot];
+        if (traceback_accept_count > 0)
+        {
+          addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[tracer_robot_index], transform_needed.arrived_y / resolutions_[tracer_robot_index], tracer_robot, traced_robot);
+        }
+        else
+        {
+          addTracebackLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[tracer_robot_index], transform_needed.arrived_y / resolutions_[tracer_robot_index], tracer_robot, traced_robot);
+        }
+
         // 3. match and solved and accept
         if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count >= accept_count_needed_)
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "3. match and solved and accept");
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
-
-          // int history_size = pairwise_transform_adjustment_result_history_[tracer_robot][traced_robot].size();
-          // for (size_t i = 0; i < history_size; ++i)
-          // {
-          //   TransformAdjustmentResult result = pairwise_transform_adjustment_result_history_[tracer_robot][traced_robot][i];
-          //   {
-          //     std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-          //     if (fw.is_open())
-          //     {
-          //       fw << "Index " << i << " transform_needed (tx, ty, r) = (" << result.transform_needed.tx << ", " << result.transform_needed.ty << ", " << result.transform_needed.r << ")" << std::endl;
-          //       fw.close();
-          //     }
-          //   }
-          // }
-          // for (size_t i = 0; i < history_size; ++i)
-          // {
-          //   TransformAdjustmentResult result = pairwise_transform_adjustment_result_history_[tracer_robot][traced_robot][i];
-          //   cv::Mat adjusted_transform = result.adjusted_transform;
-          //   double tx = adjusted_transform.at<double>(0, 2);
-          //   double ty = adjusted_transform.at<double>(1, 2);
-          //   double r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
-
-          //   {
-          //     std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-          //     if (fw.is_open())
-          //     {
-          //       fw << "Index " << i << " adjusted transform (tx, ty, r) = (" << tx << ", " << ty << ", " << r << ")" << std::endl;
-          //       fw.close();
-          //     }
-          //   }
-          // }
-
-          // {
-          //   std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
-          //   if (fw.is_open())
-          //   {
-          //     fw << "Unadjusted transform:" << std::endl;
-          //     if (history_size != 0)
-          //     {
-          //       fw << world_transform.at<double>(0, 0) << "\t" << world_transform.at<double>(0, 1) << "\t" << world_transform.at<double>(0, 2) << std::endl;
-          //       fw << world_transform.at<double>(1, 0) << "\t" << world_transform.at<double>(1, 1) << "\t" << world_transform.at<double>(1, 2) << std::endl;
-          //       fw << world_transform.at<double>(2, 0) << "\t" << world_transform.at<double>(2, 1) << "\t" << world_transform.at<double>(2, 2) << std::endl;
-          //     }
-          //     else
-          //     {
-          //       fw << "None because history size is 0, which should not happen!" << std::endl;
-          //     }
-          //     fw << "Optimized (tx, ty, r) = (" << optimized_tx << ", " << optimized_ty << ", " << optimized_r << ")" << std::endl;
-          //     fw << "Optimized transform:" << std::endl;
-          //     fw << optimized_transform.at<double>(0, 0) << "\t" << optimized_transform.at<double>(0, 1) << "\t" << optimized_transform.at<double>(0, 2) << std::endl;
-          //     fw << optimized_transform.at<double>(1, 0) << "\t" << optimized_transform.at<double>(1, 1) << "\t" << optimized_transform.at<double>(1, 2) << std::endl;
-          //     fw << optimized_transform.at<double>(2, 0) << "\t" << optimized_transform.at<double>(2, 1) << "\t" << optimized_transform.at<double>(2, 2) << std::endl;
-          //     fw.close();
-          //   }
-          // }
-
-          // evaluateWithGroundTruth(world_transform, optimized_transform, tracer_robot, traced_robot, current_time);
-
           robots_to_in_traceback_[tracer_robot] = false;
+
+          if (traceback_accept_count == 0)
+          {
+            {
+              boost::lock_guard<boost::shared_mutex> lock(loop_constraints_mutex_);
+
+              std::string src_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
+              std::string dst_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
+              for (auto &constraint : robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot])
+              {
+                robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
+              }
+              robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot].clear();
+            }
+          }
+
+          if (tracer_robot < traced_robot)
+          {
+            ++robot_to_robot_traceback_accept_count_[tracer_robot][traced_robot];
+          }
+          else
+          {
+            ++robot_to_robot_traceback_accept_count_[traced_robot][tracer_robot];
+          }
           // 3. match and solved and accept END
           return;
         }
@@ -286,36 +294,6 @@ namespace traceback
         else
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "4. match and solved but not yet accept");
-
-          {
-            size_t tracer_robot_index;
-            size_t traced_robot_index;
-            for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
-            {
-              if (it->second == tracer_robot)
-              {
-                tracer_robot_index = it->first;
-              }
-              else if (it->second == traced_robot)
-              {
-                traced_robot_index = it->first;
-              }
-            }
-
-            cv::Mat world_transform = robot_to_robot_traceback_in_progress_transform_[tracer_robot][traced_robot];
-
-            cv::Mat adjusted_transform;
-            findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, arrived_pose.position.x, arrived_pose.position.y, resolutions_[tracer_robot_index]);
-
-            // TransformAdjustmentResult result;
-            // result.current_time = current_time;
-            // result.transform_needed = transform_needed;
-            // result.world_transform = world_transform;
-            // result.adjusted_transform = adjusted_transform;
-
-            addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[tracer_robot_index], transform_needed.arrived_y / resolutions_[tracer_robot_index], tracer_robot, traced_robot);
-          }
-
           continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
           // 4. match and solved but not yet accept END
           return;
@@ -338,6 +316,12 @@ namespace traceback
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
           pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
           robots_to_in_traceback_[tracer_robot] = false;
+
+          {
+            std::string src_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
+            std::string dst_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
+            robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot].clear();
+          }
           // 6. does not match and reject END
           return;
         }
@@ -444,11 +428,35 @@ namespace traceback
           }
           else
           {
-            if (robot_to_robot_traceback_complete_count_[robot_name_src][dst] < robot_to_robot_traceback_complete_count_[robot_name_src][robot_name_dst])
+            size_t new_count = robot_name_src < dst ? robot_to_robot_traceback_accept_count_[robot_name_src][dst] : robot_to_robot_traceback_accept_count_[dst][robot_name_src];
+            size_t old_count = robot_name_src < robot_name_dst ? robot_to_robot_traceback_accept_count_[robot_name_src][robot_name_dst] : robot_to_robot_traceback_accept_count_[robot_name_dst][robot_name_src];
+            if (new_count < old_count)
             {
               robot_name_dst = dst;
               max_position = j;
             }
+          }
+        }
+      }
+
+      // If not yet has optimized transform, find candidate loop closure
+      bool use_candidate_loop_closure = false;
+      if (robot_name_dst == "")
+      {
+        for (size_t j = 0; j < number_of_robots; ++j)
+        {
+          if (i == j)
+          {
+            continue;
+          }
+
+          std::string dst = transforms_indexes_[j];
+
+          if (robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][dst].size() > 0)
+          {
+            use_candidate_loop_closure = true;
+            robot_name_dst = dst;
+            max_position = j;
           }
         }
       }
@@ -462,9 +470,28 @@ namespace traceback
       assert(transforms_indexes_[max_position] == robot_name_dst);
       // Select robot_name_dst END
 
-      cv::Mat transform;
-      cv::Mat inv_transform;
-      bool hasOptimizedTransform = readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
+      cv::Mat transform = cv::Mat(3, 3, CV_64F);
+      cv::Mat inv_transform = cv::Mat(3, 3, CV_64F);
+
+      if (use_candidate_loop_closure)
+      {
+        LoopClosureConstraint constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].front();
+        transform.at<double>(0, 0) = cos(constraint.r);
+        transform.at<double>(0, 1) = -sin(constraint.r);
+        transform.at<double>(0, 2) = constraint.tx;
+        transform.at<double>(1, 0) = sin(constraint.r);
+        transform.at<double>(1, 1) = cos(constraint.r);
+        transform.at<double>(1, 2) = constraint.ty;
+        transform.at<double>(2, 0) = 0;
+        transform.at<double>(2, 1) = 0;
+        transform.at<double>(2, 2) = 1;
+        inv_transform = transform.inv();
+        robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].erase(robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].begin());
+      }
+      else
+      {
+        bool hasOptimizedTransform = readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
+      }
 
       // Get current pose
       geometry_msgs::Pose pose = getRobotPose(robot_name_src);
@@ -1194,7 +1221,8 @@ namespace traceback
             }
             ROS_INFO("matrix:\n%s", s.c_str());
 
-            addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
+            // Transform proposed here is often outlier
+            addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
             // Evaluate match with current pose of current robot
             // Note that unmodified transform is used
@@ -1307,6 +1335,70 @@ namespace traceback
     }
   }
 
+  void Traceback::addTracebackLoopClosureConstraint(cv::Mat &adjusted_transform, double src_x, double src_y, std::string src_robot, std::string dst_robot)
+  {
+    if (src_robot < dst_robot)
+    {
+      LoopClosureConstraint loop_closure_constraint;
+      loop_closure_constraint.x = src_x;
+      loop_closure_constraint.y = src_y;
+      loop_closure_constraint.tx = adjusted_transform.at<double>(0, 2);
+      loop_closure_constraint.ty = adjusted_transform.at<double>(1, 2);
+      loop_closure_constraint.r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
+      robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot].push_back(loop_closure_constraint);
+    }
+    else
+    {
+      LoopClosureConstraint loop_closure_constraint;
+      cv::Mat src(3, 1, CV_64F);
+      src.at<double>(0, 0) = src_x;
+      src.at<double>(1, 0) = src_y;
+      src.at<double>(2, 0);
+      cv::Mat dst = adjusted_transform * src;
+      double inv_x = dst.at<double>(0, 0);
+      double inv_y = dst.at<double>(1, 0);
+      loop_closure_constraint.x = inv_x;
+      loop_closure_constraint.y = inv_y;
+      cv::Mat inv_adjusted_transform = adjusted_transform.inv();
+      loop_closure_constraint.tx = inv_adjusted_transform.at<double>(0, 2);
+      loop_closure_constraint.ty = inv_adjusted_transform.at<double>(1, 2);
+      loop_closure_constraint.r = atan2(inv_adjusted_transform.at<double>(1, 0), inv_adjusted_transform.at<double>(0, 0));
+      robot_to_robot_traceback_loop_closure_constraints_[dst_robot][src_robot].push_back(loop_closure_constraint);
+    }
+  }
+
+  void Traceback::addCandidateLoopClosureConstraint(cv::Mat &adjusted_transform, double src_x, double src_y, std::string src_robot, std::string dst_robot)
+  {
+    if (src_robot < dst_robot)
+    {
+      LoopClosureConstraint loop_closure_constraint;
+      loop_closure_constraint.x = src_x;
+      loop_closure_constraint.y = src_y;
+      loop_closure_constraint.tx = adjusted_transform.at<double>(0, 2);
+      loop_closure_constraint.ty = adjusted_transform.at<double>(1, 2);
+      loop_closure_constraint.r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
+      robot_to_robot_candidate_loop_closure_constraints_[src_robot][dst_robot].push_back(loop_closure_constraint);
+    }
+    else
+    {
+      LoopClosureConstraint loop_closure_constraint;
+      cv::Mat src(3, 1, CV_64F);
+      src.at<double>(0, 0) = src_x;
+      src.at<double>(1, 0) = src_y;
+      src.at<double>(2, 0);
+      cv::Mat dst = adjusted_transform * src;
+      double inv_x = dst.at<double>(0, 0);
+      double inv_y = dst.at<double>(1, 0);
+      loop_closure_constraint.x = inv_x;
+      loop_closure_constraint.y = inv_y;
+      cv::Mat inv_adjusted_transform = adjusted_transform.inv();
+      loop_closure_constraint.tx = inv_adjusted_transform.at<double>(0, 2);
+      loop_closure_constraint.ty = inv_adjusted_transform.at<double>(1, 2);
+      loop_closure_constraint.r = atan2(inv_adjusted_transform.at<double>(1, 0), inv_adjusted_transform.at<double>(0, 0));
+      robot_to_robot_candidate_loop_closure_constraints_[dst_robot][src_robot].push_back(loop_closure_constraint);
+    }
+  }
+
   void Traceback::addLoopClosureConstraint(cv::Mat &adjusted_transform, double src_x, double src_y, std::string src_robot, std::string dst_robot)
   {
     if (src_robot < dst_robot)
@@ -1342,174 +1434,178 @@ namespace traceback
   void Traceback::transformOptimization()
   {
     ROS_DEBUG("Transform optimization started.");
-    int total_loop_constraint_count = 0;
-    for (auto &src : robot_to_robot_loop_closure_constraints_)
     {
-      for (auto &dst : src.second)
-      {
-        total_loop_constraint_count += dst.second.size();
-      }
-    }
+      boost::shared_lock<boost::shared_mutex> lock(loop_constraints_mutex_);
 
-    // Only increment, so do only when there are updates
-    if (total_loop_constraint_count != last_total_loop_constraint_count_)
-    {
-      last_total_loop_constraint_count_ = total_loop_constraint_count;
-
-      // Write to file when total loop constraint number has changed
-      {
-        std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-
-        std::ofstream fw("Loop_closure_count_" + current_time + ".txt", std::ofstream::app);
-        if (fw.is_open())
-        {
-          for (auto &src : robot_to_robot_loop_closure_constraints_)
-          {
-            for (auto &dst : src.second)
-            {
-              fw << "Count from " << src.first << " to " << dst.first << " is " << dst.second.size() << std::endl;
-            }
-          }
-          fw.close();
-        }
-      }
-
-      // Do optimization
-      std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-
+      int total_loop_constraint_count = 0;
       for (auto &src : robot_to_robot_loop_closure_constraints_)
       {
         for (auto &dst : src.second)
         {
-          std::string robot_name = src.first;
-          std::string second_robot_name = dst.first;
+          total_loop_constraint_count += dst.second.size();
+        }
+      }
 
-          if (robot_name >= second_robot_name)
+      // Only increment, so do only when there are updates
+      if (total_loop_constraint_count != last_total_loop_constraint_count_)
+      {
+        last_total_loop_constraint_count_ = total_loop_constraint_count;
+
+        // Write to file when total loop constraint number has changed
+        {
+          std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+
+          std::ofstream fw("Loop_closure_count_" + current_time + ".txt", std::ofstream::app);
+          if (fw.is_open())
           {
-            continue;
-          }
-
-          std::vector<LoopClosureConstraint> loop_closure_constraints = dst.second;
-
-          if (loop_closure_constraints.size() == 0)
-          {
-            continue;
-          }
-
-          std::vector<double> x_values;
-          std::vector<double> y_values;
-          std::vector<double> tx_values;
-          std::vector<double> ty_values;
-          std::vector<double> r_values;
-
-          for (LoopClosureConstraint &constraint : loop_closure_constraints)
-          {
-            x_values.push_back(constraint.x);
-            y_values.push_back(constraint.y);
-            tx_values.push_back(constraint.tx);
-            ty_values.push_back(constraint.ty);
-            r_values.push_back(constraint.r);
-          }
-
-          double init_tx, init_ty, init_r;
-
-          cv::Mat init_transform = robot_to_robot_optimized_transform_[robot_name][second_robot_name];
-          if (!init_transform.empty())
-          {
-            init_tx = init_transform.at<double>(0, 2);
-            init_ty = init_transform.at<double>(1, 2);
-            init_r = atan2(init_transform.at<double>(1, 0), init_transform.at<double>(0, 0));
-          }
-          else
-          {
-            assert(loop_closure_constraints.size() > 0);
-            init_tx = loop_closure_constraints[0].tx;
-            init_ty = loop_closure_constraints[0].ty;
-            init_r = loop_closure_constraints[0].r;
-
-            // Just for later writing to file without error
-            init_transform = cv::Mat::eye(3, 3, CV_64F);
-          }
-
-          std::vector<double> optimized_tx_ty_r = camera_image_processor_.LMOptimize(x_values, y_values, tx_values, ty_values, r_values, init_tx, init_ty, init_r);
-
-          double optimized_tx = optimized_tx_ty_r[0];
-          double optimized_ty = optimized_tx_ty_r[1];
-          double optimized_r = optimized_tx_ty_r[2];
-
-          // Compute transformation from optimized (tx, ty, r)
-          cv::Mat optimized_transform(3, 3, CV_64F);
-          optimized_transform.at<double>(0, 0) = cos(optimized_r);
-          optimized_transform.at<double>(0, 1) = -sin(optimized_r);
-          optimized_transform.at<double>(0, 2) = optimized_tx;
-          optimized_transform.at<double>(1, 0) = sin(optimized_r);
-          optimized_transform.at<double>(1, 1) = cos(optimized_r);
-          optimized_transform.at<double>(1, 2) = optimized_ty;
-          optimized_transform.at<double>(2, 0) = 0;
-          optimized_transform.at<double>(2, 1) = 0;
-          optimized_transform.at<double>(2, 2) = 1;
-
-          robot_to_robot_optimized_transform_[robot_name][second_robot_name] = optimized_transform;
-
-          //
-          transform_estimator_.updateBestTransforms(optimized_transform, robot_name, second_robot_name, best_transforms_, has_best_transforms_);
-          //
-
-          evaluateWithGroundTruth(init_transform, optimized_transform, robot_name, second_robot_name, current_time);
-
-          if (has_best_transforms_.size() == resolutions_.size())
-          {
-            std::vector<std::string> robot_names;
-            std::vector<double> m_00;
-            std::vector<double> m_01;
-            std::vector<double> m_02;
-            std::vector<double> m_10;
-            std::vector<double> m_11;
-            std::vector<double> m_12;
-            std::vector<double> m_20;
-            std::vector<double> m_21;
-            std::vector<double> m_22;
-            for (auto it = best_transforms_[robot_name].begin(); it != best_transforms_[robot_name].end(); ++it)
+            for (auto &src : robot_to_robot_loop_closure_constraints_)
             {
-              std::string dst_robot = it->first;
-              cv::Mat dst_transform = it->second;
-              robot_names.push_back(dst_robot);
-              m_00.push_back(dst_transform.at<double>(0, 0));
-              m_01.push_back(dst_transform.at<double>(0, 1));
-              m_02.push_back(dst_transform.at<double>(0, 2));
-              m_10.push_back(dst_transform.at<double>(1, 0));
-              m_11.push_back(dst_transform.at<double>(1, 1));
-              m_12.push_back(dst_transform.at<double>(1, 2));
-              m_20.push_back(dst_transform.at<double>(2, 0));
-              m_21.push_back(dst_transform.at<double>(2, 1));
-              m_22.push_back(dst_transform.at<double>(2, 2));
-
+              for (auto &dst : src.second)
               {
-                std::ofstream fw("Best_transforms_" + current_time + "_" + robot_name.substr(1) + "_tracer_robot.txt", std::ofstream::app);
-                if (fw.is_open())
-                {
-                  fw << "Best transform from " << robot_name << " to " << dst_robot << " :" << std::endl;
-                  fw << dst_transform.at<double>(0, 0) << "\t" << dst_transform.at<double>(0, 1) << "\t" << dst_transform.at<double>(0, 2) << std::endl;
-                  fw << dst_transform.at<double>(1, 0) << "\t" << dst_transform.at<double>(1, 1) << "\t" << dst_transform.at<double>(1, 2) << std::endl;
-                  fw << dst_transform.at<double>(2, 0) << "\t" << dst_transform.at<double>(2, 1) << "\t" << dst_transform.at<double>(2, 2) << std::endl;
-                  fw.close();
-                }
+                fw << "Count from " << src.first << " to " << dst.first << " is " << dst.second.size() << std::endl;
               }
             }
+            fw.close();
+          }
+        }
 
-            traceback_msgs::TracebackTransforms traceback_transforms;
-            traceback_transforms.robot_names = robot_names;
-            traceback_transforms.m_00 = m_00;
-            traceback_transforms.m_01 = m_01;
-            traceback_transforms.m_02 = m_02;
-            traceback_transforms.m_10 = m_10;
-            traceback_transforms.m_11 = m_11;
-            traceback_transforms.m_12 = m_12;
-            traceback_transforms.m_20 = m_20;
-            traceback_transforms.m_21 = m_21;
-            traceback_transforms.m_22 = m_22;
+        // Do optimization
+        std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
-            traceback_transforms_publisher_.publish(traceback_transforms);
+        for (auto &src : robot_to_robot_loop_closure_constraints_)
+        {
+          for (auto &dst : src.second)
+          {
+            std::string robot_name = src.first;
+            std::string second_robot_name = dst.first;
+
+            if (robot_name >= second_robot_name)
+            {
+              continue;
+            }
+
+            std::vector<LoopClosureConstraint> loop_closure_constraints = dst.second;
+
+            if (loop_closure_constraints.size() == 0)
+            {
+              continue;
+            }
+
+            std::vector<double> x_values;
+            std::vector<double> y_values;
+            std::vector<double> tx_values;
+            std::vector<double> ty_values;
+            std::vector<double> r_values;
+
+            for (LoopClosureConstraint &constraint : loop_closure_constraints)
+            {
+              x_values.push_back(constraint.x);
+              y_values.push_back(constraint.y);
+              tx_values.push_back(constraint.tx);
+              ty_values.push_back(constraint.ty);
+              r_values.push_back(constraint.r);
+            }
+
+            double init_tx, init_ty, init_r;
+
+            cv::Mat init_transform = robot_to_robot_optimized_transform_[robot_name][second_robot_name];
+            if (!init_transform.empty())
+            {
+              init_tx = init_transform.at<double>(0, 2);
+              init_ty = init_transform.at<double>(1, 2);
+              init_r = atan2(init_transform.at<double>(1, 0), init_transform.at<double>(0, 0));
+            }
+            else
+            {
+              assert(loop_closure_constraints.size() > 0);
+              init_tx = loop_closure_constraints[0].tx;
+              init_ty = loop_closure_constraints[0].ty;
+              init_r = loop_closure_constraints[0].r;
+
+              // Just for later writing to file without error
+              init_transform = cv::Mat::eye(3, 3, CV_64F);
+            }
+
+            std::vector<double> optimized_tx_ty_r = camera_image_processor_.LMOptimize(x_values, y_values, tx_values, ty_values, r_values, init_tx, init_ty, init_r);
+
+            double optimized_tx = optimized_tx_ty_r[0];
+            double optimized_ty = optimized_tx_ty_r[1];
+            double optimized_r = optimized_tx_ty_r[2];
+
+            // Compute transformation from optimized (tx, ty, r)
+            cv::Mat optimized_transform(3, 3, CV_64F);
+            optimized_transform.at<double>(0, 0) = cos(optimized_r);
+            optimized_transform.at<double>(0, 1) = -sin(optimized_r);
+            optimized_transform.at<double>(0, 2) = optimized_tx;
+            optimized_transform.at<double>(1, 0) = sin(optimized_r);
+            optimized_transform.at<double>(1, 1) = cos(optimized_r);
+            optimized_transform.at<double>(1, 2) = optimized_ty;
+            optimized_transform.at<double>(2, 0) = 0;
+            optimized_transform.at<double>(2, 1) = 0;
+            optimized_transform.at<double>(2, 2) = 1;
+
+            robot_to_robot_optimized_transform_[robot_name][second_robot_name] = optimized_transform;
+
+            //
+            transform_estimator_.updateBestTransforms(optimized_transform, robot_name, second_robot_name, best_transforms_, has_best_transforms_);
+            //
+
+            evaluateWithGroundTruth(init_transform, optimized_transform, robot_name, second_robot_name, current_time);
+
+            if (has_best_transforms_.size() == resolutions_.size())
+            {
+              std::vector<std::string> robot_names;
+              std::vector<double> m_00;
+              std::vector<double> m_01;
+              std::vector<double> m_02;
+              std::vector<double> m_10;
+              std::vector<double> m_11;
+              std::vector<double> m_12;
+              std::vector<double> m_20;
+              std::vector<double> m_21;
+              std::vector<double> m_22;
+              for (auto it = best_transforms_[robot_name].begin(); it != best_transforms_[robot_name].end(); ++it)
+              {
+                std::string dst_robot = it->first;
+                cv::Mat dst_transform = it->second;
+                robot_names.push_back(dst_robot);
+                m_00.push_back(dst_transform.at<double>(0, 0));
+                m_01.push_back(dst_transform.at<double>(0, 1));
+                m_02.push_back(dst_transform.at<double>(0, 2));
+                m_10.push_back(dst_transform.at<double>(1, 0));
+                m_11.push_back(dst_transform.at<double>(1, 1));
+                m_12.push_back(dst_transform.at<double>(1, 2));
+                m_20.push_back(dst_transform.at<double>(2, 0));
+                m_21.push_back(dst_transform.at<double>(2, 1));
+                m_22.push_back(dst_transform.at<double>(2, 2));
+
+                {
+                  std::ofstream fw("Best_transforms_" + current_time + "_" + robot_name.substr(1) + "_tracer_robot.txt", std::ofstream::app);
+                  if (fw.is_open())
+                  {
+                    fw << "Best transform from " << robot_name << " to " << dst_robot << " :" << std::endl;
+                    fw << dst_transform.at<double>(0, 0) << "\t" << dst_transform.at<double>(0, 1) << "\t" << dst_transform.at<double>(0, 2) << std::endl;
+                    fw << dst_transform.at<double>(1, 0) << "\t" << dst_transform.at<double>(1, 1) << "\t" << dst_transform.at<double>(1, 2) << std::endl;
+                    fw << dst_transform.at<double>(2, 0) << "\t" << dst_transform.at<double>(2, 1) << "\t" << dst_transform.at<double>(2, 2) << std::endl;
+                    fw.close();
+                  }
+                }
+              }
+
+              traceback_msgs::TracebackTransforms traceback_transforms;
+              traceback_transforms.robot_names = robot_names;
+              traceback_transforms.m_00 = m_00;
+              traceback_transforms.m_01 = m_01;
+              traceback_transforms.m_02 = m_02;
+              traceback_transforms.m_10 = m_10;
+              traceback_transforms.m_11 = m_11;
+              traceback_transforms.m_12 = m_12;
+              traceback_transforms.m_20 = m_20;
+              traceback_transforms.m_21 = m_21;
+              traceback_transforms.m_22 = m_22;
+
+              traceback_transforms_publisher_.publish(traceback_transforms);
+            }
           }
         }
       }
@@ -1800,9 +1896,13 @@ namespace traceback
           pairwise_paused_[it->first][robot_name] = false;
           pairwise_paused_[robot_name][it->first] = false;
 
-          robot_to_robot_traceback_complete_count_[it->first][robot_name] = 0;
-          robot_to_robot_traceback_complete_count_[robot_name][it->first] = 0;
+          robot_to_robot_traceback_accept_count_[it->first][robot_name] = 0;
+          robot_to_robot_traceback_accept_count_[robot_name][it->first] = 0;
 
+          robot_to_robot_traceback_loop_closure_constraints_[it->first][robot_name] = {};
+          robot_to_robot_traceback_loop_closure_constraints_[robot_name][it->first] = {};
+          robot_to_robot_candidate_loop_closure_constraints_[it->first][robot_name] = {};
+          robot_to_robot_candidate_loop_closure_constraints_[robot_name][it->first] = {};
           robot_to_robot_loop_closure_constraints_[it->first][robot_name] = {};
           robot_to_robot_loop_closure_constraints_[robot_name][it->first] = {};
         }

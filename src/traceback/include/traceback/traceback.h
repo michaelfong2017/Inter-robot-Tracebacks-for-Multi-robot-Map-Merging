@@ -160,7 +160,12 @@ namespace traceback
     std::unordered_map<std::string, boost::shared_mutex> robots_to_current_it_mutex_;
 
     // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<LoopClosureConstraint>>> robot_to_robot_traceback_loop_closure_constraints_;
+    // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<LoopClosureConstraint>>> robot_to_robot_candidate_loop_closure_constraints_;
+    // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
     std::unordered_map<std::string, std::unordered_map<std::string, std::vector<LoopClosureConstraint>>> robot_to_robot_loop_closure_constraints_;
+    boost::shared_mutex loop_constraints_mutex_;
     // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> robot_to_robot_optimized_transform_;
 
@@ -168,9 +173,8 @@ namespace traceback
 
     // "from" can be alphabetically smaller or greater than "to"
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> robot_to_robot_traceback_in_progress_transform_;
-    // Number of traceback processes started, can be accepted, rejected or aborted
-    // "from" can be alphabetically smaller or greater than "to"
-    std::unordered_map<std::string, std::unordered_map<std::string, size_t>> robot_to_robot_traceback_complete_count_;
+    // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
+    std::unordered_map<std::string, std::unordered_map<std::string, size_t>> robot_to_robot_traceback_accept_count_;
 
     ros::Publisher traceback_transforms_publisher_;
     std::string traceback_transforms_topic_ = "/traceback/traceback_transforms";
@@ -208,6 +212,8 @@ namespace traceback
     void receiveUpdatedCameraImage();
     void pushData();
 
+    void addTracebackLoopClosureConstraint(cv::Mat &adjusted_transform, double src_x, double src_y, std::string src_robot, std::string dst_robot);
+    void addCandidateLoopClosureConstraint(cv::Mat &adjusted_transform, double src_x, double src_y, std::string src_robot, std::string dst_robot);
     void addLoopClosureConstraint(cv::Mat &adjusted_transform, double src_x, double src_y, std::string src_robot, std::string dst_robot);
 
     void transformOptimization();
