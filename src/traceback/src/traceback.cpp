@@ -183,6 +183,8 @@ namespace traceback
       geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
       double yaw = quaternionToYaw(goal_q);
       TransformNeeded transform_needed;
+      transform_needed.arrived_x = arrived_pose.position.x;
+      transform_needed.arrived_y = arrived_pose.position.y;
 
       MatchAndSolveResult result = camera_image_processor_.matchAndSolve(cv_ptr_tracer->image, cv_ptr_traced->image, cv_ptr_depth_tracer->image, cv_ptr_depth_traced->image, FeatureType::SURF, essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
 
@@ -311,10 +313,7 @@ namespace traceback
             // result.world_transform = world_transform;
             // result.adjusted_transform = adjusted_transform;
 
-            transform_needed.arrived_x = arrived_pose.position.x / resolutions_[tracer_robot_index];
-            transform_needed.arrived_y = arrived_pose.position.y / resolutions_[tracer_robot_index];
-
-            addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x, transform_needed.arrived_y, tracer_robot, traced_robot);
+            addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[tracer_robot_index], transform_needed.arrived_y / resolutions_[tracer_robot_index], tracer_robot, traced_robot);
           }
 
           continueTraceback(tracer_robot, traced_robot, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
@@ -1158,6 +1157,8 @@ namespace traceback
             geometry_msgs::Quaternion goal_q = pose1.orientation;
             double yaw = quaternionToYaw(goal_q);
             TransformNeeded transform_needed;
+            transform_needed.arrived_x = pose1.position.x;
+            transform_needed.arrived_y = pose1.position.y;
             MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
 
             if (!result.match || !result.solved)
@@ -1193,10 +1194,7 @@ namespace traceback
             }
             ROS_INFO("matrix:\n%s", s.c_str());
 
-            transform_needed.arrived_x = pose1.position.x / resolutions_[self_robot_index];
-            transform_needed.arrived_y = pose1.position.y / resolutions_[self_robot_index];
-
-            addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x, transform_needed.arrived_y, robot_name, second_robot_name);
+            addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
             // Evaluate match with current pose of current robot
             // Note that unmodified transform is used
