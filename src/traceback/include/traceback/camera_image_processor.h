@@ -132,7 +132,7 @@ namespace traceback
                 // r (angle) estimation
                 // if (i == 2)
                 // {
-                //     fvecDiff *= 20;
+                //     fvecDiff *= 15;
                 // }
                 fjac.block(0, i, values(), 1) = fvecDiff;
             }

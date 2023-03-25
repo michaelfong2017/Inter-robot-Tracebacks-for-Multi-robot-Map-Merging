@@ -183,8 +183,6 @@ namespace traceback
       geometry_msgs::Quaternion goal_q = arrived_pose.orientation;
       double yaw = quaternionToYaw(goal_q);
       TransformNeeded transform_needed;
-      transform_needed.arrived_x = arrived_pose.position.x;
-      transform_needed.arrived_y = arrived_pose.position.y;
 
       MatchAndSolveResult result = camera_image_processor_.matchAndSolve(cv_ptr_tracer->image, cv_ptr_traced->image, cv_ptr_depth_tracer->image, cv_ptr_depth_traced->image, FeatureType::SURF, essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
 
@@ -316,6 +314,9 @@ namespace traceback
             // result.transform_needed = transform_needed;
             // result.world_transform = world_transform;
             // result.adjusted_transform = adjusted_transform;
+
+            transform_needed.arrived_x = arrived_pose.position.x / resolutions_[tracer_robot_index];
+            transform_needed.arrived_y = arrived_pose.position.y / resolutions_[tracer_robot_index];
 
             addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x, transform_needed.arrived_y, tracer_robot, traced_robot);
           }
@@ -1161,8 +1162,6 @@ namespace traceback
             geometry_msgs::Quaternion goal_q = pose1.orientation;
             double yaw = quaternionToYaw(goal_q);
             TransformNeeded transform_needed;
-            transform_needed.arrived_x = pose1.position.x;
-            transform_needed.arrived_y = pose1.position.y;
             MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
 
             // TODO adjust with transform_needed
@@ -1193,6 +1192,9 @@ namespace traceback
               }
             }
             ROS_INFO("matrix:\n%s", s.c_str());
+
+            transform_needed.arrived_x = pose1.position.x / resolutions_[self_robot_index];
+            transform_needed.arrived_y = pose1.position.y / resolutions_[self_robot_index];
 
             addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x, transform_needed.arrived_y, robot_name, second_robot_name);
 
@@ -1381,15 +1383,20 @@ namespace traceback
       {
         for (auto &dst : src.second)
         {
+          std::string robot_name = src.first;
+          std::string second_robot_name = dst.first;
+
+          if (robot_name >= second_robot_name)
+          {
+            continue;
+          }
+
           std::vector<LoopClosureConstraint> loop_closure_constraints = dst.second;
 
           if (loop_closure_constraints.size() == 0)
           {
             continue;
           }
-
-          std::string robot_name = src.first;
-          std::string second_robot_name = dst.first;
 
           std::vector<double> x_values;
           std::vector<double> y_values;
