@@ -1164,7 +1164,11 @@ namespace traceback
             TransformNeeded transform_needed;
             MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
 
-            // TODO adjust with transform_needed
+            if (!result.match || !result.solved)
+            {
+              continue;
+            }
+
             cv::Mat adjusted_transform;
             findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, transform_needed.arrived_x, transform_needed.arrived_y, resolutions_[self_robot_index]);
 
