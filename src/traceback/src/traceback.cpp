@@ -262,6 +262,8 @@ namespace traceback
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "3. match and solved and accept");
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
+          pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
           robots_to_in_traceback_[tracer_robot] = false;
 
           if (traceback_accept_count == 0)
@@ -406,6 +408,11 @@ namespace traceback
       std::string robot_name_dst = "";
       size_t max_position;
 
+      if (robots_to_in_traceback_[robot_name_src])
+      {
+        continue; // continue to next robot since the current robot is currently in traceback process
+      }
+
       // Select robot_name_dst
       for (size_t j = 0; j < number_of_robots; ++j)
       {
@@ -418,6 +425,12 @@ namespace traceback
         cv::Mat t;
         cv::Mat i;
         bool hasOptimizedTransform = readOptimizedTransform(t, i, robot_name_src, dst);
+        bool hasCandidate = robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][dst].size() > 0;
+
+        // src < dst is for using candidate, dst < src is for using optimized transform
+        if (!hasOptimizedTransform && hasCandidate && robot_name_src < dst) {
+          break;
+        }        
 
         if (hasOptimizedTransform)
         {
@@ -486,12 +499,17 @@ namespace traceback
         transform.at<double>(2, 1) = 0;
         transform.at<double>(2, 2) = 1;
         inv_transform = transform.inv();
+
+        // One candidate is only consumed by one traceback process
         robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].erase(robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].begin());
       }
       else
       {
         bool hasOptimizedTransform = readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
       }
+
+      // Keep this traceback transform for traceback next goals and later calculating the loop closure constraint correctly
+      robot_to_robot_traceback_in_progress_transform_[robot_name_src][robot_name_dst] = transform.clone();
 
       // Get current pose
       geometry_msgs::Pose pose = getRobotPose(robot_name_src);
@@ -530,14 +548,7 @@ namespace traceback
 
       // ROS_INFO("transformed pose (x, y) = (%f, %f)", pose_dst.at<double>(0, 0), pose_dst.at<double>(1, 0));
 
-      if (robots_to_in_traceback_[robot_name_src])
-      {
-        continue; // continue to next robot since the current robot is currently in traceback process
-      }
-      else
-      {
-        robots_to_in_traceback_[robot_name_src] = true;
-      }
+      robots_to_in_traceback_[robot_name_src] = true;
 
       ROS_INFO("Start traceback process for robot %s", robot_name_src.c_str());
       ROS_INFO("{%s} pose %zu (x, y) = (%f, %f)", robot_name_src.c_str(), i, pose.position.x, pose.position.y);
@@ -674,19 +685,8 @@ namespace traceback
     ROS_DEBUG("startOrContinueTraceback i = %zu", i);
     ROS_DEBUG("startOrContinueTraceback max_position = %zu", max_position);
 
-    cv::Mat transform;
-    cv::Mat inv_transform;
-    bool hasOptimizedTransform = readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
-
-    if (!hasOptimizedTransform)
-    {
-      ROS_ERROR("startOrContinueTraceback but do not have optimized transform. This should not happen!");
-      return;
-    }
-
-    // Keep this traceback transform for later calculating the loop closure constraint correctly
-    robot_to_robot_traceback_in_progress_transform_[robot_name_src][robot_name_dst] = transform.clone();
-    //
+    cv::Mat transform = robot_to_robot_traceback_in_progress_transform_[robot_name_src][robot_name_dst].clone();
+    cv::Mat inv_transform = transform.inv();
 
     PoseImagePair current_it = camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst][robots_to_current_it_[robot_name_src]];
 
@@ -1181,20 +1181,20 @@ namespace traceback
             //
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
-            geometry_msgs::Quaternion goal_q = pose1.orientation;
-            double yaw = quaternionToYaw(goal_q);
+            // geometry_msgs::Quaternion goal_q = pose1.orientation;
+            // double yaw = quaternionToYaw(goal_q);
             TransformNeeded transform_needed;
             transform_needed.arrived_x = pose1.position.x;
             transform_needed.arrived_y = pose1.position.y;
-            MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
+            // MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
 
-            if (!result.match || !result.solved)
-            {
-              continue;
-            }
+            // if (!result.match || !result.solved)
+            // {
+            //   continue;
+            // }
 
-            cv::Mat adjusted_transform;
-            findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, transform_needed.arrived_x, transform_needed.arrived_y, resolutions_[self_robot_index]);
+            // cv::Mat adjusted_transform;
+            // findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, transform_needed.arrived_x, transform_needed.arrived_y, resolutions_[self_robot_index]);
 
             // std::vector<cv::Point2d> local_origins = {map_origins_[self_robot_index], map_origins_[second_robot_index]};
             // std::vector<float> local_resolutions = {resolutions_[self_robot_index], resolutions_[second_robot_index]};
@@ -1208,7 +1208,7 @@ namespace traceback
             {
               for (int x = 0; x < 3; x++)
               {
-                double val = adjusted_transform.at<double>(y, x);
+                double val = world_transform.at<double>(y, x);
                 if (x == 3 - 1)
                 {
                   s += std::to_string(val) + "\n";
@@ -1222,7 +1222,7 @@ namespace traceback
             ROS_INFO("matrix:\n%s", s.c_str());
 
             // Transform proposed here is often outlier
-            addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
+            addCandidateLoopClosureConstraint(world_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
             // Evaluate match with current pose of current robot
             // Note that unmodified transform is used
