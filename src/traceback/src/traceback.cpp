@@ -300,11 +300,7 @@ namespace traceback
               }
             }
 
-            // Convert OpenCV transform to world transform, considering the origins
-            cv::Mat transform = robot_to_robot_traceback_in_progress_transform_[tracer_robot][traced_robot];
-            cv::Mat world_transform;
-            imageTransformToMapTransform(transform, world_transform, resolutions_[tracer_robot_index], resolutions_[traced_robot_index], src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
-            //
+            cv::Mat world_transform = robot_to_robot_traceback_in_progress_transform_[tracer_robot][traced_robot];
 
             cv::Mat adjusted_transform;
             findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, arrived_pose.position.x, arrived_pose.position.y, resolutions_[tracer_robot_index]);
