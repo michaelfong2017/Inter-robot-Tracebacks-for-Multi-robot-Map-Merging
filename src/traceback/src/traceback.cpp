@@ -1016,7 +1016,7 @@ namespace traceback
       features_depths_pose.pose = getRobotPose(robot_name);
 
       if (robots_to_image_features_depths_pose_[robot_name].size() >= features_depths_max_queue_size_) {
-        robots_to_image_features_depths_pose_.erase(robots_to_image_features_depths_pose_.begin());
+        robots_to_image_features_depths_pose_[robot_name].erase(robots_to_image_features_depths_pose_[robot_name].begin());
       }
 
       robots_to_image_features_depths_pose_[robot_name].push_back(features_depths_pose);
