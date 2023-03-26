@@ -480,7 +480,15 @@ namespace traceback
       cv::Mat transform = cv::Mat(3, 3, CV_64F);
       cv::Mat inv_transform = cv::Mat(3, 3, CV_64F);
 
-      LoopClosureConstraint constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].front();
+      LoopClosureConstraint constraint;
+      if (robot_name_src < robot_name_dst)
+      {
+        constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].front();
+      }
+      else
+      {
+        constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].front();
+      }
       transform.at<double>(0, 0) = cos(constraint.r);
       transform.at<double>(0, 1) = -sin(constraint.r);
       transform.at<double>(0, 2) = constraint.tx;
