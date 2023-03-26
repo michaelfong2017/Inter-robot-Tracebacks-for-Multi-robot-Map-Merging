@@ -472,22 +472,34 @@ namespace traceback
       {
         constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].front();
         robot_to_robot_traceback_loop_closure_constraints_[robot_name_src][robot_name_dst].push_back(constraint);
+
+        transform.at<double>(0, 0) = cos(constraint.r);
+        transform.at<double>(0, 1) = -sin(constraint.r);
+        transform.at<double>(0, 2) = constraint.tx;
+        transform.at<double>(1, 0) = sin(constraint.r);
+        transform.at<double>(1, 1) = cos(constraint.r);
+        transform.at<double>(1, 2) = constraint.ty;
+        transform.at<double>(2, 0) = 0;
+        transform.at<double>(2, 1) = 0;
+        transform.at<double>(2, 2) = 1;
+        inv_transform = transform.inv();
       }
       else
       {
         constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].front();
         robot_to_robot_traceback_loop_closure_constraints_[robot_name_dst][robot_name_src].push_back(constraint);
+
+        inv_transform.at<double>(0, 0) = cos(constraint.r);
+        inv_transform.at<double>(0, 1) = -sin(constraint.r);
+        inv_transform.at<double>(0, 2) = constraint.tx;
+        inv_transform.at<double>(1, 0) = sin(constraint.r);
+        inv_transform.at<double>(1, 1) = cos(constraint.r);
+        inv_transform.at<double>(1, 2) = constraint.ty;
+        inv_transform.at<double>(2, 0) = 0;
+        inv_transform.at<double>(2, 1) = 0;
+        inv_transform.at<double>(2, 2) = 1;
+        transform = inv_transform.inv();
       }
-      transform.at<double>(0, 0) = cos(constraint.r);
-      transform.at<double>(0, 1) = -sin(constraint.r);
-      transform.at<double>(0, 2) = constraint.tx;
-      transform.at<double>(1, 0) = sin(constraint.r);
-      transform.at<double>(1, 1) = cos(constraint.r);
-      transform.at<double>(1, 2) = constraint.ty;
-      transform.at<double>(2, 0) = 0;
-      transform.at<double>(2, 1) = 0;
-      transform.at<double>(2, 2) = 1;
-      inv_transform = transform.inv();
 
       // One candidate is only consumed by one traceback process
       if (robot_name_src < robot_name_dst)
@@ -1015,7 +1027,8 @@ namespace traceback
       }
       features_depths_pose.pose = getRobotPose(robot_name);
 
-      if (robots_to_image_features_depths_pose_[robot_name].size() >= features_depths_max_queue_size_) {
+      if (robots_to_image_features_depths_pose_[robot_name].size() >= features_depths_max_queue_size_)
+      {
         robots_to_image_features_depths_pose_[robot_name].erase(robots_to_image_features_depths_pose_[robot_name].begin());
       }
 
@@ -1185,20 +1198,22 @@ namespace traceback
             //
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
-            // geometry_msgs::Quaternion goal_q = pose1.orientation;
-            // double yaw = quaternionToYaw(goal_q);
+            geometry_msgs::Quaternion goal_q = pose1.orientation;
+            double yaw = quaternionToYaw(goal_q);
             TransformNeeded transform_needed;
             transform_needed.arrived_x = pose1.position.x;
             transform_needed.arrived_y = pose1.position.y;
-            // MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
+            MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
 
-            // if (!result.match || !result.solved)
-            // {
-            //   continue;
-            // }
+            if (!result.solved)
+            {
+              transform_needed.tx = 0.0;
+              transform_needed.ty = 0.0;
+              transform_needed.r = 0.0;
+            }
 
-            // cv::Mat adjusted_transform;
-            // findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, transform_needed.arrived_x, transform_needed.arrived_y, resolutions_[self_robot_index]);
+            cv::Mat adjusted_transform;
+            findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, transform_needed.arrived_x, transform_needed.arrived_y, resolutions_[self_robot_index]);
 
             // std::vector<cv::Point2d> local_origins = {map_origins_[self_robot_index], map_origins_[second_robot_index]};
             // std::vector<float> local_resolutions = {resolutions_[self_robot_index], resolutions_[second_robot_index]};
@@ -1226,7 +1241,7 @@ namespace traceback
             ROS_INFO("matrix:\n%s", s.c_str());
 
             // Transform proposed here is often outlier
-            addCandidateLoopClosureConstraint(world_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
+            addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
             // Evaluate match with current pose of current robot
             // Note that unmodified transform is used
