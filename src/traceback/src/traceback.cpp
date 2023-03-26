@@ -1257,7 +1257,7 @@ namespace traceback
 
             // Evaluate match with current pose of current robot
             // Note that unmodified transform is used
-            cv::Mat predicted_pose = evaluateMatch(current_traceback_transforms[1], pose1.position.x, pose1.position.y, robot_name, second_robot_name, current_time);
+            cv::Mat predicted_pose = evaluateMatch(adjusted_transform, pose1.position.x, pose1.position.y, robot_name, second_robot_name, current_time);
             //
             for (int i = 0; i < 20; ++i)
             {
