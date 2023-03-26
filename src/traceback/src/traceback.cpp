@@ -223,7 +223,6 @@ namespace traceback
                     colorized_depth_traced);
 
         // 3 or 4
-        size_t traceback_accept_count = tracer_robot < traced_robot ? robot_to_robot_traceback_accept_count_[tracer_robot][traced_robot] : robot_to_robot_traceback_accept_count_[traced_robot][tracer_robot];
         if (result.solved)
         {
           // Compute loop closure constraint
@@ -1887,6 +1886,8 @@ namespace traceback
         robots_to_current_it_.emplace(robot_name, 0);
 
         traceback_transforms_publisher_ = node_.advertise<traceback_msgs::TracebackTransforms>(traceback_transforms_topic_, 10);
+
+        robots_to_image_features_depths_pose_[robot_name] = {};
 
         for (auto it = robots_to_camera_subscriptions_.begin(); it != robots_to_camera_subscriptions_.end(); ++it)
         {
