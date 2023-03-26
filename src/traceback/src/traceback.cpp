@@ -471,7 +471,13 @@ namespace traceback
       if (robot_name_src < robot_name_dst)
       {
         constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].front();
-        robot_to_robot_traceback_loop_closure_constraints_[robot_name_src][robot_name_dst].push_back(constraint);
+        LoopClosureConstraint constraint_copy;
+        constraint_copy.x = constraint.x;
+        constraint_copy.y = constraint.y;
+        constraint_copy.tx = constraint.tx;
+        constraint_copy.ty = constraint.ty;
+        constraint_copy.r = constraint.r;
+        robot_to_robot_traceback_loop_closure_constraints_[robot_name_src][robot_name_dst].push_back(constraint_copy);
 
         transform.at<double>(0, 0) = cos(constraint.r);
         transform.at<double>(0, 1) = -sin(constraint.r);
@@ -487,7 +493,13 @@ namespace traceback
       else
       {
         constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].front();
-        robot_to_robot_traceback_loop_closure_constraints_[robot_name_dst][robot_name_src].push_back(constraint);
+        LoopClosureConstraint constraint_copy;
+        constraint_copy.x = constraint.x;
+        constraint_copy.y = constraint.y;
+        constraint_copy.tx = constraint.tx;
+        constraint_copy.ty = constraint.ty;
+        constraint_copy.r = constraint.r;
+        robot_to_robot_traceback_loop_closure_constraints_[robot_name_dst][robot_name_src].push_back(constraint_copy);
 
         inv_transform.at<double>(0, 0) = cos(constraint.r);
         inv_transform.at<double>(0, 1) = -sin(constraint.r);
