@@ -471,10 +471,12 @@ namespace traceback
       if (robot_name_src < robot_name_dst)
       {
         constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].front();
+        robot_to_robot_traceback_loop_closure_constraints_[robot_name_src][robot_name_dst].push_back(constraint);
       }
       else
       {
         constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].front();
+        robot_to_robot_traceback_loop_closure_constraints_[robot_name_dst][robot_name_src].push_back(constraint);
       }
       transform.at<double>(0, 0) = cos(constraint.r);
       transform.at<double>(0, 1) = -sin(constraint.r);
@@ -735,6 +737,14 @@ namespace traceback
       {
         writeTracebackFeedbackHistory(robot_name_src, robot_name_dst, "S1. reject since the goal is unreasonably far");
         robots_to_in_traceback_[robot_name_src] = false;
+        if (robot_name_src < robot_name_dst)
+        {
+          robot_to_robot_traceback_loop_closure_constraints_[robot_name_src][robot_name_dst].clear();
+        }
+        else
+        {
+          robot_to_robot_traceback_loop_closure_constraints_[robot_name_dst][robot_name_src].clear();
+        }
 
         return;
         // S1. reject since the goal is unreasonably far END
