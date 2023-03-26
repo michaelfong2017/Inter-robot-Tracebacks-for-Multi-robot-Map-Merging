@@ -115,6 +115,7 @@ namespace traceback
     double data_push_rate_;
     int camera_pose_image_queue_skip_count_;
     int camera_pose_image_max_queue_size_;
+    int features_depths_max_queue_size_;
 
     // For every pair of robots, do LM optimization
     // read loop closure constraints, but not necessary to lock it

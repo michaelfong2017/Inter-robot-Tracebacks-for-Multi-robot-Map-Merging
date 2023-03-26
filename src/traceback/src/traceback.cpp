@@ -46,6 +46,7 @@ namespace traceback
     private_nh.param("data_push_rate", data_push_rate_, 2.0);
     private_nh.param("camera_pose_image_queue_skip_count", camera_pose_image_queue_skip_count_, 20);
     private_nh.param("camera_pose_image_max_queue_size", camera_pose_image_max_queue_size_, 100);
+    private_nh.param("features_depths_max_queue_size", features_depths_max_queue_size_, 100);
 
     // Create directories for debugging
     for (auto &dir_path : {"tb3_0_tb3_1", "tb3_0_tb3_2", "tb3_1_tb3_0", "tb3_1_tb3_2", "tb3_2_tb3_0", "tb3_2_tb3_1"})
@@ -1014,6 +1015,11 @@ namespace traceback
         continue;
       }
       features_depths_pose.pose = getRobotPose(robot_name);
+
+      if (robots_to_image_features_depths_pose_[robot_name].size() >= features_depths_max_queue_size_) {
+        robots_to_image_features_depths_pose_.erase(robots_to_image_features_depths_pose_.begin());
+      }
+
       robots_to_image_features_depths_pose_[robot_name].push_back(features_depths_pose);
 
       for (auto &pair : robots_to_image_features_depths_pose_)
