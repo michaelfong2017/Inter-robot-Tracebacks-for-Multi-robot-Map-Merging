@@ -493,7 +493,14 @@ namespace traceback
       inv_transform = transform.inv();
 
       // One candidate is only consumed by one traceback process
-      robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].erase(robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].begin());
+      if (robot_name_src < robot_name_dst)
+      {
+        robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].erase(robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].begin());
+      }
+      else
+      {
+        robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].erase(robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].begin());
+      }
 
       // Keep this traceback transform for traceback next goals and later calculating the loop closure constraint correctly
       robot_to_robot_traceback_in_progress_transform_[robot_name_src][robot_name_dst] = transform.clone();
