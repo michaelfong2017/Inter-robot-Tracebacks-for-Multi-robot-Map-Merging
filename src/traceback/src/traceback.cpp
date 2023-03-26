@@ -223,44 +223,34 @@ namespace traceback
 
         // 3 or 4
         size_t traceback_accept_count = tracer_robot < traced_robot ? robot_to_robot_traceback_accept_count_[tracer_robot][traced_robot] : robot_to_robot_traceback_accept_count_[traced_robot][tracer_robot];
-        if (!result.solved)
+        if (result.solved)
         {
-          transform_needed.tx = 0.0;
-          transform_needed.ty = 0.0;
-          transform_needed.r = 0.0;
-        }
-        // Compute loop closure constraint
-        size_t tracer_robot_index;
-        size_t traced_robot_index;
-        for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
-        {
-          if (it->second == tracer_robot)
+          // Compute loop closure constraint
+          size_t tracer_robot_index;
+          size_t traced_robot_index;
+          for (auto it = transforms_indexes_.begin(); it != transforms_indexes_.end(); ++it)
           {
-            tracer_robot_index = it->first;
+            if (it->second == tracer_robot)
+            {
+              tracer_robot_index = it->first;
+            }
+            else if (it->second == traced_robot)
+            {
+              traced_robot_index = it->first;
+            }
           }
-          else if (it->second == traced_robot)
-          {
-            traced_robot_index = it->first;
-          }
-        }
 
-        cv::Mat world_transform = robot_to_robot_traceback_in_progress_transform_[tracer_robot][traced_robot];
+          cv::Mat world_transform = robot_to_robot_traceback_in_progress_transform_[tracer_robot][traced_robot];
 
-        cv::Mat adjusted_transform;
-        findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, arrived_pose.position.x, arrived_pose.position.y, resolutions_[tracer_robot_index]);
+          cv::Mat adjusted_transform;
+          findAdjustedTransformation(world_transform, adjusted_transform, transform_needed.tx, transform_needed.ty, transform_needed.r, arrived_pose.position.x, arrived_pose.position.y, resolutions_[tracer_robot_index]);
 
-        // TransformAdjustmentResult result;
-        // result.current_time = current_time;
-        // result.transform_needed = transform_needed;
-        // result.world_transform = world_transform;
-        // result.adjusted_transform = adjusted_transform;
+          // TransformAdjustmentResult result;
+          // result.current_time = current_time;
+          // result.transform_needed = transform_needed;
+          // result.world_transform = world_transform;
+          // result.adjusted_transform = adjusted_transform;
 
-        if (traceback_accept_count > 0)
-        {
-          addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[tracer_robot_index], transform_needed.arrived_y / resolutions_[tracer_robot_index], tracer_robot, traced_robot);
-        }
-        else
-        {
           addTracebackLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[tracer_robot_index], transform_needed.arrived_y / resolutions_[tracer_robot_index], tracer_robot, traced_robot);
         }
 
@@ -280,19 +270,16 @@ namespace traceback
           pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
           robots_to_in_traceback_[tracer_robot] = false;
 
-          if (traceback_accept_count == 0)
           {
-            {
-              boost::lock_guard<boost::shared_mutex> lock(loop_constraints_mutex_);
+            boost::lock_guard<boost::shared_mutex> lock(loop_constraints_mutex_);
 
-              std::string src_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
-              std::string dst_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
-              for (auto &constraint : robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot])
-              {
-                robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
-              }
-              robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot].clear();
+            std::string src_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
+            std::string dst_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
+            for (auto &constraint : robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot])
+            {
+              robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
             }
+            robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot].clear();
           }
 
           if (tracer_robot < traced_robot)

@@ -209,15 +209,15 @@ namespace traceback
         }
 
         // HARDCODE currently
-        if (filtered_image_points1.size() < 20)
-        {
-            {
-                MatchAndSolveResult result;
-                result.match = true;
-                result.solved = false;
-                return result;
-            }
-        }
+        // if (filtered_image_points1.size() < 20)
+        // {
+        //     {
+        //         MatchAndSolveResult result;
+        //         result.match = true;
+        //         result.solved = false;
+        //         return result;
+        //     }
+        // }
 
         // solvepnp
         double k[9] = {554.254691191187, 0.0, 320.5, 0.0, 554.254691191187, 240.5, 0.0, 0.0, 1.0};
@@ -554,15 +554,15 @@ namespace traceback
         }
 
         // HARDCODE currently
-        if (filtered_image_points1.size() < 20)
-        {
-            {
-                MatchAndSolveResult result;
-                result.match = true;
-                result.solved = false;
-                return result;
-            }
-        }
+        // if (filtered_image_points1.size() < 20)
+        // {
+        //     {
+        //         MatchAndSolveResult result;
+        //         result.match = true;
+        //         result.solved = false;
+        //         return result;
+        //     }
+        // }
 
         // solvepnp
         double k[9] = {554.254691191187, 0.0, 320.5, 0.0, 554.254691191187, 240.5, 0.0, 0.0, 1.0};
