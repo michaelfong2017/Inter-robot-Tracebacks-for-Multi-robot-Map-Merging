@@ -262,9 +262,9 @@ namespace traceback
     // Traceback feedback can be one of the following 6 cases:
     // 1. abort with enough count       -> exit traceback process, cooldown
     // 2. abort without enough count    -> next goal
-    // 3. match and solved and accept               -> exit traceback process, optimize transform
-    // 4. match and solved but not yet accept       -> next goal, increment accept count
-    // 5. match but cannot solved                   -> next goal
+    // 3. match and solved and accept               -> exit traceback process, add constraint
+    // 4. match and solved but not yet accept       -> next goal, increment accept count, add constraint
+    // 5. match but cannot solved                   -> next goal, increment accept count
     // 6. does not match and reject                 -> exit traceback process
     // 7. does not match but not yet reject         -> next goal, increment reject count
     void writeTracebackFeedbackHistory(std::string tracer, std::string traced, std::string feedback);

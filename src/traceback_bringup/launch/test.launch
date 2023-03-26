@@ -42,8 +42,8 @@
         <param name="check_obstacle_nearby_pixel_distance" value="5" />
         <param name="abort_threshold_distance" value="2.0" />
         <!-- The queue size has to be large enough so that an explored near place can be found -->
-        <param name="camera_pose_image_max_queue_size" value="300" />
-        <param name="camera_pose_image_queue_skip_count" value="50" />
+        <param name="camera_pose_image_max_queue_size" value="100" />
+        <param name="camera_pose_image_queue_skip_count" value="25" />
         <param name="essential_mat_confidence" value="0.3" />
         <param name="accept_count_needed" value="5" />
         <!-- reject when reject_count >= reject_count_needed && reject_count + abort_count >= accept_count -->
