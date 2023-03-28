@@ -64,7 +64,7 @@ namespace traceback
     }
 
     {
-      std::ofstream fw("result.csv", std::ofstream::app);
+      std::ofstream fw("_result.csv", std::ofstream::app);
       if (fw.is_open())
       {
         fw << "result_index"
@@ -1427,7 +1427,7 @@ namespace traceback
   void Traceback::appendResultToFile(Result result)
   {
     boost::lock_guard<boost::shared_mutex> lock(result_file_mutex_);
-    std::ofstream fw("result.csv", std::ofstream::app);
+    std::ofstream fw("_result.csv", std::ofstream::app);
     if (fw.is_open())
     {
       fw << result_index_ << "," << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
@@ -1686,7 +1686,7 @@ namespace traceback
 
                   {
                     std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-                    std::ofstream fw("Erased_loop_closure_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt", std::ofstream::app);
+                    std::ofstream fw("_erased_loop_closure_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".csv", std::ofstream::app);
                     if (fw.is_open())
                     {
                       fw << result_index << "," << current_time << "," << constraint.x << "," << constraint.y << "," << constraint.tx << "," << constraint.ty << "," << constraint.r << std::endl;
@@ -2180,7 +2180,7 @@ namespace traceback
             std::string src_robot = it->first < robot_name ? it->first : robot_name;
             std::string dst_robot = it->first < robot_name ? robot_name : it->first;
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-            std::ofstream fw("Erased_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".txt", std::ofstream::app);
+            std::ofstream fw("_erased_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv", std::ofstream::app);
             if (fw.is_open())
             {
               fw << "result_index"
