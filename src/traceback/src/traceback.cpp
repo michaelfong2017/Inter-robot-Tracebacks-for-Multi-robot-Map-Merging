@@ -233,24 +233,24 @@ namespace traceback
         }
       }
 
+      cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer.png",
+                  cv_ptr_tracer->image);
+      cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced.png",
+                  cv_ptr_traced->image);
+      cv::Mat colorized_depth_tracer;
+      cv_ptr_depth_tracer->image.convertTo(colorized_depth_tracer, CV_8U, 255.0 / 5.0);
+      cv::cvtColor(colorized_depth_tracer, colorized_depth_tracer, cv::COLOR_GRAY2BGR);
+      cv::Mat colorized_depth_traced;
+      cv_ptr_depth_traced->image.convertTo(colorized_depth_traced, CV_8U, 255.0 / 5.0);
+      cv::cvtColor(colorized_depth_traced, colorized_depth_traced, cv::COLOR_GRAY2BGR);
+      cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer_depth.png",
+                  colorized_depth_tracer);
+      cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced_depth.png",
+                  colorized_depth_traced);
+
       // 3 or 4 or 5
       if (result.match)
       {
-        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer.png",
-                    cv_ptr_tracer->image);
-        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced.png",
-                    cv_ptr_traced->image);
-        cv::Mat colorized_depth_tracer;
-        cv_ptr_depth_tracer->image.convertTo(colorized_depth_tracer, CV_8U, 255.0 / 5.0);
-        cv::cvtColor(colorized_depth_tracer, colorized_depth_tracer, cv::COLOR_GRAY2BGR);
-        cv::Mat colorized_depth_traced;
-        cv_ptr_depth_traced->image.convertTo(colorized_depth_traced, CV_8U, 255.0 / 5.0);
-        cv::cvtColor(colorized_depth_traced, colorized_depth_traced, cv::COLOR_GRAY2BGR);
-        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + tracer_robot.substr(1) + "_tracer_depth.png",
-                    colorized_depth_tracer);
-        cv::imwrite(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + traced_robot.substr(1) + "_traced_depth.png",
-                    colorized_depth_traced);
-
         // 3 or 4
         if (result.solved)
         {
