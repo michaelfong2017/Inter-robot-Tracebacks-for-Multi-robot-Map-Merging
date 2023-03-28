@@ -1629,47 +1629,43 @@ namespace traceback
               {
                 LoopClosureConstraint constraint = *it3;
                 double RESOLUTION = 0.05;
-                constraint.x *= RESOLUTION;
-                constraint.y *= RESOLUTION;
-                constraint.tx *= RESOLUTION;
-                constraint.ty *= RESOLUTION;
-                latest_accepted_constraint.x *= RESOLUTION;
-                latest_accepted_constraint.y *= RESOLUTION;
-                latest_accepted_constraint.tx *= RESOLUTION;
-                latest_accepted_constraint.ty *= RESOLUTION;
+                double x = constraint.x * RESOLUTION;
+                double y = constraint.y * RESOLUTION;
+                double tx = constraint.tx * RESOLUTION;
+                double ty = constraint.ty * RESOLUTION;
+                double accepted_x = latest_accepted_constraint.x * RESOLUTION;
+                double accepted_y = latest_accepted_constraint.y * RESOLUTION;
+                double accepted_tx = latest_accepted_constraint.tx * RESOLUTION;
+                double accepted_ty = latest_accepted_constraint.ty * RESOLUTION;
 
-                // cv::Mat pose(3, 1, CV_64F);
-                // pose.at<double>(0, 0) = constraint.x;
-                // pose.at<double>(1, 0) = constraint.y;
-                // pose.at<double>(2, 0) = 1.0;
-                // cv::Mat transform(3, 3, CV_64F);
-                // transform.at<double>(0, 0) = cos(constraint.r);
-                // transform.at<double>(0, 1) = -sin(constraint.r);
-                // transform.at<double>(0, 2) = constraint.tx;
-                // transform.at<double>(1, 0) = sin(constraint.r);
-                // transform.at<double>(1, 1) = cos(constraint.r);
-                // transform.at<double>(1, 2) = constraint.ty;
-                // transform.at<double>(2, 0) = 0;
-                // transform.at<double>(2, 1) = 0;
-                // transform.at<double>(2, 2) = 1;
-                // cv::Mat accepted_transform(3, 3, CV_64F);
-                // accepted_transform.at<double>(0, 0) = cos(latest_accepted_constraint.r);
-                // accepted_transform.at<double>(0, 1) = -sin(latest_accepted_constraint.r);
-                // accepted_transform.at<double>(0, 2) = latest_accepted_constraint.tx;
-                // accepted_transform.at<double>(1, 0) = sin(latest_accepted_constraint.r);
-                // accepted_transform.at<double>(1, 1) = cos(latest_accepted_constraint.r);
-                // accepted_transform.at<double>(1, 2) = latest_accepted_constraint.ty;
-                // accepted_transform.at<double>(2, 0) = 0;
-                // accepted_transform.at<double>(2, 1) = 0;
-                // accepted_transform.at<double>(2, 2) = 1;
-                // cv::Mat predicted_pose = accepted_transform.inv() * transform * pose;
-                // double error = sqrt(pow(predicted_pose.at<double>(0, 0) - pose.at<double>(0, 0), 2) + pow(predicted_pose.at<double>(1, 0) - pose.at<double>(1, 0), 2));
+                cv::Mat pose(3, 1, CV_64F);
+                pose.at<double>(0, 0) = x;
+                pose.at<double>(1, 0) = y;
+                pose.at<double>(2, 0) = 1.0;
+                cv::Mat transform(3, 3, CV_64F);
+                transform.at<double>(0, 0) = cos(constraint.r);
+                transform.at<double>(0, 1) = -sin(constraint.r);
+                transform.at<double>(0, 2) = tx;
+                transform.at<double>(1, 0) = sin(constraint.r);
+                transform.at<double>(1, 1) = cos(constraint.r);
+                transform.at<double>(1, 2) = ty;
+                transform.at<double>(2, 0) = 0;
+                transform.at<double>(2, 1) = 0;
+                transform.at<double>(2, 2) = 1;
+                cv::Mat accepted_transform(3, 3, CV_64F);
+                accepted_transform.at<double>(0, 0) = cos(latest_accepted_constraint.r);
+                accepted_transform.at<double>(0, 1) = -sin(latest_accepted_constraint.r);
+                accepted_transform.at<double>(0, 2) = accepted_tx;
+                accepted_transform.at<double>(1, 0) = sin(latest_accepted_constraint.r);
+                accepted_transform.at<double>(1, 1) = cos(latest_accepted_constraint.r);
+                accepted_transform.at<double>(1, 2) = accepted_ty;
+                accepted_transform.at<double>(2, 0) = 0;
+                accepted_transform.at<double>(2, 1) = 0;
+                accepted_transform.at<double>(2, 2) = 1;
+                cv::Mat predicted_pose = accepted_transform.inv() * transform * pose;
+                double error = sqrt(pow(predicted_pose.at<double>(0, 0) - pose.at<double>(0, 0), 2) + pow(predicted_pose.at<double>(1, 0) - pose.at<double>(1, 0), 2));
 
-                double error_tx = abs(constraint.tx - latest_accepted_constraint.tx);
-                double error_ty = abs(constraint.ty - latest_accepted_constraint.ty); 
-                double error_r = abs(constraint.tx - latest_accepted_constraint.tx); 
-
-                if (error_tx >= far_from_accepted_transform_threshold_ || error_ty >= far_from_accepted_transform_threshold_ || error_r >= far_from_accepted_transform_threshold_ / 4.0)
+                if (error >= far_from_accepted_transform_threshold_)
                 {
                   //
                   size_t result_loop_index = it3 - dst.second.begin();
@@ -1693,7 +1689,7 @@ namespace traceback
                     std::ofstream fw("_erased_loop_closure_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".csv", std::ofstream::app);
                     if (fw.is_open())
                     {
-                      fw << result_index << "," << current_time << "," << constraint.x << "," << constraint.y << "," << constraint.tx << "," << constraint.ty << "," << constraint.r << std::endl;
+                      fw << result_index << "," << current_time << "," << x << "," << y << "," << tx << "," << ty << "," << constraint.r << std::endl;
                       fw.close();
                     }
                   }
