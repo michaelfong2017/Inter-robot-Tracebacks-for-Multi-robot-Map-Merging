@@ -28,7 +28,7 @@ namespace traceback
     private_nh.param("unreasonable_goal_distance", unreasonable_goal_distance_, 5.0);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
     private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
-    private_nh.param("far_from_accepted_transform_threshold", far_from_accepted_transform_threshold_, 2.0);
+    private_nh.param("far_from_accepted_transform_threshold", far_from_accepted_transform_threshold_, 5.0);
     private_nh.param("accept_count_needed", accept_count_needed_, 8);
     private_nh.param("reject_count_needed", reject_count_needed_, 2);
     private_nh.param("abort_count_needed", abort_count_needed_, 3);
