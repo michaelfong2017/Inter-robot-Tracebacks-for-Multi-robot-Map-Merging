@@ -1070,17 +1070,17 @@ namespace traceback
             std::vector<double> depths2 = pair.second[i].depths;
             // ROS_DEBUG("Match!");
 
-            if (test_mode_ != "collect")
+            // if (test_mode_ != "collect")
+            // {
             {
+              std::ofstream fw(robot_name.substr(1) + "_" + second_robot_name.substr(1) + "/" + "Transform_proposed_" + robot_name.substr(1) + "_current_robot_" + second_robot_name.substr(1) + "_target_robot.txt", std::ofstream::app);
+              if (fw.is_open())
               {
-                std::ofstream fw(robot_name.substr(1) + "_" + second_robot_name.substr(1) + "/" + "Transform_proposed_" + robot_name.substr(1) + "_current_robot_" + second_robot_name.substr(1) + "_target_robot.txt", std::ofstream::app);
-                if (fw.is_open())
-                {
-                  fw << "Transform proposed at time " << current_time << " with confidence " << confidence_output << std::endl;
-                  fw.close();
-                }
+                fw << "Transform proposed at time " << current_time << " with confidence " << confidence_output << std::endl;
+                fw.close();
               }
             }
+            // }
 
             // TEST with ground truth
             // double init_0_x = -7.0;
@@ -1278,11 +1278,6 @@ namespace traceback
                 std::string threshold_str = ss.str();
                 collectProposingData(pose1.position.x, pose1.position.y, predicted_pose.at<double>(0, 0), predicted_pose.at<double>(1, 0), confidence_output, threshold_str, robot_name, second_robot_name, current_time, true);
               }
-            }
-
-            if (test_mode_ == "collect")
-            {
-              continue;
             }
           }
         }

@@ -62,6 +62,29 @@ namespace traceback
     double r;
   };
 
+  struct Result
+  {
+    std::string current_time;
+    // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
+    std::string from_robot;
+    std::string to_robot;
+    // x-position of "from" robot where the loop closure is found, in meters
+    double x;
+    // y-position of "from" robot where the loop closure is found, in meters
+    double y;
+    // x-translation from "from" robot to "to" robot, in meters
+    double tx;
+    // y-translation from "from" robot to "to" robot, in meters
+    double ty;
+    // rotation from "from" robot to "to" robot, in radians
+    double r;
+    // For constraint collected during the traceback process, hardcode 99.0,
+    // for constraint collected in transform proposal, use it (ORB features).
+    double match_score;
+    // Error of predicted position to actual position, in meters
+    double error;
+  };
+
   struct AcceptRejectStatus
   {
     int accept_count;
