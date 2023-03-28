@@ -82,7 +82,9 @@ namespace traceback
     // for constraint collected in transform proposal, use it (ORB features).
     double match_score;
     // Error of predicted position to actual position, in meters
-    double error;
+    double t_error;
+    // in radians
+    double r_error;
   };
 
   struct AcceptRejectStatus
@@ -213,6 +215,11 @@ namespace traceback
 
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> best_transforms_;
     std::unordered_set<std::string> has_best_transforms_;
+
+    /** Generate result */
+    std::vector<Result> results_;
+    void appendResultToFile(Result result);
+    /** Generate result END */
 
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
 

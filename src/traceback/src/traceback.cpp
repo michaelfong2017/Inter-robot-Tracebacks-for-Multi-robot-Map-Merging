@@ -61,6 +61,35 @@ namespace traceback
           ROS_DEBUG("Directory %s is successfully created", "tb3_0_tb3_1");
       }
     }
+
+    {
+      std::ofstream fw("result.csv", std::ofstream::app);
+      if (fw.is_open())
+      {
+        fw << "timestamp"
+           << ","
+           << "from_robot"
+           << ","
+           << "to_robot"
+           << ","
+           << "x"
+           << ","
+           << "y"
+           << ","
+           << "tx"
+           << ","
+           << "ty"
+           << ","
+           << "r"
+           << ","
+           << "match_score"
+           << ","
+           << "t_error"
+           << ","
+           << "r_error" << std::endl;
+        fw.close();
+      }
+    }
   }
 
   void Traceback::tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg)
@@ -278,6 +307,58 @@ namespace traceback
             for (auto &constraint : robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot])
             {
               robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
+
+              // Generate result
+              {
+                cv::Mat adjusted_transform(3, 3, CV_64F);
+                adjusted_transform.at<double>(0, 0) = cos(constraint.r);
+                adjusted_transform.at<double>(0, 1) = -sin(constraint.r);
+                adjusted_transform.at<double>(0, 2) = constraint.tx;
+                adjusted_transform.at<double>(1, 0) = sin(constraint.r);
+                adjusted_transform.at<double>(1, 1) = cos(constraint.r);
+                adjusted_transform.at<double>(1, 2) = constraint.ty;
+                adjusted_transform.at<double>(2, 0) = 0;
+                adjusted_transform.at<double>(2, 1) = 0;
+                adjusted_transform.at<double>(2, 2) = 1;
+                cv::Mat predicted_pose = evaluateMatch(adjusted_transform, arrived_pose.position.x, arrived_pose.position.y, tracer_robot, traced_robot, current_time);
+
+                Result result;
+                result.current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+                if (tracer_robot < traced_robot)
+                {
+                  result.from_robot = tracer_robot;
+                  result.to_robot = traced_robot;
+                }
+                else
+                {
+                  result.from_robot = traced_robot;
+                  result.to_robot = tracer_robot;
+                }
+                result.x = constraint.x * 0.05;
+                result.y = constraint.y * 0.05;
+                result.tx = constraint.tx * 0.05;
+                result.ty = constraint.ty * 0.05;
+                result.r = constraint.r;
+                result.match_score = 99.0;
+                result.t_error = sqrt(pow(predicted_pose.at<double>(0, 0) - arrived_pose.position.x, 2) + pow(predicted_pose.at<double>(1, 0) - arrived_pose.position.y, 2));
+                double truth_r;
+                if (result.from_robot == "/tb3_0" && result.to_robot == "/tb3_1")
+                {
+                  truth_r = 0.0; // HARDCODE
+                }
+                else if (result.from_robot == "/tb3_0" && result.to_robot == "/tb3_2")
+                {
+                  truth_r = -0.785; // HARDCODE
+                }
+                else if (result.from_robot == "/tb3_1" && result.to_robot == "/tb3_2")
+                {
+                  truth_r = -0.785; // HARDCODE
+                }
+                double rot_0_0 = cos(constraint.r) * cos(-1.0 * truth_r) - sin(constraint.r) * sin(-1.0 * truth_r);
+                double rot_1_0 = sin(constraint.r) * cos(-1.0 * truth_r) + cos(constraint.r) * sin(-1.0 * truth_r);
+                result.r_error = abs(atan2(rot_1_0, rot_0_0));
+                appendResultToFile(result);
+              }
             }
             robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot].clear();
           }
@@ -1259,6 +1340,47 @@ namespace traceback
             // Note that unmodified transform is used
             cv::Mat predicted_pose = evaluateMatch(adjusted_transform, pose1.position.x, pose1.position.y, robot_name, second_robot_name, current_time);
             //
+
+            // Generate result
+            {
+              Result result;
+              result.current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+              if (robot_name < second_robot_name)
+              {
+                result.from_robot = robot_name;
+                result.to_robot = second_robot_name;
+              }
+              else
+              {
+                result.from_robot = second_robot_name;
+                result.to_robot = robot_name;
+              }
+              result.x = pose1.position.x;
+              result.y = pose1.position.y;
+              result.tx = adjusted_transform.at<double>(0, 2) * resolutions_[self_robot_index];
+              result.ty = adjusted_transform.at<double>(1, 2) * resolutions_[self_robot_index];
+              result.r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
+              result.match_score = confidence_output;
+              result.t_error = sqrt(pow(predicted_pose.at<double>(0, 0) - pose1.position.x, 2) + pow(predicted_pose.at<double>(1, 0) - pose1.position.y, 2));
+              double truth_r;
+              if (result.from_robot == "/tb3_0" && result.to_robot == "/tb3_1")
+              {
+                truth_r = 0.0; // HARDCODE
+              }
+              else if (result.from_robot == "/tb3_0" && result.to_robot == "/tb3_2")
+              {
+                truth_r = -0.785; // HARDCODE
+              }
+              else if (result.from_robot == "/tb3_1" && result.to_robot == "/tb3_2")
+              {
+                truth_r = -0.785; // HARDCODE
+              }
+              double rot_0_0 = cos(result.r) * cos(-1.0 * truth_r) - sin(result.r) * sin(-1.0 * truth_r);
+              double rot_1_0 = sin(result.r) * cos(-1.0 * truth_r) + cos(result.r) * sin(-1.0 * truth_r);
+              result.r_error = abs(atan2(rot_1_0, rot_0_0));
+              appendResultToFile(result);
+            }
+
             for (int i = 0; i < 20; ++i)
             {
               double start = 1.0;
@@ -1284,6 +1406,16 @@ namespace traceback
 
         ROS_DEBUG("Robot %s finishes matching with the second robot %s, which has %zu candidates.", robot_name.c_str(), second_robot_name.c_str(), pair.second.size());
       }
+    }
+  }
+
+  void Traceback::appendResultToFile(Result result)
+  {
+    std::ofstream fw("result.csv", std::ofstream::app);
+    if (fw.is_open())
+    {
+      fw << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
+      fw.close();
     }
   }
 

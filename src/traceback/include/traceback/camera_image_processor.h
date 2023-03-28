@@ -96,8 +96,8 @@ namespace traceback
                     0, 0, 1;
                 Eigen::Vector3d transformed_predicted_pose = predicted_T * pose;
 
-                double rot_0_0 = cos(rValue) * cos(cParam) - sin(rValue) * sin(cParam);
-                double rot_1_0 = sin(rValue) * cos(cParam) + cos(rValue) * sin(cParam);
+                double rot_0_0 = cos(rValue) * cos(-1.0 * cParam) - sin(rValue) * sin(-1.0 * cParam);
+                double rot_1_0 = sin(rValue) * cos(-1.0 * cParam) + cos(rValue) * sin(-1.0 * cParam);
                 double angle_difference = abs(atan2(rot_1_0, rot_0_0));
                 double ANGLE_ERROR_MULTIPLIER = 100.0;
 
