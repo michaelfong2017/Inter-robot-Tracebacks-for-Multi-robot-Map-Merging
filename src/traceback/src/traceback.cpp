@@ -1311,11 +1311,9 @@ namespace traceback
             transform_needed.arrived_y = pose1.position.y;
             MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
 
-            if (!result.solved)
+            if (!result.match || !result.solved)
             {
-              transform_needed.tx = 0.0;
-              transform_needed.ty = 0.0;
-              transform_needed.r = 0.0;
+              continue;
             }
 
             cv::Mat adjusted_transform;
@@ -1585,6 +1583,16 @@ namespace traceback
       loop_closure_constraint.ty = adjusted_transform.at<double>(1, 2);
       loop_closure_constraint.r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
       robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(loop_closure_constraint);
+
+      {
+        std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+        std::ofstream fw("_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv", std::ofstream::app);
+        if (fw.is_open())
+        {
+          fw << current_time << "," << loop_closure_constraint.x << "," << loop_closure_constraint.y << "," << loop_closure_constraint.tx << "," << loop_closure_constraint.ty << "," << loop_closure_constraint.r << std::endl;
+          fw.close();
+        }
+      }
     }
     else
     {
@@ -1603,6 +1611,16 @@ namespace traceback
       loop_closure_constraint.ty = inv_adjusted_transform.at<double>(1, 2);
       loop_closure_constraint.r = atan2(inv_adjusted_transform.at<double>(1, 0), inv_adjusted_transform.at<double>(0, 0));
       robot_to_robot_loop_closure_constraints_[dst_robot][src_robot].push_back(loop_closure_constraint);
+
+      {
+        std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+        std::ofstream fw("_loop_closure_" + dst_robot.substr(1) + "_to_" + src_robot.substr(1) + ".csv", std::ofstream::app);
+        if (fw.is_open())
+        {
+          fw << current_time << "," << loop_closure_constraint.x << "," << loop_closure_constraint.y << "," << loop_closure_constraint.tx << "," << loop_closure_constraint.ty << "," << loop_closure_constraint.r << std::endl;
+          fw.close();
+        }
+      }
     }
   }
 
