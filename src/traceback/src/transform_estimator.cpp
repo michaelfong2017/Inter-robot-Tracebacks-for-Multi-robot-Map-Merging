@@ -24,7 +24,8 @@ namespace traceback
 
     double TransformEstimator::matchTwoFeatures(cv::detail::ImageFeatures &features1, cv::detail::ImageFeatures &features2, double confidence)
     {
-        if (features1.getKeypoints().size() < 2 || features2.getKeypoints().size() < 2) {
+        if (features1.getKeypoints().size() < 2 || features2.getKeypoints().size() < 2)
+        {
             return -1.0;
         }
 
@@ -441,6 +442,13 @@ namespace traceback
     {
         if (has_best_transforms.count(tracer) && has_best_transforms.count(traced))
         {
+            best_transforms[tracer][traced] = tracer_to_traced.clone();
+            cv::Mat temp;
+            invertAffineTransform(tracer_to_traced.rowRange(0, 2), temp);
+            double data[3] = {0.0, 0.0, 1.0};
+            cv::Mat row(1, 3, CV_64F, data);
+            temp.push_back(row);
+            best_transforms[traced][tracer] = temp;
             return;
         }
         // 1
