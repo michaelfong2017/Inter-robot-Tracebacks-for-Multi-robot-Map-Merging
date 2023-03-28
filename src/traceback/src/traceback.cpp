@@ -28,7 +28,7 @@ namespace traceback
     private_nh.param("unreasonable_goal_distance", unreasonable_goal_distance_, 5.0);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
     private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
-    private_nh.param("far_from_accepted_transform_threshold", far_from_accepted_transform_threshold_, 3.0);
+    private_nh.param("far_from_accepted_transform_threshold", far_from_accepted_transform_threshold_, 2.0);
     private_nh.param("accept_count_needed", accept_count_needed_, 8);
     private_nh.param("reject_count_needed", reject_count_needed_, 2);
     private_nh.param("abort_count_needed", abort_count_needed_, 3);
@@ -1638,34 +1638,38 @@ namespace traceback
                 latest_accepted_constraint.tx *= RESOLUTION;
                 latest_accepted_constraint.ty *= RESOLUTION;
 
-                cv::Mat pose(3, 1, CV_64F);
-                pose.at<double>(0, 0) = constraint.x;
-                pose.at<double>(1, 0) = constraint.y;
-                pose.at<double>(2, 0) = 1.0;
-                cv::Mat transform(3, 3, CV_64F);
-                transform.at<double>(0, 0) = cos(constraint.r);
-                transform.at<double>(0, 1) = -sin(constraint.r);
-                transform.at<double>(0, 2) = constraint.tx;
-                transform.at<double>(1, 0) = sin(constraint.r);
-                transform.at<double>(1, 1) = cos(constraint.r);
-                transform.at<double>(1, 2) = constraint.ty;
-                transform.at<double>(2, 0) = 0;
-                transform.at<double>(2, 1) = 0;
-                transform.at<double>(2, 2) = 1;
-                cv::Mat accepted_transform(3, 3, CV_64F);
-                accepted_transform.at<double>(0, 0) = cos(latest_accepted_constraint.r);
-                accepted_transform.at<double>(0, 1) = -sin(latest_accepted_constraint.r);
-                accepted_transform.at<double>(0, 2) = latest_accepted_constraint.tx;
-                accepted_transform.at<double>(1, 0) = sin(latest_accepted_constraint.r);
-                accepted_transform.at<double>(1, 1) = cos(latest_accepted_constraint.r);
-                accepted_transform.at<double>(1, 2) = latest_accepted_constraint.ty;
-                accepted_transform.at<double>(2, 0) = 0;
-                accepted_transform.at<double>(2, 1) = 0;
-                accepted_transform.at<double>(2, 2) = 1;
-                cv::Mat predicted_pose = accepted_transform.inv() * transform * pose;
-                double error = sqrt(pow(predicted_pose.at<double>(0, 0) - pose.at<double>(0, 0), 2) + pow(predicted_pose.at<double>(1, 0) - pose.at<double>(1, 0), 2));
+                // cv::Mat pose(3, 1, CV_64F);
+                // pose.at<double>(0, 0) = constraint.x;
+                // pose.at<double>(1, 0) = constraint.y;
+                // pose.at<double>(2, 0) = 1.0;
+                // cv::Mat transform(3, 3, CV_64F);
+                // transform.at<double>(0, 0) = cos(constraint.r);
+                // transform.at<double>(0, 1) = -sin(constraint.r);
+                // transform.at<double>(0, 2) = constraint.tx;
+                // transform.at<double>(1, 0) = sin(constraint.r);
+                // transform.at<double>(1, 1) = cos(constraint.r);
+                // transform.at<double>(1, 2) = constraint.ty;
+                // transform.at<double>(2, 0) = 0;
+                // transform.at<double>(2, 1) = 0;
+                // transform.at<double>(2, 2) = 1;
+                // cv::Mat accepted_transform(3, 3, CV_64F);
+                // accepted_transform.at<double>(0, 0) = cos(latest_accepted_constraint.r);
+                // accepted_transform.at<double>(0, 1) = -sin(latest_accepted_constraint.r);
+                // accepted_transform.at<double>(0, 2) = latest_accepted_constraint.tx;
+                // accepted_transform.at<double>(1, 0) = sin(latest_accepted_constraint.r);
+                // accepted_transform.at<double>(1, 1) = cos(latest_accepted_constraint.r);
+                // accepted_transform.at<double>(1, 2) = latest_accepted_constraint.ty;
+                // accepted_transform.at<double>(2, 0) = 0;
+                // accepted_transform.at<double>(2, 1) = 0;
+                // accepted_transform.at<double>(2, 2) = 1;
+                // cv::Mat predicted_pose = accepted_transform.inv() * transform * pose;
+                // double error = sqrt(pow(predicted_pose.at<double>(0, 0) - pose.at<double>(0, 0), 2) + pow(predicted_pose.at<double>(1, 0) - pose.at<double>(1, 0), 2));
 
-                if (error >= far_from_accepted_transform_threshold_)
+                double error_tx = abs(constraint.tx - latest_accepted_constraint.tx);
+                double error_ty = abs(constraint.ty - latest_accepted_constraint.ty); 
+                double error_r = abs(constraint.tx - latest_accepted_constraint.tx); 
+
+                if (error_tx >= far_from_accepted_transform_threshold_ || error_ty >= far_from_accepted_transform_threshold_ || error_r >= far_from_accepted_transform_threshold_ / 4.0)
                 {
                   //
                   size_t result_loop_index = it3 - dst.second.begin();
