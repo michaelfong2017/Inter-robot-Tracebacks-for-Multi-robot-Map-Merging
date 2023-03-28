@@ -307,7 +307,10 @@ namespace traceback
             size_t i = 0;
             for (auto &constraint : robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot])
             {
-              robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
+              if (i != 0)
+              {
+                robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
+              }
 
               // Generate result
               if (i != 0)
@@ -1338,6 +1341,7 @@ namespace traceback
 
             // Transform proposed here is often outlier
             addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
+            addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
             // Evaluate match with current pose of current robot
             // Note that unmodified transform is used
