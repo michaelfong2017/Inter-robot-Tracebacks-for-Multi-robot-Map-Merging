@@ -15,7 +15,7 @@
 
 namespace traceback
 {
-  Traceback::Traceback() : map_subscriptions_size_(0), camera_subscriptions_size_(0), last_total_loop_constraint_count_(0), tf_listener_(ros::Duration(10.0))
+  Traceback::Traceback() : map_subscriptions_size_(0), camera_subscriptions_size_(0), last_total_loop_constraint_count_(0), result_index_(0), tf_listener_(ros::Duration(10.0))
   {
     ros::NodeHandle private_nh("~");
 
@@ -28,6 +28,7 @@ namespace traceback
     private_nh.param("unreasonable_goal_distance", unreasonable_goal_distance_, 5.0);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
     private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
+    private_nh.param("far_from_accepted_transform_threshold", far_from_accepted_transform_threshold_, 3.0);
     private_nh.param("accept_count_needed", accept_count_needed_, 8);
     private_nh.param("reject_count_needed", reject_count_needed_, 2);
     private_nh.param("abort_count_needed", abort_count_needed_, 3);
@@ -66,7 +67,9 @@ namespace traceback
       std::ofstream fw("result.csv", std::ofstream::app);
       if (fw.is_open())
       {
-        fw << "timestamp"
+        fw << "result_index"
+           << ","
+           << "timestamp"
            << ","
            << "from_robot"
            << ","
@@ -307,7 +310,11 @@ namespace traceback
             size_t i = 0;
             for (auto &constraint : robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot])
             {
-              if (i != 0)
+              if (i == 0)
+              {
+                robot_to_robot_latest_accepted_loop_closure_constraint_[src_robot][dst_robot] = constraint;
+              }
+              else
               {
                 robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
               }
@@ -1341,6 +1348,7 @@ namespace traceback
 
             // Transform proposed here is often outlier
             addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
+
             addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
             // Evaluate match with current pose of current robot
@@ -1418,12 +1426,14 @@ namespace traceback
 
   void Traceback::appendResultToFile(Result result)
   {
+    boost::lock_guard<boost::shared_mutex> lock(result_file_mutex_);
     std::ofstream fw("result.csv", std::ofstream::app);
     if (fw.is_open())
     {
-      fw << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
+      fw << result_index_ << "," << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
       fw.close();
     }
+    ++result_index_;
   }
 
   void Traceback::pushData()
@@ -1601,6 +1611,98 @@ namespace traceback
     ROS_DEBUG("Transform optimization started.");
     {
       boost::shared_lock<boost::shared_mutex> lock(loop_constraints_mutex_);
+
+      /** Remove loop closure constraints that are too different from the latest accepted loop closure constraint */
+      for (auto &src : robot_to_robot_loop_closure_constraints_)
+      {
+        for (auto &dst : src.second)
+        {
+          auto it = robot_to_robot_latest_accepted_loop_closure_constraint_.find(src.first);
+          if (it != robot_to_robot_latest_accepted_loop_closure_constraint_.end())
+          {
+            auto it2 = robot_to_robot_latest_accepted_loop_closure_constraint_[src.first].find(dst.first);
+            if (it2 != robot_to_robot_latest_accepted_loop_closure_constraint_[src.first].end())
+            {
+              LoopClosureConstraint latest_accepted_constraint = it2->second;
+              std::vector<LoopClosureConstraint>::iterator it3 = dst.second.begin();
+              while (it3 != dst.second.end())
+              {
+                LoopClosureConstraint constraint = *it3;
+                double RESOLUTION = 0.05;
+                constraint.x *= RESOLUTION;
+                constraint.y *= RESOLUTION;
+                constraint.tx *= RESOLUTION;
+                constraint.ty *= RESOLUTION;
+                latest_accepted_constraint.x *= RESOLUTION;
+                latest_accepted_constraint.y *= RESOLUTION;
+                latest_accepted_constraint.tx *= RESOLUTION;
+                latest_accepted_constraint.ty *= RESOLUTION;
+
+                cv::Mat pose(3, 1, CV_64F);
+                pose.at<double>(0, 0) = constraint.x;
+                pose.at<double>(1, 0) = constraint.y;
+                pose.at<double>(2, 0) = 1.0;
+                cv::Mat transform(3, 3, CV_64F);
+                transform.at<double>(0, 0) = cos(constraint.r);
+                transform.at<double>(0, 1) = -sin(constraint.r);
+                transform.at<double>(0, 2) = constraint.tx;
+                transform.at<double>(1, 0) = sin(constraint.r);
+                transform.at<double>(1, 1) = cos(constraint.r);
+                transform.at<double>(1, 2) = constraint.ty;
+                transform.at<double>(2, 0) = 0;
+                transform.at<double>(2, 1) = 0;
+                transform.at<double>(2, 2) = 1;
+                cv::Mat accepted_transform(3, 3, CV_64F);
+                accepted_transform.at<double>(0, 0) = cos(latest_accepted_constraint.r);
+                accepted_transform.at<double>(0, 1) = -sin(latest_accepted_constraint.r);
+                accepted_transform.at<double>(0, 2) = latest_accepted_constraint.tx;
+                accepted_transform.at<double>(1, 0) = sin(latest_accepted_constraint.r);
+                accepted_transform.at<double>(1, 1) = cos(latest_accepted_constraint.r);
+                accepted_transform.at<double>(1, 2) = latest_accepted_constraint.ty;
+                accepted_transform.at<double>(2, 0) = 0;
+                accepted_transform.at<double>(2, 1) = 0;
+                accepted_transform.at<double>(2, 2) = 1;
+                cv::Mat predicted_pose = accepted_transform.inv() * transform * pose;
+                double error = sqrt(pow(predicted_pose.at<double>(0, 0) - pose.at<double>(0, 0), 2) + pow(predicted_pose.at<double>(1, 0) - pose.at<double>(1, 0), 2));
+
+                if (error >= far_from_accepted_transform_threshold_)
+                {
+                  //
+                  size_t result_loop_index = it3 - dst.second.begin();
+                  size_t smaller_or_equal_count = 0;
+                  for (size_t index : result_loop_indexes_)
+                  {
+                    if (index <= result_loop_index)
+                    {
+                      ++smaller_or_equal_count;
+                    }
+                  }
+                  size_t result_index = result_loop_index + smaller_or_equal_count;
+                  //
+                  result_loop_indexes_.push_back(result_loop_index);
+                  //
+
+                  it3 = dst.second.erase(it3);
+
+                  {
+                    std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+                    std::ofstream fw("Erased_loop_closure_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt", std::ofstream::app);
+                    if (fw.is_open())
+                    {
+                      fw << result_index << "," << current_time << "," << constraint.x << "," << constraint.y << "," << constraint.tx << "," << constraint.ty << "," << constraint.r << std::endl;
+                      fw.close();
+                    }
+                  }
+                  continue;
+                }
+
+                ++it3;
+              }
+            }
+          }
+        }
+      }
+      /** Remove loop closure constraints that are too different from the latest accepted loop closure constraint END */
 
       int total_loop_constraint_count = 0;
       for (auto &src : robot_to_robot_loop_closure_constraints_)
@@ -2072,6 +2174,32 @@ namespace traceback
           robot_to_robot_candidate_loop_closure_constraints_[robot_name][it->first] = {};
           robot_to_robot_loop_closure_constraints_[it->first][robot_name] = {};
           robot_to_robot_loop_closure_constraints_[robot_name][it->first] = {};
+
+          if (it->first < robot_name || it->first > robot_name)
+          {
+            std::string src_robot = it->first < robot_name ? it->first : robot_name;
+            std::string dst_robot = it->first < robot_name ? robot_name : it->first;
+            std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+            std::ofstream fw("Erased_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+              fw << "result_index"
+                 << ","
+                 << "timestamp"
+                 << ","
+                 << "x"
+                 << ","
+                 << "y"
+                 << ","
+                 << "tx"
+                 << ","
+                 << "ty"
+                 << ","
+                 << "r"
+                 << std::endl;
+              fw.close();
+            }
+          }
         }
       }
     }

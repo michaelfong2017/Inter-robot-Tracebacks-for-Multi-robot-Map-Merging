@@ -150,6 +150,13 @@ namespace traceback
     const tf::TransformListener tf_listener_; ///< @brief Used for transforming
     double transform_tolerance_;              ///< timeout before transform errors
 
+    /** Remove loop closure constraints that are too different from the latest accepted loop closure constraint */
+    // in meters
+    double far_from_accepted_transform_threshold_;
+    // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
+    std::unordered_map<std::string, std::unordered_map<std::string, LoopClosureConstraint>> robot_to_robot_latest_accepted_loop_closure_constraint_;
+    /** Remove loop closure constraints that are too different from the latest accepted loop closure constraint END */
+
     // maps robots namespaces to maps. does not own
     std::unordered_map<std::string, MapSubscription *> robots_to_map_subscriptions_;
     // owns maps -- iterator safe
@@ -217,7 +224,9 @@ namespace traceback
     std::unordered_set<std::string> has_best_transforms_;
 
     /** Generate result */
-    std::vector<Result> results_;
+    size_t result_index_;
+    boost::shared_mutex result_file_mutex_;
+    std::vector<size_t> result_loop_indexes_;
     void appendResultToFile(Result result);
     /** Generate result END */
 
