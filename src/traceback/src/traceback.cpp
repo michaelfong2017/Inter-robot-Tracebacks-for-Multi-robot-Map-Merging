@@ -304,11 +304,13 @@ namespace traceback
 
             std::string src_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
             std::string dst_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
+            size_t i = 0;
             for (auto &constraint : robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot])
             {
               robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
 
               // Generate result
+              if (i != 0)
               {
                 cv::Mat adjusted_transform(3, 3, CV_64F);
                 adjusted_transform.at<double>(0, 0) = cos(constraint.r);
@@ -359,6 +361,7 @@ namespace traceback
                 result.r_error = abs(atan2(rot_1_0, rot_0_0));
                 appendResultToFile(result);
               }
+              ++i;
             }
             robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot].clear();
           }
@@ -1232,7 +1235,7 @@ namespace traceback
             init_pose1.orientation.z = pose1.orientation.z * -1;
             init_pose1.orientation.x = 0.0;
             init_pose1.orientation.y = 0.0;
-            init_pose1.orientation.w = 1.0;
+            init_pose1.orientation.w = pose1.orientation.w;
             geometry_msgs::Pose init_pose2;
             init_pose2.position.x = pose2.position.x * -1;
             init_pose2.position.y = pose2.position.y * -1;
@@ -1240,7 +1243,7 @@ namespace traceback
             init_pose2.orientation.z = pose2.orientation.z * -1;
             init_pose2.orientation.x = 0.0;
             init_pose2.orientation.y = 0.0;
-            init_pose2.orientation.w = 1.0;
+            init_pose2.orientation.w = pose2.orientation.w;
 
             size_t self_robot_index;
             size_t second_robot_index;
