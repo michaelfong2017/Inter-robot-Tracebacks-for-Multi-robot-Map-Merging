@@ -15,7 +15,7 @@
 
 namespace traceback
 {
-  Traceback::Traceback() : map_subscriptions_size_(0), camera_subscriptions_size_(0), last_total_loop_constraint_count_(0), result_index_(0), tf_listener_(ros::Duration(10.0))
+  Traceback::Traceback() : map_subscriptions_size_(0), camera_subscriptions_size_(0), last_total_loop_constraint_count_(0), tf_listener_(ros::Duration(10.0))
   {
     ros::NodeHandle private_nh("~");
 
@@ -60,37 +60,6 @@ namespace traceback
 
         if (boost::filesystem::create_directory(dir))
           ROS_DEBUG("Directory %s is successfully created", "tb3_0_tb3_1");
-      }
-    }
-
-    {
-      std::ofstream fw("_result.csv", std::ofstream::app);
-      if (fw.is_open())
-      {
-        fw << "result_index"
-           << ","
-           << "timestamp"
-           << ","
-           << "from_robot"
-           << ","
-           << "to_robot"
-           << ","
-           << "x"
-           << ","
-           << "y"
-           << ","
-           << "tx"
-           << ","
-           << "ty"
-           << ","
-           << "r"
-           << ","
-           << "match_score"
-           << ","
-           << "t_error"
-           << ","
-           << "r_error" << std::endl;
-        fw.close();
       }
     }
   }
@@ -407,7 +376,7 @@ namespace traceback
       else
       {
         // 6. does not match and reject
-        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count + pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 2 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "6. does not match and reject");
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
@@ -545,7 +514,7 @@ namespace traceback
       }
 
       {
-        std::ofstream fw("Traceback_" + robot_name_src.substr(1) + "_.txt", std::ofstream::app);
+        std::ofstream fw("_traceback_initiated" + robot_name_src.substr(1) + "_.txt", std::ofstream::app);
         if (fw.is_open())
         {
           std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
@@ -1425,13 +1394,13 @@ namespace traceback
   void Traceback::appendResultToFile(Result result)
   {
     boost::lock_guard<boost::shared_mutex> lock(result_file_mutex_);
-    std::ofstream fw("_result.csv", std::ofstream::app);
+    std::ofstream fw("_result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv", std::ofstream::app);
     if (fw.is_open())
     {
-      fw << result_index_ << "," << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
+      fw << robot_to_robot_result_index_[result.from_robot][result.to_robot] << "," << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
       fw.close();
     }
-    ++result_index_;
+    ++robot_to_robot_result_index_[result.from_robot][result.to_robot];
   }
 
   void Traceback::pushData()
@@ -1688,7 +1657,7 @@ namespace traceback
                   //
                   size_t result_loop_index = it3 - dst.second.begin();
                   size_t smaller_or_equal_count = 0;
-                  for (size_t index : result_loop_indexes_)
+                  for (size_t index : robot_to_robot_result_loop_indexes_[src.first][dst.first])
                   {
                     if (index <= result_loop_index)
                     {
@@ -1697,7 +1666,7 @@ namespace traceback
                   }
                   size_t result_index = result_loop_index + smaller_or_equal_count;
                   //
-                  result_loop_indexes_.push_back(result_loop_index);
+                  robot_to_robot_result_loop_indexes_[src.first][dst.first].push_back(result_loop_index);
                   //
 
                   it3 = dst.second.erase(it3);
@@ -2193,29 +2162,69 @@ namespace traceback
           robot_to_robot_loop_closure_constraints_[it->first][robot_name] = {};
           robot_to_robot_loop_closure_constraints_[robot_name][it->first] = {};
 
+          robot_to_robot_result_index_[it->first][robot_name] = 0;
+          robot_to_robot_result_index_[robot_name][it->first] = 0;
+          robot_to_robot_result_loop_indexes_[it->first][robot_name] = {};
+          robot_to_robot_result_loop_indexes_[robot_name][it->first] = {};
+
           if (it->first < robot_name || it->first > robot_name)
           {
+
             std::string src_robot = it->first < robot_name ? it->first : robot_name;
             std::string dst_robot = it->first < robot_name ? robot_name : it->first;
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-            std::ofstream fw("_erased_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv", std::ofstream::app);
-            if (fw.is_open())
+
             {
-              fw << "result_index"
-                 << ","
-                 << "timestamp"
-                 << ","
-                 << "x"
-                 << ","
-                 << "y"
-                 << ","
-                 << "tx"
-                 << ","
-                 << "ty"
-                 << ","
-                 << "r"
-                 << std::endl;
-              fw.close();
+              std::ofstream fw("_result_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv", std::ofstream::app);
+              if (fw.is_open())
+              {
+                fw << "result_index"
+                   << ","
+                   << "timestamp"
+                   << ","
+                   << "from_robot"
+                   << ","
+                   << "to_robot"
+                   << ","
+                   << "x"
+                   << ","
+                   << "y"
+                   << ","
+                   << "tx"
+                   << ","
+                   << "ty"
+                   << ","
+                   << "r"
+                   << ","
+                   << "match_score"
+                   << ","
+                   << "t_error"
+                   << ","
+                   << "r_error" << std::endl;
+                fw.close();
+              }
+            }
+
+            {
+              std::ofstream fw("_erased_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv", std::ofstream::app);
+              if (fw.is_open())
+              {
+                fw << "result_index"
+                   << ","
+                   << "timestamp"
+                   << ","
+                   << "x"
+                   << ","
+                   << "y"
+                   << ","
+                   << "tx"
+                   << ","
+                   << "ty"
+                   << ","
+                   << "r"
+                   << std::endl;
+                fw.close();
+              }
             }
           }
         }
@@ -2534,13 +2543,13 @@ namespace traceback
     }
     //
     {
-      std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+      std::ofstream fw("Optimized_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
       if (fw.is_open())
       {
         double optimized_tx = adjusted.at<double>(0, 2);
         double optimized_ty = adjusted.at<double>(1, 2);
         double optimized_r = atan2(adjusted.at<double>(1, 0), adjusted.at<double>(0, 0));
-        fw << "Unadjusted transform:" << std::endl;
+        fw << "Last transform:" << std::endl;
         fw << original.at<double>(0, 0) << "\t" << original.at<double>(0, 1) << "\t" << original.at<double>(0, 2) << std::endl;
         fw << original.at<double>(1, 0) << "\t" << original.at<double>(1, 1) << "\t" << original.at<double>(1, 2) << std::endl;
         fw << original.at<double>(2, 0) << "\t" << original.at<double>(2, 1) << "\t" << original.at<double>(2, 2) << std::endl;
@@ -2554,7 +2563,7 @@ namespace traceback
     }
 
     {
-      std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+      std::ofstream fw("Optimized_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
       if (fw.is_open())
       {
         fw << std::endl;
@@ -2571,7 +2580,7 @@ namespace traceback
     }
 
     {
-      std::ofstream fw("Accepted_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+      std::ofstream fw("Optimized_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
       if (fw.is_open())
       {
         fw << std::endl;

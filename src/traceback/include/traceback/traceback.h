@@ -224,9 +224,11 @@ namespace traceback
     std::unordered_set<std::string> has_best_transforms_;
 
     /** Generate result */
-    size_t result_index_;
+    // "from" can be alphabetically smaller or greater than "to"
+    std::unordered_map<std::string, std::unordered_map<std::string, size_t>> robot_to_robot_result_index_;
     boost::shared_mutex result_file_mutex_;
-    std::vector<size_t> result_loop_indexes_;
+    // "from" can be alphabetically smaller or greater than "to"
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<size_t>>> robot_to_robot_result_loop_indexes_;
     void appendResultToFile(Result result);
     /** Generate result END */
 
