@@ -95,7 +95,7 @@ namespace traceback
     if (msg->aborted)
     {
       // 1. abort with enough count
-      if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= 2 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+      if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
       {
         writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. abort with enough count");
 
@@ -593,6 +593,12 @@ namespace traceback
       }
       // Select robot_name_dst END
 
+      // Skip if this pair is paused (due to abort)
+      // if (pairwise_paused_[robot_name_src][robot_name_dst]) {
+      //   ROS_INFO("Skip traceback since this pair is being paused");
+      //   continue;
+      // }
+
       assert(transforms_indexes_[i] == robot_name_src);
       assert(transforms_indexes_[max_position] == robot_name_dst);
 
@@ -606,7 +612,9 @@ namespace traceback
         readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
 
         {
-          std::ofstream fw("_traceback_initiated_" + robot_name_src.substr(1) + "_to_" + robot_name_dst.substr(1) + "_.txt", std::ofstream::app);
+          std::string src_robot = robot_name_src < robot_name_dst ? robot_name_src : robot_name_dst;
+          std::string dst_robot = robot_name_src < robot_name_dst ? robot_name_dst : robot_name_src;
+          std::ofstream fw("_traceback_initiated_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + "_.txt", std::ofstream::app);
           if (fw.is_open())
           {
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
@@ -617,7 +625,8 @@ namespace traceback
       }
       else
       {
-        if (!hasCandidate) {
+        if (!hasCandidate)
+        {
           continue;
         }
 
@@ -678,7 +687,9 @@ namespace traceback
         }
 
         {
-          std::ofstream fw("_traceback_initiated_" + robot_name_src.substr(1) + "_to_" + robot_name_dst.substr(1) + "_.txt", std::ofstream::app);
+          std::string src_robot = robot_name_src < robot_name_dst ? robot_name_src : robot_name_dst;
+          std::string dst_robot = robot_name_src < robot_name_dst ? robot_name_dst : robot_name_src;
+          std::ofstream fw("_traceback_initiated_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + "_.txt", std::ofstream::app);
           if (fw.is_open())
           {
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
