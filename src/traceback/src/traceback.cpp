@@ -99,6 +99,19 @@ namespace traceback
       {
         writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. abort with enough count");
 
+        {
+          std::string from_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
+          std::string to_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
+          std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+          std::ofstream fw("_traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt", std::ofstream::app);
+          if (fw.is_open())
+          {
+            fw << current_time << " - tracer robot is " << tracer_robot << " and traced robot is " << traced_robot << " - "
+               << "abort" << std::endl;
+            fw.close();
+          }
+        }
+
         pairwise_abort_[tracer_robot][traced_robot] = 0;
 
         // Allow more time for normal exploration to prevent being stuck at local optimums
@@ -266,6 +279,20 @@ namespace traceback
           {
             writeTracebackFeedbackHistory(tracer_robot, traced_robot, "5. match but cannot solved and accept");
           }
+
+          {
+            std::string from_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
+            std::string to_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
+            std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+            std::ofstream fw("_traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+              fw << current_time << " - tracer robot is " << tracer_robot << " and traced robot is " << traced_robot << " - "
+                 << "accept" << std::endl;
+              fw.close();
+            }
+          }
+
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
           pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
@@ -379,6 +406,20 @@ namespace traceback
         if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 2 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "6. does not match and reject");
+
+          {
+            std::string from_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
+            std::string to_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
+            std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+            std::ofstream fw("_traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt", std::ofstream::app);
+            if (fw.is_open())
+            {
+              fw << current_time << " - tracer robot is " << tracer_robot << " and traced robot is " << traced_robot << " - "
+                 << "reject" << std::endl;
+              fw.close();
+            }
+          }
+
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
           pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
           robots_to_in_traceback_[tracer_robot] = false;
@@ -514,7 +555,7 @@ namespace traceback
       }
 
       {
-        std::ofstream fw("_traceback_initiated" + robot_name_src.substr(1) + "_.txt", std::ofstream::app);
+        std::ofstream fw("_traceback_initiated_" + robot_name_src.substr(1) + "_.txt", std::ofstream::app);
         if (fw.is_open())
         {
           std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
@@ -1280,9 +1321,16 @@ namespace traceback
             transform_needed.arrived_y = pose1.position.y;
             MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
 
-            if (!result.match || !result.solved)
+            if (!result.match)
             {
               continue;
+            }
+
+            if (!result.solved)
+            {
+              transform_needed.tx = 0.0;
+              transform_needed.ty = 0.0;
+              transform_needed.r = 0.0;
             }
 
             cv::Mat adjusted_transform;
