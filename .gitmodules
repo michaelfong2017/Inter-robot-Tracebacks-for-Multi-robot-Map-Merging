@@ -18,6 +18,3 @@
 	path = src/aws_robomaker_small_house_world
 	url = https://github.com/michaelfong2017/aws-robomaker-small-house-world.git
 	branch = ros1
-[submodule "src/gmapping"]
-	path = src/gmapping
-	url = https://github.com/michaelfong2017/gmapping.git
