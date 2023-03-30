@@ -324,6 +324,7 @@ namespace traceback
               else
               {
                 robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
+                ++robot_to_robot_result_index_[src_robot][dst_robot];
               }
 
               // Generate result
@@ -1455,6 +1456,7 @@ namespace traceback
             addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
             addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
+            ++robot_to_robot_result_index_[robot_name][second_robot_name];
 
             // Evaluate match with current pose of current robot
             // Note that unmodified transform is used
@@ -1540,7 +1542,6 @@ namespace traceback
       fw << robot_to_robot_result_index_[result.from_robot][result.to_robot] << "," << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
       fw.close();
     }
-    ++robot_to_robot_result_index_[result.from_robot][result.to_robot];
   }
 
   void Traceback::pushData()
@@ -3236,6 +3237,11 @@ namespace traceback
     {
       for (auto &dst : src.second)
       {
+        if (src.first >= dst.first)
+        {
+          continue;
+        }
+
         for (LoopClosureConstraint &constraint : dst.second)
         {
           double RESOLUTION = 0.05; // HARDCODE
@@ -3299,6 +3305,11 @@ namespace traceback
     {
       for (auto &dst : src.second)
       {
+        if (src.first >= dst.first)
+        {
+          continue;
+        }
+
         if (!dst.second.empty())
         {
           std::string filepath = "map/" + current_time + "/Optimized_transform_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt";
