@@ -3301,9 +3301,11 @@ namespace traceback
     {
       for (auto &dst : src.second)
       {
-        cv::Mat init_transform = cv::Mat::eye(3, 3, CV_64F);
-        std::string filepath = "map/" + current_time + "/Optimized_transform_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt";
-        evaluateWithGroundTruth(dst.second, src.first, dst.first, current_time, filepath);
+        if (!dst.second.empty())
+        {
+          std::string filepath = "map/" + current_time + "/Optimized_transform_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt";
+          evaluateWithGroundTruth(dst.second, src.first, dst.first, current_time, filepath);
+        }
       }
     }
   }
