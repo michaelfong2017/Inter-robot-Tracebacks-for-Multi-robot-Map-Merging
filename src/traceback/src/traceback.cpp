@@ -376,8 +376,11 @@ namespace traceback
                 double rot_0_0 = cos(constraint.r) * cos(-1.0 * truth_r) - sin(constraint.r) * sin(-1.0 * truth_r);
                 double rot_1_0 = sin(constraint.r) * cos(-1.0 * truth_r) + cos(constraint.r) * sin(-1.0 * truth_r);
                 result.r_error = abs(atan2(rot_1_0, rot_0_0));
+
+                result.index = robot_to_robot_result_index_[result.from_robot][result.to_robot]++;
+                current_results_.push_back(result);
                 std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
-                appendResultToFile(result, filepath, true);
+                appendResultToFile(result, filepath);
               }
               ++i;
             }
@@ -1498,9 +1501,11 @@ namespace traceback
               double rot_0_0 = cos(result.r) * cos(-1.0 * truth_r) - sin(result.r) * sin(-1.0 * truth_r);
               double rot_1_0 = sin(result.r) * cos(-1.0 * truth_r) + cos(result.r) * sin(-1.0 * truth_r);
               result.r_error = abs(atan2(rot_1_0, rot_0_0));
-              std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
 
-              appendResultToFile(result, filepath, true);
+              result.index = robot_to_robot_result_index_[result.from_robot][result.to_robot]++;
+              current_results_.push_back(result);
+              std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
+              appendResultToFile(result, filepath);
             }
 
             for (int i = 0; i < 20; ++i)
@@ -1531,18 +1536,14 @@ namespace traceback
     }
   }
 
-  void Traceback::appendResultToFile(Result result, std::string filepath, bool increment_index)
+  void Traceback::appendResultToFile(Result result, std::string filepath)
   {
     boost::lock_guard<boost::shared_mutex> lock(result_file_mutex_);
     std::ofstream fw(filepath, std::ofstream::app);
     if (fw.is_open())
     {
-      fw << robot_to_robot_result_index_[result.from_robot][result.to_robot] << "," << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
+      fw << result.index << "," << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
       fw.close();
-    }
-    if (increment_index)
-    {
-      ++robot_to_robot_result_index_[result.from_robot][result.to_robot];
     }
   }
 
@@ -1793,6 +1794,7 @@ namespace traceback
                   //
 
                   it3 = dst.second.erase(it3);
+                  current_results_.erase(current_results_.begin() + result_loop_index);
 
                   {
                     std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
@@ -3243,71 +3245,10 @@ namespace traceback
     }
 
     //
-    for (auto &src : robot_to_robot_loop_closure_constraints_)
+    for (Result &result : current_results_)
     {
-      for (auto &dst : src.second)
-      {
-        if (src.first >= dst.first)
-        {
-          continue;
-        }
-
-        for (LoopClosureConstraint &constraint : dst.second)
-        {
-          double RESOLUTION = 0.05; // HARDCODE
-
-          cv::Mat adjusted_transform(3, 3, CV_64F);
-          adjusted_transform.at<double>(0, 0) = cos(constraint.r);
-          adjusted_transform.at<double>(0, 1) = -sin(constraint.r);
-          adjusted_transform.at<double>(0, 2) = constraint.tx;
-          adjusted_transform.at<double>(1, 0) = sin(constraint.r);
-          adjusted_transform.at<double>(1, 1) = cos(constraint.r);
-          adjusted_transform.at<double>(1, 2) = constraint.ty;
-          adjusted_transform.at<double>(2, 0) = 0;
-          adjusted_transform.at<double>(2, 1) = 0;
-          adjusted_transform.at<double>(2, 2) = 1;
-          cv::Mat predicted_pose = evaluateMatch(adjusted_transform, constraint.x * RESOLUTION, constraint.y * RESOLUTION, src.first, dst.first, current_time);
-
-          Result result;
-          result.current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-          if (src.first < dst.first)
-          {
-            result.from_robot = src.first;
-            result.to_robot = dst.first;
-          }
-          else
-          {
-            result.from_robot = dst.first;
-            result.to_robot = src.first;
-          }
-          result.x = constraint.x * 0.05;
-          result.y = constraint.y * 0.05;
-          result.tx = constraint.tx * 0.05;
-          result.ty = constraint.ty * 0.05;
-          result.r = constraint.r;
-          result.match_score = 99.0;
-          result.t_error = sqrt(pow(predicted_pose.at<double>(0, 0) - constraint.x * RESOLUTION, 2) + pow(predicted_pose.at<double>(1, 0) - constraint.y * RESOLUTION, 2));
-          double truth_r;
-          if (result.from_robot == "/tb3_0" && result.to_robot == "/tb3_1")
-          {
-            truth_r = 0.0; // HARDCODE
-          }
-          else if (result.from_robot == "/tb3_0" && result.to_robot == "/tb3_2")
-          {
-            truth_r = -0.785; // HARDCODE
-          }
-          else if (result.from_robot == "/tb3_1" && result.to_robot == "/tb3_2")
-          {
-            truth_r = -0.785; // HARDCODE
-          }
-          double rot_0_0 = cos(constraint.r) * cos(-1.0 * truth_r) - sin(constraint.r) * sin(-1.0 * truth_r);
-          double rot_1_0 = sin(constraint.r) * cos(-1.0 * truth_r) + cos(constraint.r) * sin(-1.0 * truth_r);
-          result.r_error = abs(atan2(rot_1_0, rot_0_0));
-
-          std::string filepath = "map/" + current_time + "/Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
-          appendResultToFile(result, filepath, false);
-        }
-      }
+      std::string filepath = "map/" + current_time + "/Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
+      appendResultToFile(result, filepath);
     }
 
     //

@@ -64,6 +64,7 @@ namespace traceback
 
   struct Result
   {
+    size_t index;
     std::string current_time;
     // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
     std::string from_robot;
@@ -227,10 +228,12 @@ namespace traceback
     /** Generate result */
     // "from" can be alphabetically smaller or greater than "to"
     std::unordered_map<std::string, std::unordered_map<std::string, size_t>> robot_to_robot_result_index_;
+    // After erasing, update this
+    std::vector<Result> current_results_;
     boost::shared_mutex result_file_mutex_;
     // "from" can be alphabetically smaller or greater than "to"
     std::unordered_map<std::string, std::unordered_map<std::string, std::vector<size_t>>> robot_to_robot_result_loop_indexes_;
-    void appendResultToFile(Result result, std::string filepath, bool increment_index);
+    void appendResultToFile(Result result, std::string filepath);
     /** Generate result END */
 
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
