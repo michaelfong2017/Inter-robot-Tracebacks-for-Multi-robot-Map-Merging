@@ -3299,8 +3299,11 @@ namespace traceback
     {
       for (auto &dst : src.second)
       {
-        std::string filepath = "map/" + current_time + "/Optimized_transform_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt";
-        evaluateWithGroundTruth(dst.second, src.first, dst.first, current_time, filepath);
+        if (!dst.second.empty())
+        {
+          std::string filepath = "map/" + current_time + "/Optimized_transform_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt";
+          evaluateWithGroundTruth(dst.second, src.first, dst.first, current_time, filepath);
+        }
       }
     }
   }
@@ -3320,7 +3323,7 @@ namespace traceback
     }
     std::string mapname = "map/" + current_time + "/" + map_name;
 
-    std::string mapdatafile = mapname + ".png";
+    std::string mapdatafile = mapname + ".pgm";
     ROS_INFO("Writing map occupancy data to %s", mapdatafile.c_str());
     FILE *out = fopen(mapdatafile.c_str(), "w");
     if (!out)
