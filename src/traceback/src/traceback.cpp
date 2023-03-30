@@ -290,20 +290,6 @@ namespace traceback
             writeTracebackFeedbackHistory(tracer_robot, traced_robot, "5. match but cannot solved and accept");
           }
 
-          {
-            std::string from_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
-            std::string to_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
-            std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-            std::string filepath = "_Traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt";
-            std::ofstream fw(filepath, std::ofstream::app);
-            if (fw.is_open())
-            {
-              fw << current_time << " - tracer robot is " << tracer_robot << " and traced robot is " << traced_robot << " - "
-                 << "accept" << std::endl;
-              fw.close();
-            }
-          }
-
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accepted = true;
           pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count = 0;
           pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count = 0;
@@ -320,6 +306,34 @@ namespace traceback
               if (i == 0)
               {
                 robot_to_robot_latest_accepted_loop_closure_constraint_[src_robot][dst_robot] = constraint;
+
+                {
+                  std::string from_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
+                  std::string to_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
+                  std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+                  std::string filepath = "_Traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt";
+                  std::ofstream fw(filepath, std::ofstream::app);
+                  if (fw.is_open())
+                  {
+                    double RESOLUTION = 0.05; // HARDCODE
+                    fw << current_time << " - tracer robot is " << tracer_robot << " and traced robot is " << traced_robot << " - "
+                       << "accept"
+                       << " - "
+                       << "(x, y, tx, ty, r) = ("
+                       << constraint.x * RESOLUTION
+                       << ", "
+                       << constraint.y * RESOLUTION
+                       << ", "
+                       << constraint.tx * RESOLUTION
+                       << ", "
+                       << constraint.ty * RESOLUTION
+                       << ", "
+                       << constraint.r
+                       << ") (in meters)"
+                       << std::endl;
+                    fw.close();
+                  }
+                }
               }
               else
               {
@@ -1802,7 +1816,7 @@ namespace traceback
                     std::ofstream fw(filepath, std::ofstream::app);
                     if (fw.is_open())
                     {
-                      fw << result_index << "," << current_time << "," << x << "," << y << "," << tx << "," << ty << "," << constraint.r << std::endl;
+                      fw << result_index << "," << current_time << "," << x << "," << y << "," << tx << "," << ty << "," << constraint.r << "," << error << std::endl;
                       fw.close();
                     }
                   }
@@ -2356,6 +2370,8 @@ namespace traceback
                    << "ty"
                    << ","
                    << "r"
+                   << ","
+                   << "error_to_accepted"
                    << std::endl;
                 fw.close();
               }

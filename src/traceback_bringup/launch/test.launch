@@ -47,8 +47,8 @@
         <param name="camera_pose_image_queue_skip_count" value="50" />
         <param name="features_depths_max_queue_size" value="200" />
         <param name="essential_mat_confidence" value="0.35" />
-        <param name="far_from_accepted_transform_threshold" value="5.0" />
-        <param name="accept_count_needed" value="4" />
+        <param name="far_from_accepted_transform_threshold" value="4.0" />
+        <param name="accept_count_needed" value="8" />
         <!-- reject when reject_count >= reject_count_needed && reject_count >= 2 * accept_count -->
         <param name="reject_count_needed" value="1" />
         <!-- abort when abort_count >= abort_count_needed && abort_count >= 2 * accept_count -->
