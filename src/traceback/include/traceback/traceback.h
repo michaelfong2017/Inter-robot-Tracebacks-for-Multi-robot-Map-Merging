@@ -230,7 +230,7 @@ namespace traceback
     boost::shared_mutex result_file_mutex_;
     // "from" can be alphabetically smaller or greater than "to"
     std::unordered_map<std::string, std::unordered_map<std::string, std::vector<size_t>>> robot_to_robot_result_loop_indexes_;
-    void appendResultToFile(Result result, std::string filepath);
+    void appendResultToFile(Result result, std::string filepath, bool increment_index);
     /** Generate result END */
 
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);

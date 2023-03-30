@@ -51,7 +51,7 @@ namespace traceback
     private_nh.param("features_depths_max_queue_size", features_depths_max_queue_size_, 100);
 
     // Create directories for saving data
-    for (auto &dir_path : {"tb3_0_tb3_1", "tb3_0_tb3_2", "tb3_1_tb3_0", "tb3_1_tb3_2", "tb3_2_tb3_0", "tb3_2_tb3_1", "map", "transform_optimized", "constraint_count"})
+    for (auto &dir_path : {"tb3_0_tb3_1", "tb3_0_tb3_2", "tb3_1_tb3_0", "tb3_1_tb3_2", "tb3_2_tb3_0", "tb3_2_tb3_1", "map", "optimized_transform", "constraint_count"})
     {
       boost::filesystem::path dir(dir_path);
 
@@ -324,7 +324,6 @@ namespace traceback
               else
               {
                 robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(constraint);
-                ++robot_to_robot_result_index_[src_robot][dst_robot];
               }
 
               // Generate result
@@ -378,7 +377,7 @@ namespace traceback
                 double rot_1_0 = sin(constraint.r) * cos(-1.0 * truth_r) + cos(constraint.r) * sin(-1.0 * truth_r);
                 result.r_error = abs(atan2(rot_1_0, rot_0_0));
                 std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
-                appendResultToFile(result, filepath);
+                appendResultToFile(result, filepath, true);
               }
               ++i;
             }
@@ -1456,7 +1455,6 @@ namespace traceback
             addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
             addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
-            ++robot_to_robot_result_index_[robot_name][second_robot_name];
 
             // Evaluate match with current pose of current robot
             // Note that unmodified transform is used
@@ -1502,7 +1500,7 @@ namespace traceback
               result.r_error = abs(atan2(rot_1_0, rot_0_0));
               std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
 
-              appendResultToFile(result, filepath);
+              appendResultToFile(result, filepath, true);
             }
 
             for (int i = 0; i < 20; ++i)
@@ -1533,7 +1531,7 @@ namespace traceback
     }
   }
 
-  void Traceback::appendResultToFile(Result result, std::string filepath)
+  void Traceback::appendResultToFile(Result result, std::string filepath, bool increment_index)
   {
     boost::lock_guard<boost::shared_mutex> lock(result_file_mutex_);
     std::ofstream fw(filepath, std::ofstream::app);
@@ -1541,6 +1539,10 @@ namespace traceback
     {
       fw << robot_to_robot_result_index_[result.from_robot][result.to_robot] << "," << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
       fw.close();
+    }
+    if (increment_index)
+    {
+      ++robot_to_robot_result_index_[result.from_robot][result.to_robot];
     }
   }
 
@@ -1838,6 +1840,10 @@ namespace traceback
             {
               for (auto &dst : src.second)
               {
+                if (src.first >= dst.first)
+                {
+                  continue;
+                }
                 fw << "Count from " << src.first << " to " << dst.first << " is " << dst.second.size() << std::endl;
               }
             }
@@ -2305,7 +2311,7 @@ namespace traceback
               {
                 fw << "result_index"
                    << ","
-                   << "timestamp"
+                   << "generate_time"
                    << ","
                    << "from_robot"
                    << ","
@@ -2337,7 +2343,7 @@ namespace traceback
               {
                 fw << "result_index"
                    << ","
-                   << "timestamp"
+                   << "erase_time"
                    << ","
                    << "x"
                    << ","
@@ -3226,6 +3232,10 @@ namespace traceback
       {
         for (auto &dst : src.second)
         {
+          if (src.first >= dst.first)
+          {
+            continue;
+          }
           fw << "Count from " << src.first << " to " << dst.first << " is " << dst.second.size() << std::endl;
         }
       }
@@ -3295,7 +3305,7 @@ namespace traceback
           result.r_error = abs(atan2(rot_1_0, rot_0_0));
 
           std::string filepath = "map/" + current_time + "/Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
-          appendResultToFile(result, filepath);
+          appendResultToFile(result, filepath, false);
         }
       }
     }
