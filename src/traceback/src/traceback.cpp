@@ -378,7 +378,7 @@ namespace traceback
                 result.r_error = abs(atan2(rot_1_0, rot_0_0));
 
                 result.index = robot_to_robot_result_index_[result.from_robot][result.to_robot]++;
-                current_results_.push_back(result);
+                robot_to_robot_current_results_[result.from_robot][result.to_robot].push_back(result);
                 std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
                 appendResultToFile(result, filepath);
               }
@@ -1503,7 +1503,7 @@ namespace traceback
               result.r_error = abs(atan2(rot_1_0, rot_0_0));
 
               result.index = robot_to_robot_result_index_[result.from_robot][result.to_robot]++;
-              current_results_.push_back(result);
+              robot_to_robot_current_results_[result.from_robot][result.to_robot].push_back(result);
               std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
               appendResultToFile(result, filepath);
             }
@@ -1794,7 +1794,7 @@ namespace traceback
                   //
 
                   it3 = dst.second.erase(it3);
-                  current_results_.erase(current_results_.begin() + result_loop_index);
+                  robot_to_robot_current_results_[src.first][dst.first].erase(robot_to_robot_current_results_[src.first][dst.first].begin() + result_loop_index);
 
                   {
                     std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
@@ -3245,10 +3245,16 @@ namespace traceback
     }
 
     //
-    for (Result &result : current_results_)
+    for (auto &src : robot_to_robot_current_results_)
     {
-      std::string filepath = "map/" + current_time + "/Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
-      appendResultToFile(result, filepath);
+      for (auto &dst : src.second)
+      {
+        for (Result &result : dst.second)
+        {
+          std::string filepath = "map/" + current_time + "/Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
+          appendResultToFile(result, filepath);
+        }
+      }
     }
 
     //

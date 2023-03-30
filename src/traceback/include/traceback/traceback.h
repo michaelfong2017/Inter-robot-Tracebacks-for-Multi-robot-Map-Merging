@@ -228,8 +228,9 @@ namespace traceback
     /** Generate result */
     // "from" can be alphabetically smaller or greater than "to"
     std::unordered_map<std::string, std::unordered_map<std::string, size_t>> robot_to_robot_result_index_;
+    // "from" can be alphabetically smaller or greater than "to"
     // After erasing, update this
-    std::vector<Result> current_results_;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<Result>>> robot_to_robot_current_results_;
     boost::shared_mutex result_file_mutex_;
     // "from" can be alphabetically smaller or greater than "to"
     std::unordered_map<std::string, std::unordered_map<std::string, std::vector<size_t>>> robot_to_robot_result_loop_indexes_;
