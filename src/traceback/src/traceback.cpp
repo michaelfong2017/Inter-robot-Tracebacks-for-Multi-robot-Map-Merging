@@ -25,6 +25,7 @@ namespace traceback
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
     private_nh.param("transform_optimization_rate", transform_optimization_rate_, 0.2);
+    private_nh.param("save_map_rate", save_map_rate_, 0.05);
     private_nh.param("unreasonable_goal_distance", unreasonable_goal_distance_, 5.0);
     private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
     private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
@@ -50,18 +51,25 @@ namespace traceback
     private_nh.param("features_depths_max_queue_size", features_depths_max_queue_size_, 100);
 
     // Create directories for debugging
-    for (auto &dir_path : {"tb3_0_tb3_1", "tb3_0_tb3_2", "tb3_1_tb3_0", "tb3_1_tb3_2", "tb3_2_tb3_0", "tb3_2_tb3_1"})
+    for (auto &dir_path : {"tb3_0_tb3_1", "tb3_0_tb3_2", "tb3_1_tb3_0", "tb3_1_tb3_2", "tb3_2_tb3_0", "tb3_2_tb3_1", "map"})
     {
       boost::filesystem::path dir(dir_path);
 
       if (!(boost::filesystem::exists(dir)))
       {
-        ROS_DEBUG("Directory %s does not exist", "tb3_0_tb3_1");
+        ROS_DEBUG("Directory %s does not exist", dir.c_str());
 
         if (boost::filesystem::create_directory(dir))
-          ROS_DEBUG("Directory %s is successfully created", "tb3_0_tb3_1");
+          ROS_DEBUG("Directory %s is successfully created", dir.c_str());
       }
     }
+
+    save_merged_map_subscriber_ = node_.subscribe<nav_msgs::OccupancyGrid>(
+        merged_map_topic_, 50,
+        [this](const nav_msgs::OccupancyGrid::ConstPtr &msg)
+        {
+          mergedMapUpdate(msg);
+        });
   }
 
   void Traceback::tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg)
@@ -2112,7 +2120,7 @@ namespace traceback
     if (subscription.readonly_map &&
         subscription.readonly_map->header.stamp > msg->header.stamp)
     {
-      // we have been overrunned by faster update. our work was useless.
+      // It has been overrun by faster update.
       return;
     }
 
@@ -2168,6 +2176,7 @@ namespace traceback
             {
               fullMapUpdate(msg, subscription);
             });
+
         // subscription.is_self = robot_name == ros::this_node::getNamespace();
         // ROS_INFO("subscription.is_self: %s", subscription.is_self ? "true" : "false");
 
@@ -2987,6 +2996,96 @@ namespace traceback
     return is_image;
   }
 
+  void Traceback::mergedMapUpdate(const nav_msgs::OccupancyGridConstPtr &map)
+  {
+    merged_map_ = *map;
+  }
+
+  void Traceback::saveAllMaps()
+  {
+    std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+
+    boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
+    for (auto &subscription : map_subscriptions_)
+    {
+      std::string robot_name = subscription.robot_namespace;
+      saveMap(*subscription.readonly_map, robot_name.substr(1) + "_map", current_time);
+    }
+
+    saveMap(merged_map_, "merged_map", current_time);
+  }
+
+  void Traceback::saveMap(nav_msgs::OccupancyGrid map, std::string map_name, std::string current_time)
+  {
+    {
+      boost::filesystem::path dir("map/" + current_time);
+
+      if (!(boost::filesystem::exists(dir)))
+      {
+        ROS_DEBUG("Directory %s does not exist", dir.c_str());
+
+        if (boost::filesystem::create_directory(dir))
+          ROS_DEBUG("Directory %s is successfully created", dir.c_str());
+      }
+    }
+    std::string mapname = "map/" + current_time + "/" + map_name;
+
+    std::string mapdatafile = mapname + ".pgm";
+    ROS_INFO("Writing map occupancy data to %s", mapdatafile.c_str());
+    FILE *out = fopen(mapdatafile.c_str(), "w");
+    if (!out)
+    {
+      ROS_ERROR("Couldn't save map file to %s", mapdatafile.c_str());
+      return;
+    }
+
+    for (unsigned int y = 0; y < map.info.height; y++)
+    {
+      for (unsigned int x = 0; x < map.info.width; x++)
+      {
+        unsigned int i = x + (map.info.height - y - 1) * map.info.width;
+        if (map.data[i] == 0)
+        { // occ [0,0.1)
+          fputc(254, out);
+        }
+        else if (map.data[i] == +100)
+        { // occ (0.65,1]
+          fputc(000, out);
+        }
+        else
+        { // occ [0.1,0.65]
+          fputc(205, out);
+        }
+      }
+    }
+
+    fclose(out);
+
+    std::string mapmetadatafile = mapname + ".yaml";
+    ROS_INFO("Writing map occupancy data to %s", mapmetadatafile.c_str());
+    FILE *yaml = fopen(mapmetadatafile.c_str(), "w");
+
+    /*
+resolution: 0.100000
+origin: [0.000000, 0.000000, 0.000000]
+#
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+     */
+
+    tf2::Quaternion tf_q;
+    tf2::fromMsg(map.info.origin.orientation, tf_q);
+    tf2::Matrix3x3 m(tf_q);
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+
+    fprintf(yaml, "image: %s\nresolution: %f\norigin: [%f, %f, %f]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196\n\n",
+            mapdatafile.c_str(), map.info.resolution, map.info.origin.position.x, map.info.origin.position.y, yaw);
+
+    fclose(yaml);
+  }
+
   void Traceback::executeUpdateTargetPoses()
   {
     ros::Rate r(update_target_rate_);
@@ -3047,6 +3146,16 @@ namespace traceback
     }
   }
 
+  void Traceback::executeSaveAllMaps()
+  {
+    ros::Rate r(save_map_rate_);
+    while (node_.ok())
+    {
+      saveAllMaps();
+      r.sleep();
+    }
+  }
+
   /*
    * spin()
    */
@@ -3065,7 +3174,10 @@ namespace traceback
                                   { executeUpdateTargetPoses(); });
     std::thread transform_optimization_thr([this]()
                                            { executeTransformOptimization(); });
+    std::thread save_map_thr([this]()
+                             { executeSaveAllMaps(); });
     ros::spin();
+    save_map_thr.join();
     transform_optimization_thr.join();
     update_target_thr.join();
     estimation_thr.join();

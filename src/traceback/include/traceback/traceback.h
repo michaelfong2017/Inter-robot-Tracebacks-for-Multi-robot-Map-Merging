@@ -121,6 +121,7 @@ namespace traceback
     double update_target_rate_;
     double discovery_rate_;
     double estimation_rate_;
+    double save_map_rate_;
 
     double confidence_threshold_;
     double unreasonable_goal_distance_;
@@ -315,12 +316,20 @@ namespace traceback
     bool isRobotMapTopic(const ros::master::TopicInfo &topic);
     bool isRobotCameraTopic(const ros::master::TopicInfo &topic);
 
+    std::string merged_map_topic_ = "/map_merge/map";
+    ros::Subscriber save_merged_map_subscriber_;
+    nav_msgs::OccupancyGrid merged_map_;
+    void mergedMapUpdate(const nav_msgs::OccupancyGridConstPtr &map);
+    void saveAllMaps();
+    void saveMap(nav_msgs::OccupancyGrid map, std::string map_name, std::string current_time);
+
     void executeUpdateTargetPoses();
     void executeTopicSubscribing();
     void executeReceiveUpdatedCameraImage();
     void executePushData();
     void executePoseEstimation();
     void executeTransformOptimization();
+    void executeSaveAllMaps();
   };
 } // namespace traceback
 #endif
