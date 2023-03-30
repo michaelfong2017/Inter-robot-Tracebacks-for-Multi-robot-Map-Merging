@@ -2797,8 +2797,8 @@ namespace traceback
       expected_r = truth_2_r;
     }
 
-    cv::Mat original_estimated_xy, adjusted_estimated_xy;
-    double original_estimated_r, adjusted_estimated_r;
+    cv::Mat adjusted_estimated_xy;
+    double adjusted_estimated_r;
     adjusted_estimated_xy = adjusted * test_xy;
     adjusted_estimated_r = atan2(adjusted.at<double>(1, 0), adjusted.at<double>(0, 0)) + test_r;
 
@@ -2921,10 +2921,8 @@ namespace traceback
         fw << "Expected transformed (x, y, r) of the global origin object" << std::endl;
         fw << "   from robot " << tracer_robot.substr(1) << "'s frame to robot " << traced_robot.substr(1) << "'s frame:" << std::endl;
         fw << "Expected (x, y, r) = (" << expected_x << ", " << expected_y << ", " << expected_r << ")" << std::endl;
-        fw << "Original estimated (x, y, r) = (" << original_estimated_xy.at<double>(0, 0) << ", " << original_estimated_xy.at<double>(1, 0) << ", " << original_estimated_r << ")" << std::endl;
         fw << "Adjusted estimated (x, y, r) = (" << adjusted_estimated_xy.at<double>(0, 0) << ", " << adjusted_estimated_xy.at<double>(1, 0) << ", " << adjusted_estimated_r << ")" << std::endl;
         fw << std::endl;
-        fw << "Error of original is " << sqrt(pow(expected_x - original_estimated_xy.at<double>(0, 0), 2) + pow(expected_y - original_estimated_xy.at<double>(1, 0), 2)) << " pixels translation and " << abs(expected_r - original_estimated_r) << " radians rotation" << std::endl;
         fw << "Error of adjusted is " << sqrt(pow(expected_x - adjusted_estimated_xy.at<double>(0, 0), 2) + pow(expected_y - adjusted_estimated_xy.at<double>(1, 0), 2)) << " pixels translation and " << abs(expected_r - adjusted_estimated_r) << " radians rotation" << std::endl;
         fw.close();
       }
@@ -3301,11 +3299,8 @@ namespace traceback
     {
       for (auto &dst : src.second)
       {
-        if (!dst.second.empty())
-        {
-          std::string filepath = "map/" + current_time + "/Optimized_transform_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt";
-          evaluateWithGroundTruth(dst.second, src.first, dst.first, current_time, filepath);
-        }
+        std::string filepath = "map/" + current_time + "/Optimized_transform_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt";
+        evaluateWithGroundTruth(dst.second, src.first, dst.first, current_time, filepath);
       }
     }
   }
