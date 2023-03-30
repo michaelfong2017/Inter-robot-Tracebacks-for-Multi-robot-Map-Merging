@@ -80,7 +80,8 @@ namespace traceback
 
         // Write match score to file
         {
-            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_features_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt", std::ofstream::app);
+            std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_features_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt";
+            std::ofstream fw(filepath, std::ofstream::app);
             if (fw.is_open())
             {
                 if (good_indices.size() == 1)
@@ -188,7 +189,8 @@ namespace traceback
         // Below is the same as matchAndSolve
         // For the match, write the number of filtered matches to file
         {
-            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Filtered_features_number_of_matches" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Filtered_features_number_of_matches" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt";
+            std::ofstream fw(filepath, std::ofstream::app);
             if (fw.is_open())
             {
                 fw << "Number of filtered matches at " << current_time << " is " << points1.size() << std::endl;
@@ -260,7 +262,8 @@ namespace traceback
         //
         cv::Vec3d rot = rotationMatrixToEulerAngles(transform_R);
         {
-            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_features_transform_R.txt", std::ofstream::out);
+            std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_features_transform_R.txt";
+            std::ofstream fw(filepath, std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "XYZ rotation is: " << rotationMatrixToEulerAngles(rmat1) << std::endl;
@@ -286,7 +289,8 @@ namespace traceback
         }
 
         {
-            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_features_transform_t.txt", std::ofstream::out);
+            std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_features_transform_t.txt";
+            std::ofstream fw(filepath, std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "Translation matrix C1MO (O to C1):" << std::endl;
@@ -430,7 +434,8 @@ namespace traceback
 
         // Write match score to file
         {
-            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_traceback_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt", std::ofstream::app);
+            std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Match_traceback_score_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_match_score.txt";
+            std::ofstream fw(filepath, std::ofstream::app);
             if (fw.is_open())
             {
                 if (good_indices.size() == 1)
@@ -533,7 +538,8 @@ namespace traceback
 
         // For the match, write the number of filtered matches to file
         {
-            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Filtered_traceback_number_of_matches" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+            std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Filtered_traceback_number_of_matches" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt";
+            std::ofstream fw(filepath, std::ofstream::app);
             if (fw.is_open())
             {
                 fw << "Number of filtered matches at " << current_time << " is " << points1.size() << std::endl;
@@ -605,7 +611,8 @@ namespace traceback
         //
         cv::Vec3d rot = rotationMatrixToEulerAngles(transform_R);
         {
-            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_traceback_transform_R.txt", std::ofstream::out);
+            std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_traceback_transform_R.txt";
+            std::ofstream fw(filepath, std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "XYZ rotation is: " << rotationMatrixToEulerAngles(rmat1) << std::endl;
@@ -631,7 +638,8 @@ namespace traceback
         }
 
         {
-            std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_traceback_transform_t.txt", std::ofstream::out);
+            std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot" + "_traceback_transform_t.txt";
+            std::ofstream fw(filepath, std::ofstream::out);
             if (fw.is_open())
             {
                 fw << "Translation matrix C1MO (O to C1):" << std::endl;

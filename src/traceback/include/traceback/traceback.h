@@ -230,7 +230,7 @@ namespace traceback
     boost::shared_mutex result_file_mutex_;
     // "from" can be alphabetically smaller or greater than "to"
     std::unordered_map<std::string, std::unordered_map<std::string, std::vector<size_t>>> robot_to_robot_result_loop_indexes_;
-    void appendResultToFile(Result result);
+    void appendResultToFile(Result result, std::string filepath);
     /** Generate result END */
 
     void tracebackImageAndImageUpdate(const traceback_msgs::ImageAndImage::ConstPtr &msg);
@@ -294,7 +294,8 @@ namespace traceback
     // T * (140, -20, 0) = (-140, -20, 0)
     // (140, -20, 0) for tb3_0, (-140, -20, 0) for tb3_1 and (-10, -60, -0.785) for tb3_2
     // are hardcoded ground truth for evaluation.
-    void evaluateWithGroundTruth(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time = "");
+    void evaluateWithGroundTruthWithLastVersion(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time = "");
+    void evaluateWithGroundTruth(cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time, std::string filepath);
 
     cv::Mat evaluateMatch(cv::Mat &proposed, double pose_x, double pose_y, std::string tracer_robot, std::string traced_robot, std::string current_time);
 

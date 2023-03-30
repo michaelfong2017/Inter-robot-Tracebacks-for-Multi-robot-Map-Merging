@@ -50,8 +50,8 @@ namespace traceback
     private_nh.param("camera_pose_image_max_queue_size", camera_pose_image_max_queue_size_, 100);
     private_nh.param("features_depths_max_queue_size", features_depths_max_queue_size_, 100);
 
-    // Create directories for debugging
-    for (auto &dir_path : {"tb3_0_tb3_1", "tb3_0_tb3_2", "tb3_1_tb3_0", "tb3_1_tb3_2", "tb3_2_tb3_0", "tb3_2_tb3_1", "map"})
+    // Create directories for saving data
+    for (auto &dir_path : {"tb3_0_tb3_1", "tb3_0_tb3_2", "tb3_1_tb3_0", "tb3_1_tb3_2", "tb3_2_tb3_0", "tb3_2_tb3_1", "map", "transform_optimized", "constraint_count"})
     {
       boost::filesystem::path dir(dir_path);
 
@@ -111,7 +111,8 @@ namespace traceback
           std::string from_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
           std::string to_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
           std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-          std::ofstream fw("_traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt", std::ofstream::app);
+          std::string filepath = "_Traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt";
+          std::ofstream fw(filepath, std::ofstream::app);
           if (fw.is_open())
           {
             fw << current_time << " - tracer robot is " << tracer_robot << " and traced robot is " << traced_robot << " - "
@@ -218,7 +219,8 @@ namespace traceback
       MatchAndSolveResult result = camera_image_processor_.matchAndSolve(cv_ptr_tracer->image, cv_ptr_traced->image, cv_ptr_depth_tracer->image, cv_ptr_depth_traced->image, FeatureType::SURF, essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
 
       {
-        std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_transform_needed_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+        std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_transform_needed_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt";
+        std::ofstream fw(filepath, std::ofstream::app);
         if (fw.is_open())
         {
           fw << "transform_needed in global coordinates (x, y, r) = (" << transform_needed.tx << ", " << transform_needed.ty << ", " << transform_needed.r << ")" << std::endl;
@@ -292,7 +294,8 @@ namespace traceback
             std::string from_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
             std::string to_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-            std::ofstream fw("_traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt", std::ofstream::app);
+            std::string filepath = "_Traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt";
+            std::ofstream fw(filepath, std::ofstream::app);
             if (fw.is_open())
             {
               fw << current_time << " - tracer robot is " << tracer_robot << " and traced robot is " << traced_robot << " - "
@@ -373,7 +376,8 @@ namespace traceback
                 double rot_0_0 = cos(constraint.r) * cos(-1.0 * truth_r) - sin(constraint.r) * sin(-1.0 * truth_r);
                 double rot_1_0 = sin(constraint.r) * cos(-1.0 * truth_r) + cos(constraint.r) * sin(-1.0 * truth_r);
                 result.r_error = abs(atan2(rot_1_0, rot_0_0));
-                appendResultToFile(result);
+                std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
+                appendResultToFile(result, filepath);
               }
               ++i;
             }
@@ -419,7 +423,8 @@ namespace traceback
             std::string from_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
             std::string to_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-            std::ofstream fw("_traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt", std::ofstream::app);
+            std::string filepath = "_Traceback_result_" + from_robot.substr(1) + "_to_" + to_robot.substr(1) + ".txt";
+            std::ofstream fw(filepath, std::ofstream::app);
             if (fw.is_open())
             {
               fw << current_time << " - tracer robot is " << tracer_robot << " and traced robot is " << traced_robot << " - "
@@ -622,7 +627,8 @@ namespace traceback
         {
           std::string src_robot = robot_name_src < robot_name_dst ? robot_name_src : robot_name_dst;
           std::string dst_robot = robot_name_src < robot_name_dst ? robot_name_dst : robot_name_src;
-          std::ofstream fw("_traceback_initiated_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + "_.txt", std::ofstream::app);
+          std::string filepath = "_Traceback_initiated_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + "_.txt";
+          std::ofstream fw(filepath, std::ofstream::app);
           if (fw.is_open())
           {
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
@@ -697,7 +703,8 @@ namespace traceback
         {
           std::string src_robot = robot_name_src < robot_name_dst ? robot_name_src : robot_name_dst;
           std::string dst_robot = robot_name_src < robot_name_dst ? robot_name_dst : robot_name_src;
-          std::ofstream fw("_traceback_initiated_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + "_.txt", std::ofstream::app);
+          std::string filepath = "_Traceback_initiated_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + "_.txt";
+          std::ofstream fw(filepath, std::ofstream::app);
           if (fw.is_open())
           {
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
@@ -1187,7 +1194,8 @@ namespace traceback
     {
       is_first_match_and_collect_ = false;
       {
-        std::ofstream fw(current_time + ".txt", std::ofstream::app);
+        std::string filepath = current_time + ".txt";
+        std::ofstream fw(filepath, std::ofstream::app);
         if (fw.is_open())
         {
           fw << "Start matching at " << current_time << std::endl;
@@ -1258,7 +1266,8 @@ namespace traceback
             // if (test_mode_ != "collect")
             // {
             {
-              std::ofstream fw(robot_name.substr(1) + "_" + second_robot_name.substr(1) + "/" + "Transform_proposed_" + robot_name.substr(1) + "_current_robot_" + second_robot_name.substr(1) + "_target_robot.txt", std::ofstream::app);
+              std::string filepath = robot_name.substr(1) + "_" + second_robot_name.substr(1) + "/" + "Transform_proposed_" + robot_name.substr(1) + "_current_robot_" + second_robot_name.substr(1) + "_target_robot.txt";
+              std::ofstream fw(filepath, std::ofstream::app);
               if (fw.is_open())
               {
                 fw << "Transform proposed at time " << current_time << " with confidence " << confidence_output << std::endl;
@@ -1489,7 +1498,9 @@ namespace traceback
               double rot_0_0 = cos(result.r) * cos(-1.0 * truth_r) - sin(result.r) * sin(-1.0 * truth_r);
               double rot_1_0 = sin(result.r) * cos(-1.0 * truth_r) + cos(result.r) * sin(-1.0 * truth_r);
               result.r_error = abs(atan2(rot_1_0, rot_0_0));
-              appendResultToFile(result);
+              std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
+
+              appendResultToFile(result, filepath);
             }
 
             for (int i = 0; i < 20; ++i)
@@ -1520,10 +1531,10 @@ namespace traceback
     }
   }
 
-  void Traceback::appendResultToFile(Result result)
+  void Traceback::appendResultToFile(Result result, std::string filepath)
   {
     boost::lock_guard<boost::shared_mutex> lock(result_file_mutex_);
-    std::ofstream fw("_result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv", std::ofstream::app);
+    std::ofstream fw(filepath, std::ofstream::app);
     if (fw.is_open())
     {
       fw << robot_to_robot_result_index_[result.from_robot][result.to_robot] << "," << result.current_time << "," << result.from_robot << "," << result.to_robot << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << "," << result.match_score << "," << result.t_error << "," << result.r_error << std::endl;
@@ -1681,16 +1692,6 @@ namespace traceback
       loop_closure_constraint.ty = adjusted_transform.at<double>(1, 2);
       loop_closure_constraint.r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
       robot_to_robot_loop_closure_constraints_[src_robot][dst_robot].push_back(loop_closure_constraint);
-
-      // {
-      //   std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-      //   std::ofstream fw("_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv", std::ofstream::app);
-      //   if (fw.is_open())
-      //   {
-      //     fw << current_time << "," << loop_closure_constraint.x << "," << loop_closure_constraint.y << "," << loop_closure_constraint.tx << "," << loop_closure_constraint.ty << "," << loop_closure_constraint.r << std::endl;
-      //     fw.close();
-      //   }
-      // }
     }
     else
     {
@@ -1709,16 +1710,6 @@ namespace traceback
       loop_closure_constraint.ty = inv_adjusted_transform.at<double>(1, 2);
       loop_closure_constraint.r = atan2(inv_adjusted_transform.at<double>(1, 0), inv_adjusted_transform.at<double>(0, 0));
       robot_to_robot_loop_closure_constraints_[dst_robot][src_robot].push_back(loop_closure_constraint);
-
-      // {
-      //   std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-      //   std::ofstream fw("_loop_closure_" + dst_robot.substr(1) + "_to_" + src_robot.substr(1) + ".csv", std::ofstream::app);
-      //   if (fw.is_open())
-      //   {
-      //     fw << current_time << "," << loop_closure_constraint.x << "," << loop_closure_constraint.y << "," << loop_closure_constraint.tx << "," << loop_closure_constraint.ty << "," << loop_closure_constraint.r << std::endl;
-      //     fw.close();
-      //   }
-      // }
     }
   }
 
@@ -1802,7 +1793,8 @@ namespace traceback
 
                   {
                     std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-                    std::ofstream fw("_erased_loop_closure_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".csv", std::ofstream::app);
+                    std::string filepath = "_Erased_loop_closure_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".csv";
+                    std::ofstream fw(filepath, std::ofstream::app);
                     if (fw.is_open())
                     {
                       fw << result_index << "," << current_time << "," << x << "," << y << "," << tx << "," << ty << "," << constraint.r << std::endl;
@@ -1837,8 +1829,8 @@ namespace traceback
         // Write to file when total loop constraint number has changed
         {
           std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-
-          std::ofstream fw("Loop_closure_count_" + current_time + ".txt", std::ofstream::app);
+          std::string filepath = "constraint_count/Loop_closure_count_" + current_time + ".txt";
+          std::ofstream fw(filepath, std::ofstream::app);
           if (fw.is_open())
           {
             for (auto &src : robot_to_robot_loop_closure_constraints_)
@@ -1933,7 +1925,7 @@ namespace traceback
             transform_estimator_.updateBestTransforms(optimized_transform, robot_name, second_robot_name, best_transforms_, has_best_transforms_);
             //
 
-            evaluateWithGroundTruth(init_transform, optimized_transform, robot_name, second_robot_name, current_time);
+            evaluateWithGroundTruthWithLastVersion(init_transform, optimized_transform, robot_name, second_robot_name, current_time);
 
             if (has_best_transforms_.size() == resolutions_.size())
             {
@@ -1963,7 +1955,8 @@ namespace traceback
                 m_22.push_back(dst_transform.at<double>(2, 2));
 
                 {
-                  std::ofstream fw("Best_transforms_" + current_time + "_" + robot_name.substr(1) + "_tracer_robot.txt", std::ofstream::app);
+                  std::string filepath = "Best_transforms_" + current_time + "_" + robot_name.substr(1) + "_tracer_robot.txt";
+                  std::ofstream fw(filepath, std::ofstream::app);
                   if (fw.is_open())
                   {
                     fw << "Best transform from " << robot_name << " to " << dst_robot << " :" << std::endl;
@@ -2305,7 +2298,8 @@ namespace traceback
             std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
             {
-              std::ofstream fw("_result_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv", std::ofstream::app);
+              std::string filepath = "_Result_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv";
+              std::ofstream fw(filepath, std::ofstream::app);
               if (fw.is_open())
               {
                 fw << "result_index"
@@ -2335,28 +2329,9 @@ namespace traceback
               }
             }
 
-            // {
-            //   std::ofstream fw("_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv", std::ofstream::app);
-            //   if (fw.is_open())
-            //   {
-            //     fw << "timestamp"
-            //        << ","
-            //        << "x"
-            //        << ","
-            //        << "y"
-            //        << ","
-            //        << "tx"
-            //        << ","
-            //        << "ty"
-            //        << ","
-            //        << "r"
-            //        << std::endl;
-            //     fw.close();
-            //   }
-            // }
-
             {
-              std::ofstream fw("_erased_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv", std::ofstream::app);
+              std::string filepath = "_Erased_loop_closure_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + ".csv";
+              std::ofstream fw(filepath, std::ofstream::app);
               if (fw.is_open())
               {
                 fw << "result_index"
@@ -2537,7 +2512,7 @@ namespace traceback
     adjusted = t2 * adjustment * t1 * original;
   }
 
-  void Traceback::evaluateWithGroundTruth(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time)
+  void Traceback::evaluateWithGroundTruthWithLastVersion(cv::Mat &original, cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time)
   {
     // initial poses w.r.t. global frame
     double resolution = 0.05;
@@ -2693,7 +2668,8 @@ namespace traceback
     }
     //
     {
-      std::ofstream fw("Optimized_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+      std::string filepath = "optimized_transform/Optimized_transform_" + current_time + "_" + tracer_robot.substr(1) + "_to_" + traced_robot.substr(1) + ".txt";
+      std::ofstream fw(filepath, std::ofstream::app);
       if (fw.is_open())
       {
         double optimized_tx = adjusted.at<double>(0, 2);
@@ -2713,7 +2689,8 @@ namespace traceback
     }
 
     {
-      std::ofstream fw("Optimized_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+      std::string filepath = "optimized_transform/Optimized_transform_" + current_time + "_" + tracer_robot.substr(1) + "_to_" + traced_robot.substr(1) + ".txt";
+      std::ofstream fw(filepath, std::ofstream::app);
       if (fw.is_open())
       {
         fw << std::endl;
@@ -2730,7 +2707,213 @@ namespace traceback
     }
 
     {
-      std::ofstream fw("Optimized_transform_" + current_time + "_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt", std::ofstream::app);
+      std::string filepath = "optimized_transform/Optimized_transform_" + current_time + "_" + tracer_robot.substr(1) + "_to_" + traced_robot.substr(1) + ".txt";
+      std::ofstream fw(filepath, std::ofstream::app);
+      if (fw.is_open())
+      {
+        fw << std::endl;
+        fw << "Evaluation:" << std::endl;
+        fw << "Expected transformed (x, y, r) of the global origin object" << std::endl;
+        fw << "   from robot " << tracer_robot.substr(1) << "'s frame to robot " << traced_robot.substr(1) << "'s frame:" << std::endl;
+        fw << "Expected (x, y, r) = (" << expected_x << ", " << expected_y << ", " << expected_r << ")" << std::endl;
+        fw << "Original estimated (x, y, r) = (" << original_estimated_xy.at<double>(0, 0) << ", " << original_estimated_xy.at<double>(1, 0) << ", " << original_estimated_r << ")" << std::endl;
+        fw << "Adjusted estimated (x, y, r) = (" << adjusted_estimated_xy.at<double>(0, 0) << ", " << adjusted_estimated_xy.at<double>(1, 0) << ", " << adjusted_estimated_r << ")" << std::endl;
+        fw << std::endl;
+        fw << "Error of original is " << sqrt(pow(expected_x - original_estimated_xy.at<double>(0, 0), 2) + pow(expected_y - original_estimated_xy.at<double>(1, 0), 2)) << " pixels translation and " << abs(expected_r - original_estimated_r) << " radians rotation" << std::endl;
+        fw << "Error of adjusted is " << sqrt(pow(expected_x - adjusted_estimated_xy.at<double>(0, 0), 2) + pow(expected_y - adjusted_estimated_xy.at<double>(1, 0), 2)) << " pixels translation and " << abs(expected_r - adjusted_estimated_r) << " radians rotation" << std::endl;
+        fw.close();
+      }
+    }
+  }
+
+  void Traceback::evaluateWithGroundTruth(cv::Mat &adjusted, std::string tracer_robot, std::string traced_robot, std::string current_time, std::string filepath)
+  {
+    // initial poses w.r.t. global frame
+    double resolution = 0.05;
+    double init_0_x = -7.0;
+    double init_0_y = -1.0;
+    double init_0_r = 0.0;
+    double init_1_x = 7.0;
+    double init_1_y = -1.0;
+    double init_1_r = 0.0;
+    double init_2_x = 0.5;
+    double init_2_y = 3.0;
+    double init_2_r = 0.785;
+
+    // global origin object w.r.t. frame 0
+    cv::Mat truth_0_xy(3, 1, CV_64F);
+    truth_0_xy.at<double>(0, 0) = -1 * init_0_x / resolution;
+    truth_0_xy.at<double>(1, 0) = -1 * init_0_y / resolution;
+    truth_0_xy.at<double>(2, 0) = 1.0;
+    double truth_0_r = 0.0;
+    // global origin object w.r.t. frame 1
+    cv::Mat truth_1_xy(3, 1, CV_64F);
+    truth_1_xy.at<double>(0, 0) = -1 * init_1_x / resolution;
+    truth_1_xy.at<double>(1, 0) = -1 * init_1_y / resolution;
+    truth_1_xy.at<double>(2, 0) = 1.0;
+    double truth_1_r = 0.0;
+    // global origin object w.r.t. frame 2
+    cv::Mat truth_2_xy(3, 1, CV_64F);
+    truth_2_xy.at<double>(0, 0) = -1 * init_2_x / resolution;
+    truth_2_xy.at<double>(1, 0) = -1 * init_2_y / resolution;
+    truth_2_xy.at<double>(2, 0) = 1.0;
+    double truth_2_r = -1 * init_2_r;
+
+    cv::Mat test_xy;
+    double test_r;
+    if (tracer_robot == "/tb3_0")
+    {
+      test_xy = truth_0_xy;
+      test_r = truth_0_r;
+    }
+    else if (tracer_robot == "/tb3_1")
+    {
+      test_xy = truth_1_xy;
+      test_r = truth_1_r;
+    }
+    else if (tracer_robot == "/tb3_2")
+    {
+      test_xy = truth_2_xy;
+      test_r = truth_2_r;
+    }
+
+    double expected_x, expected_y, expected_r;
+    if (traced_robot == "/tb3_0")
+    {
+      expected_x = truth_0_xy.at<double>(0, 0);
+      expected_y = truth_0_xy.at<double>(1, 0);
+      expected_r = truth_0_r;
+    }
+    else if (traced_robot == "/tb3_1")
+    {
+      expected_x = truth_1_xy.at<double>(0, 0);
+      expected_y = truth_1_xy.at<double>(1, 0);
+      expected_r = truth_1_r;
+    }
+    else if (traced_robot == "/tb3_2")
+    {
+      expected_x = truth_2_xy.at<double>(0, 0);
+      expected_y = truth_2_xy.at<double>(1, 0);
+      expected_r = truth_2_r;
+    }
+
+    cv::Mat original_estimated_xy, adjusted_estimated_xy;
+    double original_estimated_r, adjusted_estimated_r;
+    adjusted_estimated_xy = adjusted * test_xy;
+    adjusted_estimated_r = atan2(adjusted.at<double>(1, 0), adjusted.at<double>(0, 0)) + test_r;
+
+    // Compute ground truth pairwise matrix
+    // e.g. from w.r.t frame 0 to w.r.t frame 2:
+    // 0->2 = global->2 * 0->global
+    //      = global->2 * inv(global->0)
+    // Using the above order, initial pose values can be directly used.
+    cv::Mat t_global_0(3, 3, CV_64F);
+    t_global_0.at<double>(0, 0) = cos(-1 * init_0_r);
+    t_global_0.at<double>(0, 1) = -sin(-1 * init_0_r);
+    t_global_0.at<double>(0, 2) = -1 * init_0_x / resolution;
+    t_global_0.at<double>(1, 0) = sin(-1 * init_0_r);
+    t_global_0.at<double>(1, 1) = cos(-1 * init_0_r);
+    t_global_0.at<double>(1, 2) = -1 * init_0_y / resolution;
+    t_global_0.at<double>(2, 0) = 0.0;
+    t_global_0.at<double>(2, 1) = 0.0;
+    t_global_0.at<double>(2, 2) = 1;
+
+    cv::Mat t_global_1(3, 3, CV_64F);
+    t_global_1.at<double>(0, 0) = cos(-1 * init_1_r);
+    t_global_1.at<double>(0, 1) = -sin(-1 * init_1_r);
+    t_global_1.at<double>(0, 2) = -1 * init_1_x / resolution;
+    t_global_1.at<double>(1, 0) = sin(-1 * init_1_r);
+    t_global_1.at<double>(1, 1) = cos(-1 * init_1_r);
+    t_global_1.at<double>(1, 2) = -1 * init_1_y / resolution;
+    t_global_1.at<double>(2, 0) = 0.0;
+    t_global_1.at<double>(2, 1) = 0.0;
+    t_global_1.at<double>(2, 2) = 1;
+
+    cv::Mat t_global_2(3, 3, CV_64F);
+    t_global_2.at<double>(0, 0) = cos(-1 * init_2_r);
+    t_global_2.at<double>(0, 1) = -sin(-1 * init_2_r);
+    t_global_2.at<double>(0, 2) = -1 * init_2_x / resolution;
+    t_global_2.at<double>(1, 0) = sin(-1 * init_2_r);
+    t_global_2.at<double>(1, 1) = cos(-1 * init_2_r);
+    t_global_2.at<double>(1, 2) = -1 * init_2_y / resolution;
+    t_global_2.at<double>(2, 0) = 0.0;
+    t_global_2.at<double>(2, 1) = 0.0;
+    t_global_2.at<double>(2, 2) = 1;
+
+    cv::Mat t_0_1 = t_global_1 * t_global_0.inv();
+    cv::Mat t_0_2 = t_global_2 * t_global_0.inv();
+    cv::Mat t_1_0 = t_0_1.inv();
+    cv::Mat t_1_2 = t_global_2 * t_global_1.inv();
+    cv::Mat t_2_0 = t_0_2.inv();
+    cv::Mat t_2_1 = t_1_2.inv();
+
+    cv::Mat ground_truth_transform, inverse_ground_truth_transform;
+    if (tracer_robot == "/tb3_0" && traced_robot == "/tb3_1")
+    {
+      ground_truth_transform = t_0_1;
+      inverse_ground_truth_transform = t_1_0;
+    }
+    else if (tracer_robot == "/tb3_0" && traced_robot == "/tb3_2")
+    {
+      ground_truth_transform = t_0_2;
+      inverse_ground_truth_transform = t_2_0;
+    }
+    else if (tracer_robot == "/tb3_1" && traced_robot == "/tb3_0")
+    {
+      ground_truth_transform = t_1_0;
+      inverse_ground_truth_transform = t_0_1;
+    }
+    else if (tracer_robot == "/tb3_1" && traced_robot == "/tb3_2")
+    {
+      ground_truth_transform = t_1_2;
+      inverse_ground_truth_transform = t_2_1;
+    }
+    else if (tracer_robot == "/tb3_2" && traced_robot == "/tb3_0")
+    {
+      ground_truth_transform = t_2_0;
+      inverse_ground_truth_transform = t_0_2;
+    }
+    else if (tracer_robot == "/tb3_2" && traced_robot == "/tb3_1")
+    {
+      ground_truth_transform = t_2_1;
+      inverse_ground_truth_transform = t_1_2;
+    }
+    //
+    {
+      std::ofstream fw(filepath, std::ofstream::app);
+      if (fw.is_open())
+      {
+        double optimized_tx = adjusted.at<double>(0, 2);
+        double optimized_ty = adjusted.at<double>(1, 2);
+        double optimized_r = atan2(adjusted.at<double>(1, 0), adjusted.at<double>(0, 0));
+        fw << "Optimized (tx, ty, r) = (" << optimized_tx << ", " << optimized_ty << ", " << optimized_r << ")" << std::endl;
+        fw << "Optimized transform:" << std::endl;
+        fw << adjusted.at<double>(0, 0) << "\t" << adjusted.at<double>(0, 1) << "\t" << adjusted.at<double>(0, 2) << std::endl;
+        fw << adjusted.at<double>(1, 0) << "\t" << adjusted.at<double>(1, 1) << "\t" << adjusted.at<double>(1, 2) << std::endl;
+        fw << adjusted.at<double>(2, 0) << "\t" << adjusted.at<double>(2, 1) << "\t" << adjusted.at<double>(2, 2) << std::endl;
+        fw.close();
+      }
+    }
+
+    {
+      std::ofstream fw(filepath, std::ofstream::app);
+      if (fw.is_open())
+      {
+        fw << std::endl;
+        fw << "Ground truth transform from robot " << tracer_robot.substr(1) << "'s frame to robot " << traced_robot.substr(1) << "'s frame:" << std::endl;
+        fw << ground_truth_transform.at<double>(0, 0) << "\t" << ground_truth_transform.at<double>(0, 1) << "\t" << ground_truth_transform.at<double>(0, 2) << std::endl;
+        fw << ground_truth_transform.at<double>(1, 0) << "\t" << ground_truth_transform.at<double>(1, 1) << "\t" << ground_truth_transform.at<double>(1, 2) << std::endl;
+        fw << ground_truth_transform.at<double>(2, 0) << "\t" << ground_truth_transform.at<double>(2, 1) << "\t" << ground_truth_transform.at<double>(2, 2) << std::endl;
+        fw << "Inverse ground truth transform, that is, from robot " << traced_robot.substr(1) << "'s frame to robot " << tracer_robot.substr(1) << "'s frame:" << std::endl;
+        fw << inverse_ground_truth_transform.at<double>(0, 0) << "\t" << inverse_ground_truth_transform.at<double>(0, 1) << "\t" << inverse_ground_truth_transform.at<double>(0, 2) << std::endl;
+        fw << inverse_ground_truth_transform.at<double>(1, 0) << "\t" << inverse_ground_truth_transform.at<double>(1, 1) << "\t" << inverse_ground_truth_transform.at<double>(1, 2) << std::endl;
+        fw << inverse_ground_truth_transform.at<double>(2, 0) << "\t" << inverse_ground_truth_transform.at<double>(2, 1) << "\t" << inverse_ground_truth_transform.at<double>(2, 2) << std::endl;
+        fw.close();
+      }
+    }
+
+    {
+      std::ofstream fw(filepath, std::ofstream::app);
       if (fw.is_open())
       {
         fw << std::endl;
@@ -2900,7 +3083,8 @@ namespace traceback
 
     if (same_interval)
     {
-      std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Error_" + std::to_string(camera_image_update_rate_) + "_rate_" + threshold + "_threshold_" + tracer_robot.substr(1) + "_current_robot_" + traced_robot.substr(1) + "_target_robot.csv", std::ofstream::app);
+      std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Error_" + std::to_string(camera_image_update_rate_) + "_rate_" + threshold + "_threshold_" + tracer_robot.substr(1) + "_current_robot_" + traced_robot.substr(1) + "_target_robot.csv";
+      std::ofstream fw(filepath, std::ofstream::app);
       if (fw.is_open())
       {
         fw << current_time << "," << count << "," << score << "," << pose_x << "," << pose_y << "," << predicted_pose_x << "," << predicted_pose_y << "," << error << std::endl;
@@ -2909,7 +3093,8 @@ namespace traceback
     }
     else
     {
-      std::ofstream fw(tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Cf_" + std::to_string(camera_image_update_rate_) + "_rate_" + threshold + "_threshold_" + tracer_robot.substr(1) + "_current_robot_" + traced_robot.substr(1) + "_target_robot.csv", std::ofstream::app);
+      std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + "Cf_" + std::to_string(camera_image_update_rate_) + "_rate_" + threshold + "_threshold_" + tracer_robot.substr(1) + "_current_robot_" + traced_robot.substr(1) + "_target_robot.csv";
+      std::ofstream fw(filepath, std::ofstream::app);
       if (fw.is_open())
       {
         fw << current_time << "," << count << "," << score << "," << pose_x << "," << pose_y << "," << predicted_pose_x << "," << predicted_pose_y << "," << error << std::endl;
@@ -2921,8 +3106,8 @@ namespace traceback
   void Traceback::writeTracebackFeedbackHistory(std::string tracer, std::string traced, std::string feedback)
   {
     std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-
-    std::ofstream fw(tracer.substr(1) + "_" + traced.substr(1) + "/" + "Feedback_history_" + tracer.substr(1) + "_tracer_robot_" + traced.substr(1) + "_traced_robot.txt", std::ofstream::app);
+    std::string filepath = tracer.substr(1) + "_" + traced.substr(1) + "/" + "Feedback_history_" + tracer.substr(1) + "_tracer_robot_" + traced.substr(1) + "_traced_robot.txt";
+    std::ofstream fw(filepath, std::ofstream::app);
     if (fw.is_open())
     {
       fw << current_time << " - " << feedback << std::endl;
@@ -3005,14 +3190,122 @@ namespace traceback
   {
     std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
+    {
+      boost::filesystem::path dir("map/" + current_time);
+
+      if (!(boost::filesystem::exists(dir)))
+      {
+        ROS_DEBUG("Directory %s does not exist", dir.c_str());
+
+        if (boost::filesystem::create_directory(dir))
+          ROS_DEBUG("Directory %s is successfully created", dir.c_str());
+      }
+    }
+
     boost::shared_lock<boost::shared_mutex> lock(map_subscriptions_mutex_);
     for (auto &subscription : map_subscriptions_)
     {
+      // In case the map topic is just subscribed and pose estimation is started before
+      // receiving the first map update from that topic, this subscription should
+      // be skipped to prevent error.
+      if (!subscription.readonly_map)
+      {
+        continue;
+      }
       std::string robot_name = subscription.robot_namespace;
       saveMap(*subscription.readonly_map, robot_name.substr(1) + "_map", current_time);
     }
 
     saveMap(merged_map_, "merged_map", current_time);
+
+    // Also save loop closure count, loop closures, and optimized transforms
+    std::string filepath = "map/" + current_time + "/Loop_closure_count.txt";
+    std::ofstream fw(filepath, std::ofstream::app);
+    if (fw.is_open())
+    {
+      for (auto &src : robot_to_robot_loop_closure_constraints_)
+      {
+        for (auto &dst : src.second)
+        {
+          fw << "Count from " << src.first << " to " << dst.first << " is " << dst.second.size() << std::endl;
+        }
+      }
+      fw.close();
+    }
+
+    //
+    for (auto &src : robot_to_robot_loop_closure_constraints_)
+    {
+      for (auto &dst : src.second)
+      {
+        for (LoopClosureConstraint &constraint : dst.second)
+        {
+          double RESOLUTION = 0.05; // HARDCODE
+
+          cv::Mat adjusted_transform(3, 3, CV_64F);
+          adjusted_transform.at<double>(0, 0) = cos(constraint.r);
+          adjusted_transform.at<double>(0, 1) = -sin(constraint.r);
+          adjusted_transform.at<double>(0, 2) = constraint.tx;
+          adjusted_transform.at<double>(1, 0) = sin(constraint.r);
+          adjusted_transform.at<double>(1, 1) = cos(constraint.r);
+          adjusted_transform.at<double>(1, 2) = constraint.ty;
+          adjusted_transform.at<double>(2, 0) = 0;
+          adjusted_transform.at<double>(2, 1) = 0;
+          adjusted_transform.at<double>(2, 2) = 1;
+          cv::Mat predicted_pose = evaluateMatch(adjusted_transform, constraint.x * RESOLUTION, constraint.y * RESOLUTION, src.first, dst.first, current_time);
+
+          Result result;
+          result.current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+          if (src.first < dst.first)
+          {
+            result.from_robot = src.first;
+            result.to_robot = dst.first;
+          }
+          else
+          {
+            result.from_robot = dst.first;
+            result.to_robot = src.first;
+          }
+          result.x = constraint.x * 0.05;
+          result.y = constraint.y * 0.05;
+          result.tx = constraint.tx * 0.05;
+          result.ty = constraint.ty * 0.05;
+          result.r = constraint.r;
+          result.match_score = 99.0;
+          result.t_error = sqrt(pow(predicted_pose.at<double>(0, 0) - constraint.x * RESOLUTION, 2) + pow(predicted_pose.at<double>(1, 0) - constraint.y * RESOLUTION, 2));
+          double truth_r;
+          if (result.from_robot == "/tb3_0" && result.to_robot == "/tb3_1")
+          {
+            truth_r = 0.0; // HARDCODE
+          }
+          else if (result.from_robot == "/tb3_0" && result.to_robot == "/tb3_2")
+          {
+            truth_r = -0.785; // HARDCODE
+          }
+          else if (result.from_robot == "/tb3_1" && result.to_robot == "/tb3_2")
+          {
+            truth_r = -0.785; // HARDCODE
+          }
+          double rot_0_0 = cos(constraint.r) * cos(-1.0 * truth_r) - sin(constraint.r) * sin(-1.0 * truth_r);
+          double rot_1_0 = sin(constraint.r) * cos(-1.0 * truth_r) + cos(constraint.r) * sin(-1.0 * truth_r);
+          result.r_error = abs(atan2(rot_1_0, rot_0_0));
+
+          std::string filepath = "map/" + current_time + "/Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
+          appendResultToFile(result, filepath);
+        }
+      }
+    }
+
+    //
+    for (auto &src : robot_to_robot_optimized_transform_)
+    {
+      for (auto &dst : src.second)
+      {
+        cv::Mat init_transform = cv::Mat::eye(3, 3, CV_64F);
+        std::string filepath = "map/" + current_time + "/Optimized_transform_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt";
+        evaluateWithGroundTruth(dst.second, src.first, dst.first, current_time, filepath);
+      }
+    }
   }
 
   void Traceback::saveMap(nav_msgs::OccupancyGrid map, std::string map_name, std::string current_time)
@@ -3030,7 +3323,7 @@ namespace traceback
     }
     std::string mapname = "map/" + current_time + "/" + map_name;
 
-    std::string mapdatafile = mapname + ".pgm";
+    std::string mapdatafile = mapname + ".png";
     ROS_INFO("Writing map occupancy data to %s", mapdatafile.c_str());
     FILE *out = fopen(mapdatafile.c_str(), "w");
     if (!out)
