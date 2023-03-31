@@ -663,17 +663,20 @@ namespace traceback
       cv::Mat transform = cv::Mat(3, 3, CV_64F);
       cv::Mat inv_transform = cv::Mat(3, 3, CV_64F);
 
-      // if loop closure constraint count reaches 50,
+      // if loop closure constraint count reaches 30,
       // complete and don't traceback anymore
-      // HARDCODE 50
+      // HARDCODE 30
       size_t current_loop_closure_count = robot_name_src < robot_name_dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][robot_name_dst].size() : robot_to_robot_loop_closure_constraints_[robot_name_dst][robot_name_src].size();
-      if (current_loop_closure_count >= 50) {
+      if (current_loop_closure_count >= 30)
+      {
         continue;
       }
 
       // if accept count is not zero, always use optimized transform
+      // OR if not yet accept before and there is at least 10 constraints for this pair
+      // HARDCODE 10
       size_t accept_count = robot_name_src < robot_name_dst ? robot_to_robot_traceback_accept_count_[robot_name_src][robot_name_dst] : robot_to_robot_traceback_accept_count_[robot_name_dst][robot_name_src];
-      if (accept_count != 0)
+      if (accept_count != 0 || current_loop_closure_count >= 10)
       {
         readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
 
@@ -690,6 +693,8 @@ namespace traceback
           }
         }
       }
+      // Use candidate transform only when accept count is zero
+      // and there is less than 10 constraints for this pair
       else
       {
         if (!hasCandidate)
