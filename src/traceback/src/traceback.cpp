@@ -1519,6 +1519,32 @@ namespace traceback
 
             // Generate result
             {
+              double meter_x, meter_y, meter_tx, meter_ty, meter_r;
+              if (robot_name < second_robot_name)
+              {
+                meter_x = pose1.position.x;
+                meter_y = pose1.position.y;
+                meter_tx = adjusted_transform.at<double>(0, 2) * resolutions_[self_robot_index];
+                meter_ty = adjusted_transform.at<double>(1, 2) * resolutions_[self_robot_index];
+                meter_r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
+              }
+              else
+              {
+                cv::Mat src(3, 1, CV_64F);
+                src.at<double>(0, 0) = pose1.position.x / resolutions_[self_robot_index];
+                src.at<double>(1, 0) = pose1.position.y / resolutions_[self_robot_index];
+                src.at<double>(2, 0);
+                cv::Mat dst = adjusted_transform * src;
+                double inv_x = dst.at<double>(0, 0) * resolutions_[self_robot_index];
+                double inv_y = dst.at<double>(1, 0) * resolutions_[self_robot_index];
+                meter_x = inv_x;
+                meter_y = inv_y;
+                cv::Mat inv_adjusted_transform = adjusted_transform.inv();
+                meter_tx = inv_adjusted_transform.at<double>(0, 2) * resolutions_[self_robot_index];
+                meter_ty = inv_adjusted_transform.at<double>(1, 2) * resolutions_[self_robot_index];
+                meter_r = atan2(inv_adjusted_transform.at<double>(1, 0), inv_adjusted_transform.at<double>(0, 0));
+              }
+
               Result result;
               result.current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
               if (robot_name < second_robot_name)
@@ -1531,11 +1557,11 @@ namespace traceback
                 result.from_robot = second_robot_name;
                 result.to_robot = robot_name;
               }
-              result.x = pose1.position.x;
-              result.y = pose1.position.y;
-              result.tx = adjusted_transform.at<double>(0, 2) * resolutions_[self_robot_index];
-              result.ty = adjusted_transform.at<double>(1, 2) * resolutions_[self_robot_index];
-              result.r = atan2(adjusted_transform.at<double>(1, 0), adjusted_transform.at<double>(0, 0));
+              result.x = meter_x;
+              result.y = meter_y;
+              result.tx = meter_tx;
+              result.ty = meter_ty;
+              result.r = meter_r;
               result.match_score = confidence_output;
               result.t_error = sqrt(pow(predicted_pose.at<double>(0, 0) - pose1.position.x, 2) + pow(predicted_pose.at<double>(1, 0) - pose1.position.y, 2));
               double truth_r;
