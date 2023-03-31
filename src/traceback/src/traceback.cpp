@@ -44,6 +44,7 @@ namespace traceback
     private_nh.param<std::string>("camera_image_topic", robot_camera_image_topic_, "camera/rgb/image_raw"); // Don't use image_raw
     private_nh.param<std::string>("camera_depth_image_topic", robot_camera_depth_image_topic_, "camera/depth/image_raw");
     private_nh.param("check_obstacle_nearby_pixel_distance", check_obstacle_nearby_pixel_distance_, 3);
+    private_nh.param("traceback_threshold_distance", traceback_threshold_distance_, 2.0);
     private_nh.param("abort_threshold_distance", abort_threshold_distance_, 2.0);
     private_nh.param("camera_image_update_rate", camera_image_update_rate_, 0.2); // Too high update rate can result in "continue traceback looping"
     private_nh.param("data_push_rate", data_push_rate_, 2.0);
@@ -854,7 +855,7 @@ namespace traceback
       /** just for finding min_it */
       {
         boost::shared_lock<boost::shared_mutex> lock(robots_to_current_it_mutex_[robot_name_dst]);
-        robots_to_current_it_[robot_name_src] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst], 0.0, robot_name_dst, pose_dst);
+        robots_to_current_it_[robot_name_src] = findMinIndex(camera_image_processor_.robots_to_all_pose_image_pairs_[robot_name_dst], traceback_threshold_distance_, robot_name_dst, pose_dst);
       }
       /** just for finding min_it END */
 

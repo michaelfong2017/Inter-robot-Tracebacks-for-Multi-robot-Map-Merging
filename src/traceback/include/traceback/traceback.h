@@ -140,6 +140,7 @@ namespace traceback
     std::string robot_camera_image_topic_;
     std::string robot_camera_depth_image_topic_;
     int check_obstacle_nearby_pixel_distance_;
+    double traceback_threshold_distance_;
     double abort_threshold_distance_;
     double camera_image_update_rate_;
     double data_push_rate_;
