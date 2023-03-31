@@ -663,6 +663,14 @@ namespace traceback
       cv::Mat transform = cv::Mat(3, 3, CV_64F);
       cv::Mat inv_transform = cv::Mat(3, 3, CV_64F);
 
+      // if loop closure constraint count reaches 50,
+      // complete and don't traceback anymore
+      // HARDCODE 50
+      size_t current_loop_closure_count = robot_name_src < robot_name_dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][robot_name_dst].size() : robot_to_robot_loop_closure_constraints_[robot_name_dst][robot_name_src].size();
+      if (current_loop_closure_count >= 50) {
+        continue;
+      }
+
       // if accept count is not zero, always use optimized transform
       size_t accept_count = robot_name_src < robot_name_dst ? robot_to_robot_traceback_accept_count_[robot_name_src][robot_name_dst] : robot_to_robot_traceback_accept_count_[robot_name_dst][robot_name_src];
       if (accept_count != 0)
@@ -3325,6 +3333,34 @@ namespace traceback
         {
           std::string filepath = "map/" + current_time + "/Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
           appendResultToFile(result, filepath);
+
+          // For global optimization
+          {
+            size_t from_index, to_index;
+            if (result.from_robot == "/tb3_0")
+            {
+              from_index = 0;
+            }
+            else if (result.from_robot == "/tb3_1")
+            {
+              from_index = 1;
+            }
+            if (result.to_robot == "/tb3_1")
+            {
+              to_index = 1;
+            }
+            else if (result.to_robot == "/tb3_2")
+            {
+              to_index = 2;
+            }
+            std::string filepath = "map/" + current_time + "/Global_constraint.csv";
+            std::ofstream fw(filepath, std::ofstream::app);
+            if (fw.is_open())
+            {
+              fw << from_index << "," << to_index << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << std::endl;
+              fw.close();
+            }
+          }
         }
       }
     }
