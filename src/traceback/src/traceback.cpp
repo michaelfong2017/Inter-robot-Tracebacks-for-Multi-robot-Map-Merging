@@ -36,6 +36,8 @@ namespace traceback
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
     private_nh.param<std::string>("robot_namespace", robot_namespace_, "");
+    private_nh.param("start_traceback_constraint_count", start_traceback_constraint_count_, 10);
+    private_nh.param("stop_traceback_constraint_count", stop_traceback_constraint_count_, 50);
     // transform tolerance is used for all tf transforms here
     private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
 
@@ -666,20 +668,18 @@ namespace traceback
       cv::Mat transform = cv::Mat(3, 3, CV_64F);
       cv::Mat inv_transform = cv::Mat(3, 3, CV_64F);
 
-      // if loop closure constraint count reaches 30,
+      // if loop closure constraint count reaches a threshold,
       // complete and don't traceback anymore
-      // HARDCODE 30
       size_t current_loop_closure_count = robot_name_src < robot_name_dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][robot_name_dst].size() : robot_to_robot_loop_closure_constraints_[robot_name_dst][robot_name_src].size();
-      if (current_loop_closure_count >= 30)
+      if (current_loop_closure_count >= stop_traceback_constraint_count_)
       {
         continue;
       }
 
       // if accept count is not zero, always use optimized transform
-      // OR if not yet accept before and there is at least 10 constraints for this pair
-      // HARDCODE 10
+      // OR if not yet accept before and there is at least some constraints for this pair
       size_t accept_count = robot_name_src < robot_name_dst ? robot_to_robot_traceback_accept_count_[robot_name_src][robot_name_dst] : robot_to_robot_traceback_accept_count_[robot_name_dst][robot_name_src];
-      if (accept_count != 0 || current_loop_closure_count >= 10)
+      if (accept_count != 0 || current_loop_closure_count >= start_traceback_constraint_count_)
       {
         readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
 
@@ -1497,9 +1497,6 @@ namespace traceback
               }
             }
             ROS_INFO("matrix:\n%s", s.c_str());
-
-            // Transform proposed here is often outlier
-            addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
             addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 

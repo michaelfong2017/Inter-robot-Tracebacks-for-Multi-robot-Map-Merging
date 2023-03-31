@@ -134,6 +134,9 @@ namespace traceback
     std::string robot_map_updates_topic_;
     std::string robot_namespace_;
 
+    int start_traceback_constraint_count_;
+    int stop_traceback_constraint_count_;
+
     std::string robot_camera_image_topic_;
     std::string robot_camera_depth_image_topic_;
     int check_obstacle_nearby_pixel_distance_;

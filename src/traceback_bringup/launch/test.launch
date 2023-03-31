@@ -30,11 +30,15 @@
         <param name="save_map_rate" value="0.05" />
         <param name="unreasonable_goal_distance" value="5.0" /> <!-- Strongly related to the pixel
         distance -->
+
         <!-- either "normal" or "without" -->
         <!-- meaning with traceback or without traceback -->
-        <param name="test_mode" value="without" default="normal" />
+        <param name="test_mode" value="normal" default="normal" />
         <!-- 1.5 is good, can try 1.0 to 2.0 -->
         <param name="estimation_confidence" value="1.5" />
+
+        <param name="start_traceback_constraint_count" value="10" />
+        <param name="stop_traceback_constraint_count" value="50" />
         <param name="camera_image_update_rate" value="0.2" />
         <param name="data_push_rate" value="3.0" />
         <param name="check_obstacle_nearby_pixel_distance" value="5" />
@@ -49,7 +53,7 @@
         <!-- reject when reject_count >= reject_count_needed && reject_count >= 2 * accept_count -->
         <param name="reject_count_needed" value="1" />
         <!-- abort when abort_count >= abort_count_needed && abort_count >= 2 * accept_count -->
-        <param name="abort_count_needed" value="1" /> 
+        <param name="abort_count_needed" value="1" />
     </node>
 
 
