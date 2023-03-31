@@ -68,7 +68,7 @@ namespace traceback
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
     private_nh.param<std::string>("robot_namespace", robot_namespace_, "");
-    private_nh.param("start_traceback_constraint_count", start_traceback_constraint_count_, 25);
+    private_nh.param("start_traceback_constraint_count", start_traceback_constraint_count_, 20);
     private_nh.param("stop_traceback_constraint_count", stop_traceback_constraint_count_, 50);
     // transform tolerance is used for all tf transforms here
     private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
@@ -713,7 +713,7 @@ namespace traceback
 
       size_t accept_count = robot_name_src < robot_name_dst ? robot_to_robot_traceback_accept_count_[robot_name_src][robot_name_dst] : robot_to_robot_traceback_accept_count_[robot_name_dst][robot_name_src];
       size_t current_loop_closure_count = robot_name_src < robot_name_dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][robot_name_dst].size() : robot_to_robot_loop_closure_constraints_[robot_name_dst][robot_name_src].size();
-      // use optimized transform if already accept or have enough constraints (e.g. 25)
+      // use optimized transform if already accept or have enough constraints (e.g. 20)
       if (accept_count != 0 || current_loop_closure_count >= start_traceback_constraint_count_)
       {
         readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
