@@ -1300,6 +1300,10 @@ namespace traceback
       for (auto &pair : robots_to_image_features_depths_pose_)
       {
         std::string second_robot_name = pair.first;
+        if (robot_name == second_robot_name)
+        {
+          continue;
+        }
 
         for (size_t i = 0; i < pair.second.size(); ++i)
         {
