@@ -1300,12 +1300,6 @@ namespace traceback
       for (auto &pair : robots_to_image_features_depths_pose_)
       {
         std::string second_robot_name = pair.first;
-        // Ensure robot_name < second_robot_name so that the same pair will not be done twice
-        // Later only need to insert the transform (loop closure constraint) for this pair (no need inv_transform)
-        if (robot_name >= second_robot_name)
-        {
-          continue;
-        }
 
         for (size_t i = 0; i < pair.second.size(); ++i)
         {
