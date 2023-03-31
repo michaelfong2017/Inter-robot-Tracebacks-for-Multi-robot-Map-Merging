@@ -68,7 +68,7 @@ namespace traceback
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
     private_nh.param<std::string>("robot_namespace", robot_namespace_, "");
-    private_nh.param("start_traceback_constraint_count", start_traceback_constraint_count_, 20);
+    private_nh.param("start_traceback_constraint_count", start_traceback_constraint_count_, 10);
     private_nh.param("stop_traceback_constraint_count", stop_traceback_constraint_count_, 30);
     // transform tolerance is used for all tf transforms here
     private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
