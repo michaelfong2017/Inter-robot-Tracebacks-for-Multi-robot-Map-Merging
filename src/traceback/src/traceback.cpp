@@ -20,8 +20,7 @@ namespace traceback
     ros::NodeHandle private_nh("~");
 
     private_nh.param<std::string>("test_mode", test_mode_, "normal");
-    private_nh.param<std::string>("estimation_mode", estimation_mode_, "image");
-    private_nh.param("update_target_rate", update_target_rate_, 0.2);
+    private_nh.param("initiate_traceback_rate", initiate_traceback_rate_, 0.2);
     private_nh.param("discovery_rate", discovery_rate_, 0.05);
     private_nh.param("estimation_rate", estimation_rate_, 0.5);
     private_nh.param("transform_optimization_rate", transform_optimization_rate_, 0.2);
@@ -552,9 +551,13 @@ namespace traceback
     startOrContinueTraceback(robot_name_src, robot_name_dst, src_map_origin_x, src_map_origin_y, dst_map_origin_x, dst_map_origin_y);
   }
 
-  void Traceback::updateTargetPoses()
+  void Traceback::initiateTraceback()
   {
-    ROS_DEBUG("Update target poses started.");
+    if (test_mode_ == "without") {
+      return;
+    }
+
+    ROS_DEBUG("initiateTraceback");
 
     std::vector<cv::Point2d> map_origins;
 
@@ -1261,15 +1264,6 @@ namespace traceback
         }
       }
     }
-    // ROS_DEBUG("Receive updated camera image started.");
-
-    ////
-    // return if in "map" mode, proceed if in "image" mode
-    ////
-    if (estimation_mode_ == "map")
-    {
-      return;
-    }
 
     for (auto current : camera_image_processor_.robots_to_current_image_)
     {
@@ -1319,8 +1313,6 @@ namespace traceback
             std::vector<double> depths2 = pair.second[i].depths;
             // ROS_DEBUG("Match!");
 
-            // if (test_mode_ != "collect")
-            // {
             {
               std::string filepath = robot_name.substr(1) + "_" + second_robot_name.substr(1) + "/" + "Transform_proposed_" + robot_name.substr(1) + "_current_robot_" + second_robot_name.substr(1) + "_target_robot.txt";
               std::ofstream fw(filepath, std::ofstream::app);
@@ -1330,7 +1322,6 @@ namespace traceback
                 fw.close();
               }
             }
-            // }
 
             // TEST with ground truth
             // double init_0_x = -7.0;
@@ -2206,11 +2197,11 @@ namespace traceback
 
     transform_estimator_.feed(grids.begin(), grids.end());
 
-    if (estimation_mode_ == "map")
-    {
-      transform_estimator_.estimateTransforms(FeatureType::AKAZE,
-                                              confidence_threshold_);
-    }
+    // if (estimation_mode_ == "map")
+    // {
+    //   transform_estimator_.estimateTransforms(FeatureType::AKAZE,
+    //                                           confidence_threshold_);
+    // }
   }
 
   void Traceback::CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg)
@@ -3560,12 +3551,12 @@ namespace traceback
     fclose(yaml);
   }
 
-  void Traceback::executeUpdateTargetPoses()
+  void Traceback::executeInitiateTraceback()
   {
-    ros::Rate r(update_target_rate_);
+    ros::Rate r(initiate_traceback_rate_);
     while (node_.ok())
     {
-      updateTargetPoses();
+      initiateTraceback();
       r.sleep();
     }
   }
@@ -3644,8 +3635,8 @@ namespace traceback
                               { executePushData(); });
     std::thread estimation_thr([this]()
                                { executePoseEstimation(); });
-    std::thread update_target_thr([this]()
-                                  { executeUpdateTargetPoses(); });
+    std::thread initiate_traceback_thr([this]()
+                                  { executeInitiateTraceback(); });
     std::thread transform_optimization_thr([this]()
                                            { executeTransformOptimization(); });
     std::thread save_map_thr([this]()
@@ -3653,7 +3644,7 @@ namespace traceback
     ros::spin();
     save_map_thr.join();
     transform_optimization_thr.join();
-    update_target_thr.join();
+    initiate_traceback_thr.join();
     estimation_thr.join();
     data_push_thr.join();
     receive_camera_image_thr.join();

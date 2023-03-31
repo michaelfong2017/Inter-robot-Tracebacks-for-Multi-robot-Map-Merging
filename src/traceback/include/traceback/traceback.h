@@ -119,7 +119,7 @@ namespace traceback
     /* parameters */
     std::string test_mode_;
     std::string estimation_mode_;
-    double update_target_rate_;
+    double initiate_traceback_rate_;
     double discovery_rate_;
     double estimation_rate_;
     double save_map_rate_;
@@ -249,7 +249,7 @@ namespace traceback
 
     void continueTraceback(std::string tracer_robot, std::string traced_robot, double src_map_origin_x, double src_map_origin_y, double dst_map_origin_x, double dst_map_origin_y, bool is_middle_abort = false);
 
-    void updateTargetPoses();
+    void initiateTraceback();
 
     size_t findMinIndex(std::vector<PoseImagePair> &pose_image_pairs, double threshold_distance, std::string robot_name_dst, cv::Mat pose_dst);
 
@@ -336,7 +336,7 @@ namespace traceback
     void saveAllMaps();
     void saveMap(nav_msgs::OccupancyGrid map, std::string map_name, std::string current_time);
 
-    void executeUpdateTargetPoses();
+    void executeInitiateTraceback();
     void executeTopicSubscribing();
     void executeReceiveUpdatedCameraImage();
     void executePushData();
