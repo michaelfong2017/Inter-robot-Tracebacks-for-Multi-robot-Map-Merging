@@ -700,10 +700,10 @@ namespace traceback
       // Select robot_name_dst END
 
       // Skip if this pair is paused (due to abort)
-      // if (pairwise_paused_[robot_name_src][robot_name_dst]) {
-      //   ROS_INFO("Skip traceback since this pair is being paused");
-      //   continue;
-      // }
+      if (pairwise_paused_[robot_name_src][robot_name_dst]) {
+        ROS_INFO("Skip traceback since this pair is being paused");
+        continue;
+      }
 
       assert(transforms_indexes_[i] == robot_name_src);
       assert(transforms_indexes_[max_position] == robot_name_dst);
