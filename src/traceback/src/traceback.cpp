@@ -395,6 +395,34 @@ namespace traceback
                 robot_to_robot_current_results_[result.from_robot][result.to_robot].push_back(result);
                 std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
                 appendResultToFile(result, filepath);
+
+                // For global optimization
+                {
+                  size_t from_index, to_index;
+                  if (result.from_robot == "/tb3_0")
+                  {
+                    from_index = 0;
+                  }
+                  else if (result.from_robot == "/tb3_1")
+                  {
+                    from_index = 1;
+                  }
+                  if (result.to_robot == "/tb3_1")
+                  {
+                    to_index = 1;
+                  }
+                  else if (result.to_robot == "/tb3_2")
+                  {
+                    to_index = 2;
+                  }
+                  std::string filepath = "_Global_constraint.csv";
+                  std::ofstream fw(filepath, std::ofstream::app);
+                  if (fw.is_open())
+                  {
+                    fw << from_index << "," << to_index << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << std::endl;
+                    fw.close();
+                  }
+                }
               }
               ++i;
             }
@@ -1520,6 +1548,34 @@ namespace traceback
               robot_to_robot_current_results_[result.from_robot][result.to_robot].push_back(result);
               std::string filepath = "_Result_" + result.from_robot.substr(1) + "_to_" + result.to_robot.substr(1) + ".csv";
               appendResultToFile(result, filepath);
+
+              // For global optimization
+              {
+                size_t from_index, to_index;
+                if (result.from_robot == "/tb3_0")
+                {
+                  from_index = 0;
+                }
+                else if (result.from_robot == "/tb3_1")
+                {
+                  from_index = 1;
+                }
+                if (result.to_robot == "/tb3_1")
+                {
+                  to_index = 1;
+                }
+                else if (result.to_robot == "/tb3_2")
+                {
+                  to_index = 2;
+                }
+                std::string filepath = "_Global_constraint.csv";
+                std::ofstream fw(filepath, std::ofstream::app);
+                if (fw.is_open())
+                {
+                  fw << from_index << "," << to_index << "," << result.x << "," << result.y << "," << result.tx << "," << result.ty << "," << result.r << std::endl;
+                  fw.close();
+                }
+              }
             }
 
             for (int i = 0; i < 20; ++i)
