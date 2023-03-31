@@ -37,11 +37,11 @@
         <!-- 1.5 is good, can try 1.0 to 2.0 -->
         <param name="loop_closure_confidence_threshold" value="1.5" />
         <!-- Candidate for traceback -->
-        <param name="candidate_estimation_confidence" value="1.5" />
+        <param name="candidate_estimation_confidence" value="1.6" />
         <param name="traceback_match_confidence_threshold" value="0.35" />
 
-        <param name="start_traceback_constraint_count" value="10" />
-        <param name="stop_traceback_constraint_count" value="25" />
+        <param name="start_traceback_constraint_count" value="20" />
+        <param name="stop_traceback_constraint_count" value="30" />
         <param name="camera_image_update_rate" value="0.2" />
         <param name="data_push_rate" value="3.0" />
         <param name="check_obstacle_nearby_pixel_distance" value="5" />
