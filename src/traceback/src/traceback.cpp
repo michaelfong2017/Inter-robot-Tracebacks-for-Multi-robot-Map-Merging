@@ -2121,7 +2121,7 @@ namespace traceback
 
         // HARDCODE names
         std::vector<std::string> robot_names = {"/tb3_0", "/tb3_1", "/tb3_2"};
-        
+
         for (size_t i = 0; i < global_optimized_transforms_.size(); ++i)
         {
           std::string filepath = "global_optimized/Global_optimized_transforms_" + current_time + ".txt";
@@ -3407,7 +3407,8 @@ namespace traceback
 
     saveMap(merged_map_, "merged_map", current_time);
 
-    // Also save loop closure count, loop closures, and optimized transforms
+    /** Also save loop closure count, loop closures, optimized transforms and global optimized transforms */
+    //
     std::string filepath = "map/" + current_time + "/Loop_closure_count.txt";
     std::ofstream fw(filepath, std::ofstream::app);
     if (fw.is_open())
@@ -3482,6 +3483,24 @@ namespace traceback
           std::string filepath = "map/" + current_time + "/Optimized_transform_" + src.first.substr(1) + "_to_" + dst.first.substr(1) + ".txt";
           evaluateWithGroundTruth(dst.second, src.first, dst.first, current_time, filepath);
         }
+      }
+    }
+
+    //
+    // HARDCODE names
+    std::vector<std::string> robot_names = {"/tb3_0", "/tb3_1", "/tb3_2"};
+
+    for (size_t i = 0; i < global_optimized_transforms_.size(); ++i)
+    {
+      std::string filepath = "map/" + current_time + "/Global_optimized_transforms.txt";
+      std::ofstream fw(filepath, std::ofstream::app);
+      if (fw.is_open())
+      {
+        fw << "Global optimized transform from " + robot_names[0] + " to " + robot_names[i] + " :" << std::endl;
+        fw << global_optimized_transforms_[i].at<double>(0, 0) << "\t" << global_optimized_transforms_[i].at<double>(0, 1) << "\t" << global_optimized_transforms_[i].at<double>(0, 2) << std::endl;
+        fw << global_optimized_transforms_[i].at<double>(1, 0) << "\t" << global_optimized_transforms_[i].at<double>(1, 1) << "\t" << global_optimized_transforms_[i].at<double>(1, 2) << std::endl;
+        fw << global_optimized_transforms_[i].at<double>(2, 0) << "\t" << global_optimized_transforms_[i].at<double>(2, 1) << "\t" << global_optimized_transforms_[i].at<double>(2, 2) << std::endl;
+        fw.close();
       }
     }
   }
