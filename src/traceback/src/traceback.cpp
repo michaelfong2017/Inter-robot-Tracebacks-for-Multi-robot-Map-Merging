@@ -555,7 +555,8 @@ namespace traceback
 
   void Traceback::initiateTraceback()
   {
-    if (test_mode_ == "without") {
+    if (test_mode_ == "without")
+    {
       return;
     }
 
@@ -589,6 +590,14 @@ namespace traceback
           continue;
         }
         std::string dst = transforms_indexes_[j];
+
+        // if loop closure constraint count does not reach a minimum or reaches a threshold
+        // that is traceback only when the count is between an interval
+        size_t current_loop_closure_count = robot_name_src < dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][dst].size() : robot_to_robot_loop_closure_constraints_[dst][robot_name_src].size();
+        if (current_loop_closure_count < start_traceback_constraint_count_ || current_loop_closure_count >= stop_traceback_constraint_count_)
+        {
+          continue;
+        }
 
         bool hasCandidate = robot_name_src < dst ? robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][dst].size() > 0 : robot_to_robot_candidate_loop_closure_constraints_[dst][robot_name_src].size() > 0;
 
@@ -668,18 +677,8 @@ namespace traceback
       cv::Mat transform = cv::Mat(3, 3, CV_64F);
       cv::Mat inv_transform = cv::Mat(3, 3, CV_64F);
 
-      // if loop closure constraint count reaches a threshold,
-      // complete and don't traceback anymore
-      size_t current_loop_closure_count = robot_name_src < robot_name_dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][robot_name_dst].size() : robot_to_robot_loop_closure_constraints_[robot_name_dst][robot_name_src].size();
-      if (current_loop_closure_count >= stop_traceback_constraint_count_)
-      {
-        continue;
-      }
-
-      // if accept count is not zero, always use optimized transform
-      // OR if not yet accept before and there is at least some constraints for this pair
       size_t accept_count = robot_name_src < robot_name_dst ? robot_to_robot_traceback_accept_count_[robot_name_src][robot_name_dst] : robot_to_robot_traceback_accept_count_[robot_name_dst][robot_name_src];
-      if (accept_count != 0 || current_loop_closure_count >= start_traceback_constraint_count_)
+      if (accept_count != 0)
       {
         readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
 
@@ -3633,7 +3632,7 @@ namespace traceback
     std::thread estimation_thr([this]()
                                { executePoseEstimation(); });
     std::thread initiate_traceback_thr([this]()
-                                  { executeInitiateTraceback(); });
+                                       { executeInitiateTraceback(); });
     std::thread transform_optimization_thr([this]()
                                            { executeTransformOptimization(); });
     std::thread save_map_thr([this]()
