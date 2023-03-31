@@ -137,7 +137,7 @@ namespace traceback
     if (msg->aborted)
     {
       // 1. abort with enough count
-      if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] > pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+      if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= 1.1 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
       {
         writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. abort with enough count");
 
@@ -494,7 +494,7 @@ namespace traceback
       else
       {
         // 6. does not match and reject
-        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count > pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 1.1 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "6. does not match and reject");
 
