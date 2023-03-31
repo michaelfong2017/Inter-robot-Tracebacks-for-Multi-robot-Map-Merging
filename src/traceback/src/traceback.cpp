@@ -1034,7 +1034,7 @@ namespace traceback
     // Abort timeout allowed based on distance to goal
     // in seconds
     // HARDCODE the formula currently
-    abort_timeout = 10 + 3 * distance_to_goal;
+    abort_timeout = 30 + 5 * distance_to_goal;
     // abort timeout END
 
     // Reject when the goal is too far only when the traceback process
