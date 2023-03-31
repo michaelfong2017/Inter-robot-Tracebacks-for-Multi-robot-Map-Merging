@@ -69,7 +69,7 @@ namespace traceback
                                   robot_map_updates_topic_, "map_updates");
     private_nh.param<std::string>("robot_namespace", robot_namespace_, "");
     private_nh.param("start_traceback_constraint_count", start_traceback_constraint_count_, 10);
-    private_nh.param("stop_traceback_constraint_count", stop_traceback_constraint_count_, 50);
+    private_nh.param("stop_traceback_constraint_count", stop_traceback_constraint_count_, 25);
     // transform tolerance is used for all tf transforms here
     private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
 
@@ -137,7 +137,7 @@ namespace traceback
     if (msg->aborted)
     {
       // 1. abort with enough count
-      if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= 1.1 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+      if (++pairwise_abort_[tracer_robot][traced_robot] >= abort_count_needed_ && pairwise_abort_[tracer_robot][traced_robot] >= 2.0 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
       {
         writeTracebackFeedbackHistory(tracer_robot, traced_robot, "1. abort with enough count");
 
@@ -494,7 +494,7 @@ namespace traceback
       else
       {
         // 6. does not match and reject
-        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 1.1 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
+        if (++pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= reject_count_needed_ && pairwise_accept_reject_status_[tracer_robot][traced_robot].reject_count >= 2.0 * pairwise_accept_reject_status_[tracer_robot][traced_robot].accept_count)
         {
           writeTracebackFeedbackHistory(tracer_robot, traced_robot, "6. does not match and reject");
 
