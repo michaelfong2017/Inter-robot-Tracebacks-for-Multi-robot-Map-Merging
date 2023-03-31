@@ -51,7 +51,7 @@ namespace traceback
     private_nh.param("features_depths_max_queue_size", features_depths_max_queue_size_, 100);
 
     // Create directories for saving data
-    for (auto &dir_path : {"tb3_0_tb3_1", "tb3_0_tb3_2", "tb3_1_tb3_0", "tb3_1_tb3_2", "tb3_2_tb3_0", "tb3_2_tb3_1", "map", "optimized_transform", "constraint_count"})
+    for (auto &dir_path : {"tb3_0_tb3_1", "tb3_0_tb3_2", "tb3_1_tb3_0", "tb3_1_tb3_2", "tb3_2_tb3_0", "tb3_2_tb3_1", "map", "optimized_transform", "constraint_count", "global_optimized"})
     {
       boost::filesystem::path dir(dir_path);
 
@@ -1960,9 +1960,9 @@ namespace traceback
           }
         }
 
-        // Do optimization
         std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
 
+        /** Local optimization */
         for (auto &src : robot_to_robot_loop_closure_constraints_)
         {
           for (auto &dst : src.second)
@@ -2017,6 +2017,7 @@ namespace traceback
               init_transform = cv::Mat::eye(3, 3, CV_64F);
             }
 
+            // in pixels
             std::vector<double> optimized_tx_ty_r = camera_image_processor_.LMOptimize(x_values, y_values, tx_values, ty_values, r_values, init_tx, init_ty, init_r);
 
             double optimized_tx = optimized_tx_ty_r[0];
@@ -2037,69 +2038,141 @@ namespace traceback
 
             robot_to_robot_optimized_transform_[robot_name][second_robot_name] = optimized_transform;
 
-            //
-            transform_estimator_.updateBestTransforms(optimized_transform, robot_name, second_robot_name, best_transforms_, has_best_transforms_);
-            //
-
             evaluateWithGroundTruthWithLastVersion(init_transform, optimized_transform, robot_name, second_robot_name, current_time);
+          }
+        }
+        /** Local optimization END */
 
-            if (has_best_transforms_.size() == resolutions_.size())
+        /** Global optimization */
+        std::vector<int> from_indexes;
+        std::vector<int> to_indexes;
+        std::vector<double> x_values;
+        std::vector<double> y_values;
+        std::vector<double> tx_values;
+        std::vector<double> ty_values;
+        std::vector<double> r_values;
+
+        for (auto &src : robot_to_robot_loop_closure_constraints_)
+        {
+          for (auto &dst : src.second)
+          {
+            if (src.first >= dst.first)
             {
-              std::vector<std::string> robot_names;
-              std::vector<double> m_00;
-              std::vector<double> m_01;
-              std::vector<double> m_02;
-              std::vector<double> m_10;
-              std::vector<double> m_11;
-              std::vector<double> m_12;
-              std::vector<double> m_20;
-              std::vector<double> m_21;
-              std::vector<double> m_22;
-              for (auto it = best_transforms_[robot_name].begin(); it != best_transforms_[robot_name].end(); ++it)
+              continue;
+            }
+            for (LoopClosureConstraint &constraint : dst.second)
+            {
+              // For global optimization
+              // HARDCODE index and robot name,
+              // 0 is /tb3_0, 1 is /tb3_1, 2 is /tb3_2
+              size_t from_index, to_index;
+              if (src.first == "/tb3_0")
               {
-                std::string dst_robot = it->first;
-                cv::Mat dst_transform = it->second;
-                robot_names.push_back(dst_robot);
-                m_00.push_back(dst_transform.at<double>(0, 0));
-                m_01.push_back(dst_transform.at<double>(0, 1));
-                m_02.push_back(dst_transform.at<double>(0, 2));
-                m_10.push_back(dst_transform.at<double>(1, 0));
-                m_11.push_back(dst_transform.at<double>(1, 1));
-                m_12.push_back(dst_transform.at<double>(1, 2));
-                m_20.push_back(dst_transform.at<double>(2, 0));
-                m_21.push_back(dst_transform.at<double>(2, 1));
-                m_22.push_back(dst_transform.at<double>(2, 2));
-
-                {
-                  std::string filepath = "Best_transforms_" + current_time + "_" + robot_name.substr(1) + "_tracer_robot.txt";
-                  std::ofstream fw(filepath, std::ofstream::app);
-                  if (fw.is_open())
-                  {
-                    fw << "Best transform from " << robot_name << " to " << dst_robot << " :" << std::endl;
-                    fw << dst_transform.at<double>(0, 0) << "\t" << dst_transform.at<double>(0, 1) << "\t" << dst_transform.at<double>(0, 2) << std::endl;
-                    fw << dst_transform.at<double>(1, 0) << "\t" << dst_transform.at<double>(1, 1) << "\t" << dst_transform.at<double>(1, 2) << std::endl;
-                    fw << dst_transform.at<double>(2, 0) << "\t" << dst_transform.at<double>(2, 1) << "\t" << dst_transform.at<double>(2, 2) << std::endl;
-                    fw.close();
-                  }
-                }
+                from_index = 0;
               }
-
-              traceback_msgs::TracebackTransforms traceback_transforms;
-              traceback_transforms.robot_names = robot_names;
-              traceback_transforms.m_00 = m_00;
-              traceback_transforms.m_01 = m_01;
-              traceback_transforms.m_02 = m_02;
-              traceback_transforms.m_10 = m_10;
-              traceback_transforms.m_11 = m_11;
-              traceback_transforms.m_12 = m_12;
-              traceback_transforms.m_20 = m_20;
-              traceback_transforms.m_21 = m_21;
-              traceback_transforms.m_22 = m_22;
-
-              traceback_transforms_publisher_.publish(traceback_transforms);
+              else if (src.first == "/tb3_1")
+              {
+                from_index = 1;
+              }
+              if (dst.first == "/tb3_1")
+              {
+                to_index = 1;
+              }
+              else if (dst.first == "/tb3_2")
+              {
+                to_index = 2;
+              }
+              from_indexes.push_back(from_index);
+              to_indexes.push_back(to_index);
+              //
+              x_values.push_back(constraint.x);
+              y_values.push_back(constraint.y);
+              tx_values.push_back(constraint.tx);
+              ty_values.push_back(constraint.ty);
+              r_values.push_back(constraint.r);
             }
           }
         }
+
+        // resolutions_.size() gives num_robot
+        // in pixels
+        std::vector<std::vector<double>> optimized_tx_ty_r = camera_image_processor_.LMOptimizeGlobal(from_indexes, to_indexes, x_values, y_values, tx_values, ty_values, r_values, resolutions_.size());
+
+        global_optimized_transforms_.clear();
+        global_optimized_transforms_.emplace_back(cv::Mat::eye(3, 3, CV_64F));
+        // optimized_tx_ty_r.size() = num_robot - 1
+        for (size_t i = 0; i < optimized_tx_ty_r.size(); ++i)
+        {
+          double tx = optimized_tx_ty_r[i][0];
+          double ty = optimized_tx_ty_r[i][1];
+          double r = optimized_tx_ty_r[i][2];
+          cv::Mat mat(3, 3, CV_64F);
+          mat.at<double>(0, 0) = cos(r);
+          mat.at<double>(0, 1) = -sin(r);
+          mat.at<double>(0, 2) = tx;
+          mat.at<double>(1, 0) = sin(r);
+          mat.at<double>(1, 1) = cos(r);
+          mat.at<double>(1, 2) = ty;
+          mat.at<double>(2, 0) = 0.0;
+          mat.at<double>(2, 1) = 0.0;
+          mat.at<double>(2, 2) = 1.0;
+          global_optimized_transforms_.push_back(mat);
+        }
+
+        // HARDCODE names
+        std::vector<std::string> robot_names = {"/tb3_0", "/tb3_1", "/tb3_2"};
+        
+        for (size_t i = 0; i < global_optimized_transforms_.size(); ++i)
+        {
+          std::string filepath = "global_optimized/Global_optimized_transforms_" + current_time + ".txt";
+          std::ofstream fw(filepath, std::ofstream::app);
+          if (fw.is_open())
+          {
+            fw << "Global optimized transform from " + robot_names[0] + " to " + robot_names[i] + " :" << std::endl;
+            fw << global_optimized_transforms_[i].at<double>(0, 0) << "\t" << global_optimized_transforms_[i].at<double>(0, 1) << "\t" << global_optimized_transforms_[i].at<double>(0, 2) << std::endl;
+            fw << global_optimized_transforms_[i].at<double>(1, 0) << "\t" << global_optimized_transforms_[i].at<double>(1, 1) << "\t" << global_optimized_transforms_[i].at<double>(1, 2) << std::endl;
+            fw << global_optimized_transforms_[i].at<double>(2, 0) << "\t" << global_optimized_transforms_[i].at<double>(2, 1) << "\t" << global_optimized_transforms_[i].at<double>(2, 2) << std::endl;
+            fw.close();
+          }
+        }
+
+        std::vector<double> m_00;
+        std::vector<double> m_01;
+        std::vector<double> m_02;
+        std::vector<double> m_10;
+        std::vector<double> m_11;
+        std::vector<double> m_12;
+        std::vector<double> m_20;
+        std::vector<double> m_21;
+        std::vector<double> m_22;
+
+        for (size_t i = 0; i < global_optimized_transforms_.size(); ++i)
+        {
+          m_00.push_back(global_optimized_transforms_[i].at<double>(0, 0));
+          m_01.push_back(global_optimized_transforms_[i].at<double>(0, 1));
+          m_02.push_back(global_optimized_transforms_[i].at<double>(0, 2));
+          m_10.push_back(global_optimized_transforms_[i].at<double>(1, 0));
+          m_11.push_back(global_optimized_transforms_[i].at<double>(1, 1));
+          m_12.push_back(global_optimized_transforms_[i].at<double>(1, 2));
+          m_20.push_back(global_optimized_transforms_[i].at<double>(2, 0));
+          m_21.push_back(global_optimized_transforms_[i].at<double>(2, 1));
+          m_22.push_back(global_optimized_transforms_[i].at<double>(2, 2));
+        }
+
+        traceback_msgs::TracebackTransforms traceback_transforms;
+        traceback_transforms.robot_names = robot_names;
+        traceback_transforms.m_00 = m_00;
+        traceback_transforms.m_01 = m_01;
+        traceback_transforms.m_02 = m_02;
+        traceback_transforms.m_10 = m_10;
+        traceback_transforms.m_11 = m_11;
+        traceback_transforms.m_12 = m_12;
+        traceback_transforms.m_20 = m_20;
+        traceback_transforms.m_21 = m_21;
+        traceback_transforms.m_22 = m_22;
+
+        traceback_transforms_publisher_.publish(traceback_transforms);
+        /** Global optimization END */
       }
     }
   }
@@ -3464,12 +3537,12 @@ namespace traceback
     FILE *yaml = fopen(mapmetadatafile.c_str(), "w");
 
     /*
-resolution: 0.100000
-origin: [0.000000, 0.000000, 0.000000]
-#
-negate: 0
-occupied_thresh: 0.65
-free_thresh: 0.196
+  resolution: 0.100000
+  origin: [0.000000, 0.000000, 0.000000]
+  #
+  negate: 0
+  occupied_thresh: 0.65
+  free_thresh: 0.196
      */
 
     tf2::Quaternion tf_q;

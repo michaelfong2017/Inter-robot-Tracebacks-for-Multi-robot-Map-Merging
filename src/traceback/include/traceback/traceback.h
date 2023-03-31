@@ -195,6 +195,7 @@ namespace traceback
     std::unordered_map<std::string, boost::shared_mutex> robots_to_current_it_mutex_;
 
     // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
+    // in pixels
     std::unordered_map<std::string, std::unordered_map<std::string, std::vector<LoopClosureConstraint>>> robot_to_robot_traceback_loop_closure_constraints_;
     // "from" must be alphabetically smaller than "to", e.g. from "/tb3_0" to "/tb3_1"
     std::unordered_map<std::string, std::unordered_map<std::string, std::vector<LoopClosureConstraint>>> robot_to_robot_candidate_loop_closure_constraints_;
@@ -225,11 +226,18 @@ namespace traceback
     std::unordered_map<std::string, std::unordered_map<std::string, cv::Mat>> best_transforms_;
     std::unordered_set<std::string> has_best_transforms_;
 
+    // 0->0, 0->1, 0->2, etc
+    // HARDCODE from inputting to global optimizer to here:
+    // 0 is /tb3_0, 1 is /tb3_1, 2 is /tb3_2
+    // Include the identity transform
+    std::vector<cv::Mat> global_optimized_transforms_;
+
     /** Generate result */
     // "from" can be alphabetically smaller or greater than "to"
     std::unordered_map<std::string, std::unordered_map<std::string, size_t>> robot_to_robot_result_index_;
     // "from" can be alphabetically smaller or greater than "to"
     // After erasing, update this
+    // in meters
     std::unordered_map<std::string, std::unordered_map<std::string, std::vector<Result>>> robot_to_robot_current_results_;
     boost::shared_mutex result_file_mutex_;
     // "from" can be alphabetically smaller or greater than "to"

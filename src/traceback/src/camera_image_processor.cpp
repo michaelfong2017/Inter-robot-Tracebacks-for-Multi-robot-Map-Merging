@@ -761,9 +761,87 @@ namespace traceback
         // Results
         // The 'x' vector also contains the results of the optimization.
         //
-        ROS_INFO("Optimization results (a, b, c) = (%f, %f, %f)", x(0), x(1), x(2));
+        ROS_INFO("Optimization results (tx, ty, r) = (%f, %f, %f)", x(0), x(1), x(2));
 
         return {x(0), x(1), x(2)};
+    }
+
+    std::vector<std::vector<double>> CameraImageProcessor::LMOptimizeGlobal(std::vector<int> from_indexes,
+                                                               std::vector<int> to_indexes,
+                                                               std::vector<double> x_values,
+                                                               std::vector<double> y_values,
+                                                               std::vector<double> tx_values,
+                                                               std::vector<double> ty_values,
+                                                               std::vector<double> r_values,
+                                                               int num_robot)
+    {
+        // 'm' is the number of data points.
+        int m = x_values.size();
+
+        // Move the data into an Eigen Matrix.
+        // The first column has the input values, x. The second column is the f(x) values.
+        Eigen::MatrixXd measuredValues(m, 7);
+        for (int i = 0; i < m; i++)
+        {
+            measuredValues(i, 0) = from_indexes[i];
+            measuredValues(i, 1) = to_indexes[i];
+            measuredValues(i, 2) = x_values[i];
+            measuredValues(i, 3) = y_values[i];
+            measuredValues(i, 4) = tx_values[i];
+            measuredValues(i, 5) = ty_values[i];
+            measuredValues(i, 6) = r_values[i];
+        }
+
+        // 'n' is the number of parameters in the function.
+        // f(x) = a(x^2) + b(x) + c has 3 parameters: a, b, c
+        // For num_robot = 3, there are 3 * (num_robot - 1) number of parameters
+        int n = 3 * (num_robot - 1);
+
+        // 'x' is vector of length 'n' containing the initial values for the parameters.
+        // The parameters 'x' are also referred to as the 'inputs' in the context of LM optimization.
+        // The LM optimization inputs should not be confused with the x input values.
+        Eigen::VectorXd x(n);
+        // e.g. for 3 robots,
+        // the first 3 parameters are 0->1 transform
+        // the second 3 parameters are 0->2 transform
+        for (int i = 0; i < num_robot - 1; ++i)
+        {
+            x(0 + 3 * i) = 0.0; // initial value for 'a'
+            x(1 + 3 * i) = 0.0; // initial value for 'b'
+            x(2 + 3 * i) = 0.0; // initial value for 'c'
+        }
+
+        //
+        // Run the LM optimization
+        // Create a LevenbergMarquardt object and pass it the functor.
+        //
+
+        LMFunctorGlobal functor;
+        functor.measuredValues = measuredValues;
+        functor.m = m;
+        functor.n = n;
+
+        Eigen::LevenbergMarquardt<LMFunctorGlobal, double> lm(functor);
+        int status = lm.minimize(x);
+        ROS_INFO("LM optimization (global) status: %d", status);
+
+        //
+        // Results
+        // The 'x' vector also contains the results of the optimization.
+        //
+        ROS_INFO("Optimization results:");
+        std::vector<std::vector<double>> results;
+        for (int i = 0; i < num_robot - 1; ++i)
+        {
+            ROS_INFO("0->%d - (tx, ty, r) = (%f, %f, %f)", i + 1, x(0 + 3 * i), x(1 + 3 * i), x(2 + 3 * i));
+            std::vector<double> result;
+            result.push_back(x(0 + 3 * i));
+            result.push_back(x(1 + 3 * i));
+            result.push_back(x(2 + 3 * i));
+            results.push_back(result);
+        }
+
+        return results;
     }
 
     // Calculates rotation matrix to euler angles
