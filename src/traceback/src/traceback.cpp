@@ -1532,10 +1532,10 @@ namespace traceback
             }
             ROS_INFO("matrix:\n%s", s.c_str());
 
-            if (confidence_output >= candidate_estimation_confidence_)
-            {
-              addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
-            }
+            // if (confidence_output >= candidate_estimation_confidence_)
+            // {
+            //   addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
+            // }
 
             addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 

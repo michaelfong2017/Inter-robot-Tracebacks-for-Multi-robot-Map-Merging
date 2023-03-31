@@ -40,8 +40,8 @@
         <param name="candidate_estimation_confidence" value="1.5" />
         <param name="traceback_match_confidence_threshold" value="0.35" />
 
-        <param name="start_traceback_constraint_count" value="10" />
-        <param name="stop_traceback_constraint_count" value="30" />
+        <param name="start_traceback_constraint_count" value="15" />
+        <param name="stop_traceback_constraint_count" value="35" />
         <param name="camera_image_update_rate" value="0.2" />
         <param name="data_push_rate" value="3.0" />
         <param name="check_obstacle_nearby_pixel_distance" value="5" />
