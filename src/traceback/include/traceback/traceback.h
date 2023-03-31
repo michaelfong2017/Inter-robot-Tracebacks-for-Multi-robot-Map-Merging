@@ -155,9 +155,9 @@ namespace traceback
     double estimation_rate_;
     double save_map_rate_;
 
-    double confidence_threshold_;
-    double unreasonable_goal_distance_;
-    double essential_mat_confidence_threshold_;
+    double loop_closure_confidence_threshold_;
+    double candidate_estimation_confidence_;
+    double traceback_match_confidence_threshold_;
     int accept_count_needed_;
     int reject_count_needed_;
     int abort_count_needed_;
@@ -170,6 +170,7 @@ namespace traceback
 
     std::string robot_camera_image_topic_;
     std::string robot_camera_depth_image_topic_;
+    double unreasonable_goal_distance_;
     int check_obstacle_nearby_pixel_distance_;
     double traceback_threshold_distance_;
     double abort_threshold_distance_;

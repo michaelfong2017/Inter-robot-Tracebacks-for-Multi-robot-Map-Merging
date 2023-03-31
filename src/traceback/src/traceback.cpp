@@ -1,22 +1,22 @@
 /*******************************************************************************
  * BSD 3-Clause License
- * 
+ *
  * Copyright (c) 2023, Fong Chun Him
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from
  *    this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -27,7 +27,7 @@
  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*******************************************************************************/
+ *******************************************************************************/
 
 #include <traceback/traceback.h>
 
@@ -57,8 +57,9 @@ namespace traceback
     private_nh.param("transform_optimization_rate", transform_optimization_rate_, 0.2);
     private_nh.param("save_map_rate", save_map_rate_, 0.05);
     private_nh.param("unreasonable_goal_distance", unreasonable_goal_distance_, 5.0);
-    private_nh.param("estimation_confidence", confidence_threshold_, 1.0);
-    private_nh.param("essential_mat_confidence", essential_mat_confidence_threshold_, 1.0);
+    private_nh.param("loop_closure_confidence_threshold", loop_closure_confidence_threshold_, 1.5);
+    private_nh.param("candidate_estimation_confidence", candidate_estimation_confidence_, 2.0);
+    private_nh.param("traceback_match_confidence_threshold", traceback_match_confidence_threshold_, 0.35);
     private_nh.param("far_from_accepted_transform_threshold", far_from_accepted_transform_threshold_, 5.0);
     private_nh.param("accept_count_needed", accept_count_needed_, 8);
     private_nh.param("reject_count_needed", reject_count_needed_, 2);
@@ -67,7 +68,7 @@ namespace traceback
     private_nh.param<std::string>("robot_map_updates_topic",
                                   robot_map_updates_topic_, "map_updates");
     private_nh.param<std::string>("robot_namespace", robot_namespace_, "");
-    private_nh.param("start_traceback_constraint_count", start_traceback_constraint_count_, 10);
+    private_nh.param("start_traceback_constraint_count", start_traceback_constraint_count_, 25);
     private_nh.param("stop_traceback_constraint_count", stop_traceback_constraint_count_, 50);
     // transform tolerance is used for all tf transforms here
     private_nh.param("transform_tolerance", transform_tolerance_, 0.3);
@@ -249,7 +250,7 @@ namespace traceback
       transform_needed.arrived_x = arrived_pose.position.x;
       transform_needed.arrived_y = arrived_pose.position.y;
 
-      MatchAndSolveResult result = camera_image_processor_.matchAndSolve(cv_ptr_tracer->image, cv_ptr_traced->image, cv_ptr_depth_tracer->image, cv_ptr_depth_traced->image, FeatureType::SURF, essential_mat_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
+      MatchAndSolveResult result = camera_image_processor_.matchAndSolve(cv_ptr_tracer->image, cv_ptr_traced->image, cv_ptr_depth_tracer->image, cv_ptr_depth_traced->image, FeatureType::SURF, traceback_match_confidence_threshold_, yaw, transform_needed, tracer_robot, traced_robot, current_time);
 
       {
         std::string filepath = tracer_robot.substr(1) + "_" + traced_robot.substr(1) + "/" + current_time + "_transform_needed_" + tracer_robot.substr(1) + "_tracer_robot_" + traced_robot.substr(1) + "_traced_robot.txt";
@@ -623,14 +624,6 @@ namespace traceback
         }
         std::string dst = transforms_indexes_[j];
 
-        // if loop closure constraint count does not reach a minimum or reaches a threshold
-        // that is traceback only when the count is between an interval
-        size_t current_loop_closure_count = robot_name_src < dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][dst].size() : robot_to_robot_loop_closure_constraints_[dst][robot_name_src].size();
-        if (current_loop_closure_count < start_traceback_constraint_count_ || current_loop_closure_count >= stop_traceback_constraint_count_)
-        {
-          continue;
-        }
-
         bool hasCandidate = robot_name_src < dst ? robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][dst].size() > 0 : robot_to_robot_candidate_loop_closure_constraints_[dst][robot_name_src].size() > 0;
 
         if (hasCandidate)
@@ -666,6 +659,7 @@ namespace traceback
           }
           std::string dst = transforms_indexes_[j];
 
+          // for using optimized transform
           // if loop closure constraint count does not reach a minimum or reaches a threshold
           // that is traceback only when the count is between an interval
           size_t current_loop_closure_count = robot_name_src < dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][dst].size() : robot_to_robot_loop_closure_constraints_[dst][robot_name_src].size();
@@ -718,8 +712,9 @@ namespace traceback
       cv::Mat inv_transform = cv::Mat(3, 3, CV_64F);
 
       size_t accept_count = robot_name_src < robot_name_dst ? robot_to_robot_traceback_accept_count_[robot_name_src][robot_name_dst] : robot_to_robot_traceback_accept_count_[robot_name_dst][robot_name_src];
-      // accept count not considered now
-      if (true)
+      size_t current_loop_closure_count = robot_name_src < robot_name_dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][robot_name_dst].size() : robot_to_robot_loop_closure_constraints_[robot_name_dst][robot_name_src].size();
+      // use optimized transform if already accept or have enough constraints (e.g. 25)
+      if (accept_count != 0 || current_loop_closure_count >= start_traceback_constraint_count_)
       {
         readOptimizedTransform(transform, inv_transform, robot_name_src, robot_name_dst);
 
@@ -736,83 +731,83 @@ namespace traceback
           }
         }
       }
-      // accept count not considered now
-      // else
-      // {
-      //   if (!hasCandidate)
-      //   {
-      //     continue;
-      //   }
+      // if not yet accept and not enough loop closure constraints, continue to use candidate
+      else
+      {
+        if (!hasCandidate)
+        {
+          continue;
+        }
 
-      //   LoopClosureConstraint constraint;
-      //   if (robot_name_src < robot_name_dst)
-      //   {
-      //     constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].front();
-      //     LoopClosureConstraint constraint_copy;
-      //     constraint_copy.x = constraint.x;
-      //     constraint_copy.y = constraint.y;
-      //     constraint_copy.tx = constraint.tx;
-      //     constraint_copy.ty = constraint.ty;
-      //     constraint_copy.r = constraint.r;
-      //     robot_to_robot_traceback_loop_closure_constraints_[robot_name_src][robot_name_dst].push_back(constraint_copy);
+        LoopClosureConstraint constraint;
+        if (robot_name_src < robot_name_dst)
+        {
+          constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].front();
+          LoopClosureConstraint constraint_copy;
+          constraint_copy.x = constraint.x;
+          constraint_copy.y = constraint.y;
+          constraint_copy.tx = constraint.tx;
+          constraint_copy.ty = constraint.ty;
+          constraint_copy.r = constraint.r;
+          robot_to_robot_traceback_loop_closure_constraints_[robot_name_src][robot_name_dst].push_back(constraint_copy);
 
-      //     transform.at<double>(0, 0) = cos(constraint.r);
-      //     transform.at<double>(0, 1) = -sin(constraint.r);
-      //     transform.at<double>(0, 2) = constraint.tx;
-      //     transform.at<double>(1, 0) = sin(constraint.r);
-      //     transform.at<double>(1, 1) = cos(constraint.r);
-      //     transform.at<double>(1, 2) = constraint.ty;
-      //     transform.at<double>(2, 0) = 0;
-      //     transform.at<double>(2, 1) = 0;
-      //     transform.at<double>(2, 2) = 1;
-      //     inv_transform = transform.inv();
-      //   }
-      //   else
-      //   {
-      //     constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].front();
-      //     LoopClosureConstraint constraint_copy;
-      //     constraint_copy.x = constraint.x;
-      //     constraint_copy.y = constraint.y;
-      //     constraint_copy.tx = constraint.tx;
-      //     constraint_copy.ty = constraint.ty;
-      //     constraint_copy.r = constraint.r;
-      //     robot_to_robot_traceback_loop_closure_constraints_[robot_name_dst][robot_name_src].push_back(constraint_copy);
+          transform.at<double>(0, 0) = cos(constraint.r);
+          transform.at<double>(0, 1) = -sin(constraint.r);
+          transform.at<double>(0, 2) = constraint.tx;
+          transform.at<double>(1, 0) = sin(constraint.r);
+          transform.at<double>(1, 1) = cos(constraint.r);
+          transform.at<double>(1, 2) = constraint.ty;
+          transform.at<double>(2, 0) = 0;
+          transform.at<double>(2, 1) = 0;
+          transform.at<double>(2, 2) = 1;
+          inv_transform = transform.inv();
+        }
+        else
+        {
+          constraint = robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].front();
+          LoopClosureConstraint constraint_copy;
+          constraint_copy.x = constraint.x;
+          constraint_copy.y = constraint.y;
+          constraint_copy.tx = constraint.tx;
+          constraint_copy.ty = constraint.ty;
+          constraint_copy.r = constraint.r;
+          robot_to_robot_traceback_loop_closure_constraints_[robot_name_dst][robot_name_src].push_back(constraint_copy);
 
-      //     inv_transform.at<double>(0, 0) = cos(constraint.r);
-      //     inv_transform.at<double>(0, 1) = -sin(constraint.r);
-      //     inv_transform.at<double>(0, 2) = constraint.tx;
-      //     inv_transform.at<double>(1, 0) = sin(constraint.r);
-      //     inv_transform.at<double>(1, 1) = cos(constraint.r);
-      //     inv_transform.at<double>(1, 2) = constraint.ty;
-      //     inv_transform.at<double>(2, 0) = 0;
-      //     inv_transform.at<double>(2, 1) = 0;
-      //     inv_transform.at<double>(2, 2) = 1;
-      //     transform = inv_transform.inv();
-      //   }
+          inv_transform.at<double>(0, 0) = cos(constraint.r);
+          inv_transform.at<double>(0, 1) = -sin(constraint.r);
+          inv_transform.at<double>(0, 2) = constraint.tx;
+          inv_transform.at<double>(1, 0) = sin(constraint.r);
+          inv_transform.at<double>(1, 1) = cos(constraint.r);
+          inv_transform.at<double>(1, 2) = constraint.ty;
+          inv_transform.at<double>(2, 0) = 0;
+          inv_transform.at<double>(2, 1) = 0;
+          inv_transform.at<double>(2, 2) = 1;
+          transform = inv_transform.inv();
+        }
 
-      //   // One candidate is only consumed by one traceback process
-      //   if (robot_name_src < robot_name_dst)
-      //   {
-      //     robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].erase(robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].begin());
-      //   }
-      //   else
-      //   {
-      //     robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].erase(robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].begin());
-      //   }
+        // One candidate is only consumed by one traceback process
+        if (robot_name_src < robot_name_dst)
+        {
+          robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].erase(robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][robot_name_dst].begin());
+        }
+        else
+        {
+          robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].erase(robot_to_robot_candidate_loop_closure_constraints_[robot_name_dst][robot_name_src].begin());
+        }
 
-      //   {
-      //     std::string src_robot = robot_name_src < robot_name_dst ? robot_name_src : robot_name_dst;
-      //     std::string dst_robot = robot_name_src < robot_name_dst ? robot_name_dst : robot_name_src;
-      //     std::string filepath = "_Traceback_initiated_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + "_.txt";
-      //     std::ofstream fw(filepath, std::ofstream::app);
-      //     if (fw.is_open())
-      //     {
-      //       std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
-      //       fw << current_time << " - Candidate loop closure - tracer robot is " << robot_name_src << " and traced robot is " << robot_name_dst << std::endl;
-      //       fw.close();
-      //     }
-      //   }
-      // }
+        {
+          std::string src_robot = robot_name_src < robot_name_dst ? robot_name_src : robot_name_dst;
+          std::string dst_robot = robot_name_src < robot_name_dst ? robot_name_dst : robot_name_src;
+          std::string filepath = "_Traceback_initiated_" + src_robot.substr(1) + "_to_" + dst_robot.substr(1) + "_.txt";
+          std::ofstream fw(filepath, std::ofstream::app);
+          if (fw.is_open())
+          {
+            std::string current_time = std::to_string(round(ros::Time::now().toSec() * 100.0) / 100.0);
+            fw << current_time << " - Candidate loop closure - tracer robot is " << robot_name_src << " and traced robot is " << robot_name_dst << std::endl;
+            fw.close();
+          }
+        }
+      }
       // transform and inv_transform already read
 
       // Keep this traceback transform for traceback next goals and later calculating the loop closure constraint correctly
@@ -1343,7 +1338,7 @@ namespace traceback
           cv::detail::ImageFeatures features1 = robots_to_image_features_depths_pose_[robot_name].back().features;
           cv::detail::ImageFeatures features2 = pair.second[i].features;
 
-          double confidence_output = transform_estimator_.matchTwoFeatures(features1, features2, confidence_threshold_);
+          double confidence_output = transform_estimator_.matchTwoFeatures(features1, features2, loop_closure_confidence_threshold_);
           if (confidence_output > 0.0)
           {
             geometry_msgs::Pose pose1 = robots_to_image_features_depths_pose_[robot_name].back().pose;
@@ -1495,7 +1490,7 @@ namespace traceback
             TransformNeeded transform_needed;
             transform_needed.arrived_x = pose1.position.x;
             transform_needed.arrived_y = pose1.position.y;
-            MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, essential_mat_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
+            MatchAndSolveResult result = camera_image_processor_.matchAndSolveWithFeaturesAndDepths(features1, features2, depths1, depths2, traceback_match_confidence_threshold_, yaw, transform_needed, robot_name, second_robot_name, current_time);
 
             if (!result.match)
             {
@@ -1536,6 +1531,11 @@ namespace traceback
               }
             }
             ROS_INFO("matrix:\n%s", s.c_str());
+
+            if (confidence_output >= candidate_estimation_confidence_)
+            {
+              addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
+            }
 
             addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
 
@@ -2236,7 +2236,7 @@ namespace traceback
     // if (estimation_mode_ == "map")
     // {
     //   transform_estimator_.estimateTransforms(FeatureType::AKAZE,
-    //                                           confidence_threshold_);
+    //                                           loop_closure_confidence_threshold_);
     // }
   }
 
