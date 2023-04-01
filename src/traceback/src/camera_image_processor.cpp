@@ -1,22 +1,22 @@
 /*******************************************************************************
  * BSD 3-Clause License
- * 
+ *
  * Copyright (c) 2023, Fong Chun Him
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from
  *    this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -27,7 +27,7 @@
  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*******************************************************************************/
+ *******************************************************************************/
 
 #include <traceback/camera_image_processor.h>
 
@@ -77,6 +77,8 @@ namespace traceback
         std::vector<int> good_indices;
         cv::Ptr<cv::detail::FeaturesMatcher> matcher =
             cv::makePtr<cv::detail::AffineBestOf2NearestMatcher>();
+        cv::Ptr<cv::detail::Estimator> estimator =
+            cv::makePtr<cv::detail::AffineBasedEstimator>();
 
         try
         {
@@ -138,6 +140,53 @@ namespace traceback
                 return result;
             }
         }
+
+        // If transform is unreasonable, reject
+        std::vector<cv::detail::CameraParams> transforms;
+        if (!(*estimator)(image_features, pairwise_matches, transforms))
+        {
+            {
+                MatchAndSolveResult result;
+                result.match = true;
+                result.solved = false;
+                return result;
+            }
+        }
+        for (auto &transform : transforms)
+        {
+            transform.R.convertTo(transform.R, CV_64F);
+
+            std::string s = "";
+            for (int y = 0; y < 3; y++)
+            {
+                for (int x = 0; x < 3; x++)
+                {
+                    double val = transform.R.at<double>(y, x);
+                    if (x == 3 - 1)
+                    {
+                        s += std::to_string(val) + "\n";
+                    }
+                    else
+                    {
+                        s += std::to_string(val) + ", ";
+                    }
+                }
+            }
+            ROS_INFO("matrix:\n%s", s.c_str());
+
+            {
+                double scale = sqrt(pow(transform.R.at<double>(1, 0), 2) + pow(transform.R.at<double>(0, 0), 2));
+                if (scale < 0.1 || scale > 1.0)
+                {
+                    MatchAndSolveResult result;
+                    result.match = false;
+                    result.solved = false;
+                    return result;
+                }
+            }
+        }
+        ROS_DEBUG("debug");
+        // If transform is unreasonable, reject END
 
         std::vector<cv::Point2f> image_points1, image_points2;
         std::vector<double> matched_depths1, matched_depths2;
@@ -394,12 +443,13 @@ namespace traceback
         const std::vector<cv::Mat> &images = {tracer_robot_color_image, traced_robot_color_image};
         std::vector<cv::detail::ImageFeatures> image_features;
         std::vector<cv::detail::MatchesInfo> pairwise_matches;
-        std::vector<cv::detail::CameraParams> transforms;
         std::vector<int> good_indices;
         // TODO investigate value translation effect on features
         auto finder = internal::chooseFeatureFinder(feature_type);
         cv::Ptr<cv::detail::FeaturesMatcher> matcher =
             cv::makePtr<cv::detail::AffineBestOf2NearestMatcher>();
+        cv::Ptr<cv::detail::Estimator> estimator =
+            cv::makePtr<cv::detail::AffineBasedEstimator>();
 
         if (tracer_robot_color_image.empty() || traced_robot_color_image.empty())
         {
@@ -492,6 +542,53 @@ namespace traceback
                 return result;
             }
         }
+
+        // If transform is unreasonable, reject
+        std::vector<cv::detail::CameraParams> transforms;
+        if (!(*estimator)(image_features, pairwise_matches, transforms))
+        {
+            {
+                MatchAndSolveResult result;
+                result.match = true;
+                result.solved = false;
+                return result;
+            }
+        }
+        for (auto &transform : transforms)
+        {
+            transform.R.convertTo(transform.R, CV_64F);
+
+            std::string s = "";
+            for (int y = 0; y < 3; y++)
+            {
+                for (int x = 0; x < 3; x++)
+                {
+                    double val = transform.R.at<double>(y, x);
+                    if (x == 3 - 1)
+                    {
+                        s += std::to_string(val) + "\n";
+                    }
+                    else
+                    {
+                        s += std::to_string(val) + ", ";
+                    }
+                }
+            }
+            ROS_INFO("matrix:\n%s", s.c_str());
+
+            {
+                double scale = sqrt(pow(transform.R.at<double>(1, 0), 2) + pow(transform.R.at<double>(0, 0), 2));
+                if (scale < 0.1 || scale > 1.0)
+                {
+                    MatchAndSolveResult result;
+                    result.match = false;
+                    result.solved = false;
+                    return result;
+                }
+            }
+        }
+        ROS_DEBUG("debug");
+        // If transform is unreasonable, reject END
 
         std::vector<cv::Point2f> image_points1, image_points2;
 
@@ -798,13 +895,13 @@ namespace traceback
     }
 
     std::vector<std::vector<double>> CameraImageProcessor::LMOptimizeGlobal(std::vector<int> from_indexes,
-                                                               std::vector<int> to_indexes,
-                                                               std::vector<double> x_values,
-                                                               std::vector<double> y_values,
-                                                               std::vector<double> tx_values,
-                                                               std::vector<double> ty_values,
-                                                               std::vector<double> r_values,
-                                                               int num_robot)
+                                                                            std::vector<int> to_indexes,
+                                                                            std::vector<double> x_values,
+                                                                            std::vector<double> y_values,
+                                                                            std::vector<double> tx_values,
+                                                                            std::vector<double> ty_values,
+                                                                            std::vector<double> r_values,
+                                                                            int num_robot)
     {
         // 'm' is the number of data points.
         int m = x_values.size();
