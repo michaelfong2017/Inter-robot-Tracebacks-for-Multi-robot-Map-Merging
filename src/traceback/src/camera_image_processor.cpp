@@ -368,7 +368,7 @@ namespace traceback
         transform_needed.r = rot[1];
 
         // Regard as does not match when solvepnp returns result that does not make sense
-        if (abs(transform_needed.tx) > 1.5 || abs(transform_needed.ty) > 1.5)
+        if (abs(transform_needed.tx) > 3.0 || abs(transform_needed.ty) > 3.0)
         {
             {
                 MatchAndSolveResult result;
@@ -717,7 +717,7 @@ namespace traceback
         transform_needed.r = rot[1];
 
         // Regard as does not match when solvepnp returns result that does not make sense
-        if (abs(transform_needed.tx) > 1.5 || abs(transform_needed.ty) > 1.5)
+        if (abs(transform_needed.tx) > 3.0 || abs(transform_needed.ty) > 3.0)
         {
             {
                 MatchAndSolveResult result;
