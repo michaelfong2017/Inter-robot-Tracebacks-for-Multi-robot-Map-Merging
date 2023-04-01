@@ -7,6 +7,9 @@
 5.  Open the second terminal.
 6.  roslaunch ~/catkin_ws/src/traceback_bringup/launch/test.launch
 
+# Raw data
+## All raw data are inside doc/ in this repo, including the raw data in the seven experiments.
+
 ## Change gazebo world
 Under ~/catkin_ws/src/traceback_bringup/launch/gazebo_and_rviz.launch, change the gazebo world as instructed
 
