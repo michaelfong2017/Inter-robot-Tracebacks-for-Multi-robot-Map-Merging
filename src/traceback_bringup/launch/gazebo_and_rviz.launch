@@ -42,7 +42,7 @@
         <!-- 2. <arg name="world_name" value="$(find aws_robomaker_small_house_world)/worlds/small_house.world" /> -->
         <!-- 3. <arg name="world_name" value="$(find aws_robomaker_bookstore_world)/worlds/bookstore.world" /> -->
         <!-- 4. <arg name="world_name" value="$(find aws_robomaker_small_warehouse_world)/worlds/no_roof_small_warehouse.world" /> -->
-        <arg name="world_name" value="$(find turtlebot3_gazebo)/worlds/turtlebot3_house.world" />
+        <arg name="world_name" value="$(find aws_robomaker_bookstore_world)/worlds/bookstore.world" />
         <arg name="paused" value="false" />
         <arg name="use_sim_time" value="true" />
         <arg name="gui" value="true" />
