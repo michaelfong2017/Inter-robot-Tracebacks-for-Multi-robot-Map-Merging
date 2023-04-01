@@ -108,3 +108,22 @@ export TURTLEBOT3_MODEL=waffle_pi
 ```
 roslaunch turtlebot3_gazebo turtlebot3_house.launch
 ```
+
+## ~/.bashrc
+```bash
+source /opt/ros/noetic/setup.bash
+
+export TURTLEBOT3_MODEL=waffle_pi
+
+export GAZEBO_RESOURCE_PATH=$GAZEBO_RESOURCE_PATH:/usr/share/gazebo-11
+
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$HOME/catkin_ws/src/traceback_bringup/models
+export GAZEBO_RESOURCE_PATH=$GAZEBO_RESOURCE_PATH:$HOME/catkin_ws/src/traceback_bringup/worlds
+
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$HOME/catkin_ws/src/aws_robomaker_small_warehouse_world/models
+export GAZEBO_RESOURCE_PATH=$GAZEBO_RESOURCE_PATH:$HOME/catkin_ws/src/aws_robomaker_small_warehouse_world/worlds
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$HOME/catkin_ws/src/aws_robomaker_bookstore_world/models
+export GAZEBO_RESOURCE_PATH=$GAZEBO_RESOURCE_PATH:$HOME/catkin_ws/src/aws_robomaker_bookstore_world/worlds
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$HOME/catkin_ws/src/aws_robomaker_small_house_world/models
+export GAZEBO_RESOURCE_PATH=$GAZEBO_RESOURCE_PATH:$HOME/catkin_ws/src/aws_robomaker_small_house_world/worlds
+```
