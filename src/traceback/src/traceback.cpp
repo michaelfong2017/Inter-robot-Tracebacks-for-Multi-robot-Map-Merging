@@ -335,11 +335,45 @@ namespace traceback
             std::string src_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
             std::string dst_robot = tracer_robot < traced_robot ? traced_robot : tracer_robot;
             size_t i = 0;
+            // Include initially proposed transform
             for (auto &constraint : robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot])
             {
               if (i == 0)
               {
-                robot_to_robot_latest_accepted_loop_closure_constraint_[src_robot][dst_robot] = constraint;
+                // Use optimized transform based on traceback transforms and the initially proposed transform
+                // for latest accepted transform
+                std::vector<double> x_values;
+                std::vector<double> y_values;
+                std::vector<double> tx_values;
+                std::vector<double> ty_values;
+                std::vector<double> r_values;
+
+                // Include initially proposed transform
+                for (auto &con : robot_to_robot_traceback_loop_closure_constraints_[src_robot][dst_robot])
+                {
+                  x_values.push_back(con.x);
+                  y_values.push_back(con.y);
+                  tx_values.push_back(con.tx);
+                  ty_values.push_back(con.ty);
+                  r_values.push_back(con.r);
+                }
+
+                double init_tx = constraint.tx;
+                double init_ty = constraint.ty;
+                double init_r = constraint.r;
+
+                // in pixels
+                std::vector<double> optimized_tx_ty_r = camera_image_processor_.LMOptimize(x_values, y_values, tx_values, ty_values, r_values, init_tx, init_ty, init_r);
+                
+                LoopClosureConstraint latest_accepted_constraint;
+                latest_accepted_constraint.x = constraint.x;
+                latest_accepted_constraint.y = constraint.y;
+                latest_accepted_constraint.tx = optimized_tx_ty_r[0];
+                latest_accepted_constraint.ty = optimized_tx_ty_r[1];
+                latest_accepted_constraint.r = optimized_tx_ty_r[2];
+                // Use optimized transform based on traceback transforms and the initially proposed transform END
+
+                robot_to_robot_latest_accepted_loop_closure_constraint_[src_robot][dst_robot] = latest_accepted_constraint;
 
                 {
                   std::string from_robot = tracer_robot < traced_robot ? tracer_robot : traced_robot;
@@ -700,7 +734,8 @@ namespace traceback
       // Select robot_name_dst END
 
       // Skip if this pair is paused (due to abort)
-      if (pairwise_paused_[robot_name_src][robot_name_dst]) {
+      if (pairwise_paused_[robot_name_src][robot_name_dst])
+      {
         ROS_INFO("Skip traceback since this pair is being paused");
         continue;
       }
@@ -1538,7 +1573,8 @@ namespace traceback
               addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
             }
 
-            if (confidence_output < loop_closure_confidence_threshold_) {
+            if (confidence_output < loop_closure_confidence_threshold_)
+            {
               continue;
             }
 
