@@ -658,6 +658,14 @@ namespace traceback
         }
         std::string dst = transforms_indexes_[j];
 
+        // if loop closure constraint count reaches a threshold
+        // never traceback anymore for this pair
+        size_t current_loop_closure_count = robot_name_src < dst ? robot_to_robot_loop_closure_constraints_[robot_name_src][dst].size() : robot_to_robot_loop_closure_constraints_[dst][robot_name_src].size();
+        if (current_loop_closure_count >= stop_traceback_constraint_count_)
+        {
+          continue;
+        }
+
         bool hasCandidate = robot_name_src < dst ? robot_to_robot_candidate_loop_closure_constraints_[robot_name_src][dst].size() > 0 : robot_to_robot_candidate_loop_closure_constraints_[dst][robot_name_src].size() > 0;
 
         if (hasCandidate)
