@@ -176,7 +176,7 @@ namespace traceback
 
             {
                 double scale = sqrt(pow(transform.R.at<double>(1, 0), 2) + pow(transform.R.at<double>(0, 0), 2));
-                if (scale < 0.1 || scale > 1.0)
+                if (scale < 0.1 || scale > 10.0)
                 {
                     MatchAndSolveResult result;
                     result.match = false;
@@ -578,7 +578,7 @@ namespace traceback
 
             {
                 double scale = sqrt(pow(transform.R.at<double>(1, 0), 2) + pow(transform.R.at<double>(0, 0), 2));
-                if (scale < 0.1 || scale > 1.0)
+                if (scale < 0.1 || scale > 10.0)
                 {
                     MatchAndSolveResult result;
                     result.match = false;
