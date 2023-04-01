@@ -35,7 +35,7 @@
         <!-- meaning with traceback or without traceback -->
         <param name="test_mode" value="normal" default="normal" />
         <!-- 1.5 is good, can try 1.0 to 2.0 -->
-        <param name="loop_closure_confidence_threshold" value="1.5" />
+        <param name="loop_closure_confidence_threshold" value="2.0" />
         <!-- Candidate for traceback -->
         <param name="candidate_estimation_confidence" value="1.5" />
         <param name="traceback_match_confidence_threshold" value="0.35" />

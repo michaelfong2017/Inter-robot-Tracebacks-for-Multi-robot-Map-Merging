@@ -1338,7 +1338,8 @@ namespace traceback
           cv::detail::ImageFeatures features1 = robots_to_image_features_depths_pose_[robot_name].back().features;
           cv::detail::ImageFeatures features2 = pair.second[i].features;
 
-          double confidence_output = transform_estimator_.matchTwoFeatures(features1, features2, loop_closure_confidence_threshold_);
+          double confidence_threshold = MIN(loop_closure_confidence_threshold_, candidate_estimation_confidence_);
+          double confidence_output = transform_estimator_.matchTwoFeatures(features1, features2, confidence_threshold);
           if (confidence_output > 0.0)
           {
             geometry_msgs::Pose pose1 = robots_to_image_features_depths_pose_[robot_name].back().pose;
@@ -1535,6 +1536,10 @@ namespace traceback
             if (confidence_output >= candidate_estimation_confidence_)
             {
               addCandidateLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
+            }
+
+            if (confidence_output < loop_closure_confidence_threshold_) {
+              continue;
             }
 
             addLoopClosureConstraint(adjusted_transform, transform_needed.arrived_x / resolutions_[self_robot_index], transform_needed.arrived_y / resolutions_[self_robot_index], robot_name, second_robot_name);
