@@ -1,0 +1,7 @@
+582.900000 - 6. does not match and reject
+634.500000 - S1. reject since the goal is unreasonably far
+639.500000 - S1. reject since the goal is unreasonably far
+644.500000 - S1. reject since the goal is unreasonably far
+649.500000 - S1. reject since the goal is unreasonably far
+654.500000 - S1. reject since the goal is unreasonably far
+714.510000 - 1. abort with enough count

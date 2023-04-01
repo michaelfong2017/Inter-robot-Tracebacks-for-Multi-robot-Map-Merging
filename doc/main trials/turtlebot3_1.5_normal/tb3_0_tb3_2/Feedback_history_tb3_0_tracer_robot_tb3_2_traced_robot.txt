@@ -1,0 +1,10 @@
+280.540000 - 1. abort with enough count
+419.500000 - S1. reject since the goal is unreasonably far
+424.500000 - S1. reject since the goal is unreasonably far
+454.840000 - 6. does not match and reject
+474.820000 - 4. match and solved but not yet accept
+483.230000 - 4. match and solved but not yet accept
+506.100000 - 4. match and solved but not yet accept
+542.130000 - 2. abort without enough count
+556.770000 - 3. match and solved and accept
+592.510000 - 1. abort with enough count

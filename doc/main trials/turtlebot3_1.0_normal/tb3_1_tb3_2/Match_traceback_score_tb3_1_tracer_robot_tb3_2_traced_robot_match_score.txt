@@ -1,0 +1,2 @@
+Does not match at time 256.800000 with confidence -1
+Match at time 279.450000 with confidence 1.59242

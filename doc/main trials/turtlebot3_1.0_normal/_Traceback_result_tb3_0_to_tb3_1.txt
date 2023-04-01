@@ -1,0 +1,5 @@
+147.560000 - tracer robot is /tb3_0 and traced robot is /tb3_1 - abort
+226.940000 - tracer robot is /tb3_1 and traced robot is /tb3_0 - accept - (x, y, tx, ty, r) = (-8.02958, 3.78097, -13.1465, -0.33216, 0.11304) (in meters)
+308.800000 - tracer robot is /tb3_0 and traced robot is /tb3_1 - abort
+588.260000 - tracer robot is /tb3_0 and traced robot is /tb3_1 - abort
+666.880000 - tracer robot is /tb3_1 and traced robot is /tb3_0 - accept - (x, y, tx, ty, r) = (-0.767755, 3.04235, -12.9585, -0.339753, 0.13143) (in meters)

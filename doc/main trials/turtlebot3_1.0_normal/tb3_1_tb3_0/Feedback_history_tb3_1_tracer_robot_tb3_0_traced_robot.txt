@@ -1,0 +1,20 @@
+140.400000 - 4. match and solved but not yet accept
+141.860000 - 4. match and solved but not yet accept
+144.650000 - 7. does not match but not yet reject
+181.320000 - 4. match and solved but not yet accept
+226.940000 - 5. match but cannot solved and accept
+408.530000 - S1. reject since the goal is unreasonably far
+413.540000 - S1. reject since the goal is unreasonably far
+418.530000 - S1. reject since the goal is unreasonably far
+423.530000 - S1. reject since the goal is unreasonably far
+428.530000 - S1. reject since the goal is unreasonably far
+433.530000 - S1. reject since the goal is unreasonably far
+438.530000 - S1. reject since the goal is unreasonably far
+443.530000 - S1. reject since the goal is unreasonably far
+473.250000 - 4. match and solved but not yet accept
+505.820000 - 4. match and solved but not yet accept
+545.850000 - 2. abort without enough count
+586.870000 - 2. abort without enough count
+635.890000 - 2. abort without enough count
+654.070000 - 4. match and solved but not yet accept
+666.880000 - 3. match and solved and accept

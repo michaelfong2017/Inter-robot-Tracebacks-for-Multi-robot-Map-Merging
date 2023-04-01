@@ -1,0 +1,40 @@
+Match at time 324.480000 with confidence 0.517241
+Does not match at time 335.190000 with confidence 0.27907
+Match at time 348.430000 with confidence 0.381679
+Match at time 361.830000 with confidence 0.842391
+Does not match at time 376.100000 with confidence 0.322581
+Match at time 380.050000 with confidence 0.425532
+Does not match at time 466.160000 with confidence 0.0458716
+Match at time 659.260000 with confidence 0.48951
+Does not match at time 831.050000 with confidence 0.252366
+Match at time 839.200000 with confidence 0.402685
+Match at time 846.780000 with confidence 0.39604
+Match at time 849.240000 with confidence 0.510204
+Does not match at time 853.130000 with confidence -1
+Match at time 959.430000 with confidence 0.471698
+Does not match at time 967.520000 with confidence 0.196721
+Does not match at time 1018.020000 with confidence 0.209059
+Does not match at time 1024.570000 with confidence 0.344828
+Match at time 1048.130000 with confidence 0.485437
+Match at time 1056.810000 with confidence 1.72702
+Match at time 1061.660000 with confidence 0.870536
+Match at time 1065.820000 with confidence 0.512048
+Match at time 1076.280000 with confidence 0.38674
+Does not match at time 1122.710000 with confidence 0.16791
+Match at time 1129.050000 with confidence 0.41841
+Match at time 1138.060000 with confidence 0.974212
+Match at time 1145.100000 with confidence 0.889571
+Match at time 1153.410000 with confidence 2.0083
+Match at time 1172.850000 with confidence 0.683544
+Match at time 1181.890000 with confidence 0.426009
+Match at time 1184.800000 with confidence 0.717131
+Match at time 1188.350000 with confidence 0.521739
+Match at time 1190.360000 with confidence 0.670391
+Match at time 1192.260000 with confidence 0.661157
+Match at time 1193.710000 with confidence 0.55794
+Match at time 1195.010000 with confidence 0.628272
+Match at time 1198.130000 with confidence 0.521739
+Match at time 1199.520000 with confidence 0.59633
+Match at time 1200.970000 with confidence 0.660793
+Match at time 1212.840000 with confidence 0.457143
+Match at time 1214.360000 with confidence 0.422078

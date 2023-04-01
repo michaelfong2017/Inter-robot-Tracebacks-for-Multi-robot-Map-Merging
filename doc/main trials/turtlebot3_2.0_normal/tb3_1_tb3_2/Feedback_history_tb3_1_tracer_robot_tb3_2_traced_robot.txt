@@ -1,0 +1,43 @@
+330.510000 - 4. match and solved but not yet accept
+370.530000 - 2. abort without enough count
+385.340000 - 4. match and solved but not yet accept
+416.360000 - 2. abort without enough count
+457.380000 - 2. abort without enough count
+495.660000 - 4. match and solved but not yet accept
+528.690000 - 2. abort without enough count
+569.720000 - 2. abort without enough count
+584.610000 - 3. match and solved and accept
+597.170000 - 4. match and solved but not yet accept
+626.220000 - 4. match and solved but not yet accept
+663.240000 - 1. abort with enough count
+773.720000 - 4. match and solved but not yet accept
+789.690000 - 4. match and solved but not yet accept
+821.720000 - 2. abort without enough count
+862.740000 - 2. abort without enough count
+903.760000 - 2. abort without enough count
+921.910000 - 4. match and solved but not yet accept
+943.620000 - 3. match and solved and accept
+975.950000 - 4. match and solved but not yet accept
+993.150000 - 4. match and solved but not yet accept
+1008.810000 - 4. match and solved but not yet accept
+1043.870000 - 2. abort without enough count
+1084.890000 - 2. abort without enough count
+1125.920000 - 1. abort with enough count
+1221.550000 - 1. abort with enough count
+1318.200000 - 4. match and solved but not yet accept
+1333.570000 - 4. match and solved but not yet accept
+1335.170000 - 4. match and solved but not yet accept
+1336.940000 - 3. match and solved and accept
+1384.120000 - 4. match and solved but not yet accept
+1399.900000 - 4. match and solved but not yet accept
+1441.930000 - 2. abort without enough count
+1482.950000 - 2. abort without enough count
+1523.980000 - 2. abort without enough count
+1542.560000 - 4. match and solved but not yet accept
+1545.380000 - 3. match and solved and accept
+1659.860000 - 4. match and solved but not yet accept
+1690.880000 - 1. abort with enough count
+1792.550000 - 1. abort with enough count
+1890.560000 - 1. abort with enough count
+1987.930000 - 1. abort with enough count
+2081.560000 - 1. abort with enough count

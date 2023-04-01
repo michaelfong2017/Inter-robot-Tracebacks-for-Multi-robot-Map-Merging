@@ -1,0 +1,3 @@
+Count from /tb3_1 to /tb3_2 is 398
+Count from /tb3_0 to /tb3_2 is 643
+Count from /tb3_0 to /tb3_1 is 219

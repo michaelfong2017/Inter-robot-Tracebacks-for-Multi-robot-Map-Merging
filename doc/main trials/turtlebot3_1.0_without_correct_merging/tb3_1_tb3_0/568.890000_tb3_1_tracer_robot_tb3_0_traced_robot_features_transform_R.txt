@@ -1,0 +1,15 @@
+XYZ rotation is: [0, -0, 0]
+Rotation matrix C1MO (O to C1):
+1	0	0
+0	1	0
+0	0	1
+XYZ rotation is: [0, -0, 0]
+Rotation matrix C2MO (O to C2):
+1	0	0
+0	1	0
+0	0	1
+XYZ rotation is: [0, -0, 0]
+Rotation matrix R:
+1	0	0
+0	1	0
+0	0	1

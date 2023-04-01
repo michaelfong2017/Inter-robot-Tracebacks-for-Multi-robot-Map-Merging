@@ -1,0 +1,10 @@
+147.560000 - 1. abort with enough count
+228.760000 - 4. match and solved but not yet accept
+267.790000 - 2. abort without enough count
+308.800000 - 1. abort with enough count
+419.720000 - 4. match and solved but not yet accept
+454.750000 - 2. abort without enough count
+470.190000 - 4. match and solved but not yet accept
+506.220000 - 2. abort without enough count
+547.240000 - 2. abort without enough count
+588.260000 - 1. abort with enough count

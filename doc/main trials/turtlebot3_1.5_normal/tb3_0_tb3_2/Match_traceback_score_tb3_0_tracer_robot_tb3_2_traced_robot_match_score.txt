@@ -1,0 +1,5 @@
+Does not match at time 454.600000 with confidence 0.252101
+Match at time 474.520000 with confidence 1.24409
+Match at time 482.940000 with confidence 0.705882
+Match at time 505.850000 with confidence 1.7
+Match at time 556.350000 with confidence 1.0473

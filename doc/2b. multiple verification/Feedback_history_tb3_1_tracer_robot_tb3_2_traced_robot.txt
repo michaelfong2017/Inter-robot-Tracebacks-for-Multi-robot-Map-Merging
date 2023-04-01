@@ -1,0 +1,48 @@
+309.050000 - 2. abort without enough count
+324.750000 - 7. does not match but not yet reject
+335.500000 - 7. does not match but not yet reject
+348.840000 - 6. does not match and reject
+362.160000 - 7. does not match but not yet reject
+376.320000 - 7. does not match but not yet reject
+380.490000 - 6. does not match and reject
+466.420000 - 7. does not match but not yet reject
+524.440000 - 1. abort with enough count
+634.020000 - 2. abort without enough count
+660.010000 - 7. does not match but not yet reject
+702.090000 - 1. abort with enough count
+812.030000 - 2. abort without enough count
+831.570000 - 7. does not match but not yet reject
+839.550000 - 7. does not match but not yet reject
+847.010000 - 4. match and solved but not yet accept
+849.530000 - 6. does not match and reject
+853.440000 - 7. does not match but not yet reject
+884.470000 - 1. abort with enough count
+959.890000 - 4. match and solved but not yet accept
+967.770000 - 7. does not match but not yet reject
+999.790000 - 2. abort without enough count
+1018.540000 - 7. does not match but not yet reject
+1025.010000 - 6. does not match and reject
+1048.370000 - 4. match and solved but not yet accept
+1057.720000 - 4. match and solved but not yet accept
+1062.390000 - 4. match and solved but not yet accept
+1066.260000 - 7. does not match but not yet reject
+1076.760000 - 4. match and solved but not yet accept
+1107.780000 - 2. abort without enough count
+1123.230000 - 7. does not match but not yet reject
+1129.440000 - 7. does not match but not yet reject
+1138.870000 - 3. match and solved and accept
+1145.470000 - 4. match and solved but not yet accept
+1154.310000 - 4. match and solved but not yet accept
+1173.260000 - 4. match and solved but not yet accept
+1182.380000 - 4. match and solved but not yet accept
+1185.160000 - 3. match and solved and accept
+1188.730000 - 4. match and solved but not yet accept
+1190.730000 - 4. match and solved but not yet accept
+1192.590000 - 4. match and solved but not yet accept
+1193.880000 - 4. match and solved but not yet accept
+1195.380000 - 3. match and solved and accept
+1198.380000 - 4. match and solved but not yet accept
+1199.840000 - 4. match and solved but not yet accept
+1201.320000 - 4. match and solved but not yet accept
+1213.230000 - 4. match and solved but not yet accept
+1214.810000 - 3. match and solved and accept

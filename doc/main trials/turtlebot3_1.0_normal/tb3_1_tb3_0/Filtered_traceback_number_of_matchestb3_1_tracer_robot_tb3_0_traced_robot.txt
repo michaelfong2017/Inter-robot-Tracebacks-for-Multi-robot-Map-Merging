@@ -1,0 +1,8 @@
+Number of filtered matches at 139.700000 is 14
+Number of filtered matches at 141.550000 is 13
+Number of filtered matches at 180.980000 is 184
+Number of filtered matches at 226.660000 is 1
+Number of filtered matches at 472.910000 is 35
+Number of filtered matches at 504.870000 is 138
+Number of filtered matches at 653.220000 is 31
+Number of filtered matches at 665.990000 is 188

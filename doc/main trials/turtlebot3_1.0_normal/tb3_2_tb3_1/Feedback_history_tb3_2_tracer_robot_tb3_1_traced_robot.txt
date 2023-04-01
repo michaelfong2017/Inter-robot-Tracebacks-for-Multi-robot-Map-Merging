@@ -1,0 +1,5 @@
+227.560000 - 1. abort with enough count
+306.670000 - 4. match and solved but not yet accept
+320.880000 - 4. match and solved but not yet accept
+322.870000 - 4. match and solved but not yet accept
+326.380000 - 3. match and solved and accept

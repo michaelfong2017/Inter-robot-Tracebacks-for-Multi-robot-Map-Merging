@@ -1,0 +1,28 @@
+Last transform:
+0.627792	0.778381	31.6695
+-0.778381	0.627792	-146.861
+0	0	1
+Optimized (tx, ty, r) = (31.8747, -147.048, -0.891965)
+Optimized transform:
+0.627884	0.778307	31.8747
+-0.778307	0.627884	-147.048
+0	0	1
+
+Ground truth transform from robot tb3_1's frame to robot tb3_2's frame:
+0.707388	0.706825	74.8979
+-0.706825	0.707388	-173.103
+0	0	1
+Inverse ground truth transform, that is, from robot tb3_2's frame to robot tb3_1's frame:
+0.707388	-0.706825	-175.336
+0.706825	0.707388	69.5115
+-0	0	1
+
+Evaluation:
+Expected transformed (x, y, r) of the global origin object
+   from robot tb3_1's frame to robot tb3_2's frame:
+Expected (x, y, r) = (-10, -60, -0.785)
+Original estimated (x, y, r) = (-40.6537, -25.3319, -0.892083)
+Adjusted estimated (x, y, r) = (-40.4629, -25.5277, -0.891965)
+
+Error of original is 46.2766 pixels translation and 0.107083 radians rotation
+Error of adjusted is 46.0036 pixels translation and 0.106965 radians rotation

@@ -1,0 +1,4 @@
+Match at time 306.380000 with confidence 1.41264
+Match at time 320.390000 with confidence 1.23433
+Match at time 322.590000 with confidence 0.904807
+Match at time 326.090000 with confidence 0.890411

@@ -1,0 +1,3 @@
+582.900000 - tracer robot is /tb3_2 and traced robot is /tb3_1 - reject
+585.520000 - tracer robot is /tb3_1 and traced robot is /tb3_2 - abort
+714.510000 - tracer robot is /tb3_2 and traced robot is /tb3_1 - abort

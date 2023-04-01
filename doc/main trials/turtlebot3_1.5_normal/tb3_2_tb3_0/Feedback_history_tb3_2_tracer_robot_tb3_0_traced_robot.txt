@@ -1,0 +1,19 @@
+247.110000 - 4. match and solved but not yet accept
+295.140000 - 2. abort without enough count
+327.050000 - 4. match and solved but not yet accept
+364.060000 - 2. abort without enough count
+405.110000 - 2. abort without enough count
+426.180000 - 4. match and solved but not yet accept
+430.510000 - 3. match and solved and accept
+445.760000 - 4. match and solved but not yet accept
+451.440000 - 4. match and solved but not yet accept
+454.390000 - 4. match and solved but not yet accept
+456.010000 - 3. match and solved and accept
+462.530000 - 4. match and solved but not yet accept
+463.860000 - 4. match and solved but not yet accept
+467.240000 - 4. match and solved but not yet accept
+469.010000 - 3. match and solved and accept
+473.080000 - 4. match and solved but not yet accept
+491.400000 - 7. does not match but not yet reject
+516.450000 - 4. match and solved but not yet accept
+571.470000 - 1. abort with enough count

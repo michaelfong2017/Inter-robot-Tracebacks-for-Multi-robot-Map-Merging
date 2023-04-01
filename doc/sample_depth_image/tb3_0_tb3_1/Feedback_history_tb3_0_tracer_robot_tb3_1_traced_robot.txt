@@ -1,4 +1,0 @@
-607.540000 - 4. match and close but not yet accept
-614.830000 - 4. match and close but not yet accept
-625.180000 - 4. match and close but not yet accept
-656.270000 - 2. abort without enough consecutive count

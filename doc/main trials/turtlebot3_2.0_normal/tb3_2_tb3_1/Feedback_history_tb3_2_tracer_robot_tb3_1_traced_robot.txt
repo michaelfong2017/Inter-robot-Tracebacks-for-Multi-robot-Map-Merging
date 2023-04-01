@@ -1,0 +1,34 @@
+321.570000 - 1. abort with enough count
+396.580000 - 4. match and solved but not yet accept
+422.930000 - 7. does not match but not yet reject
+454.550000 - 6. does not match and reject
+736.560000 - 1. abort with enough count
+816.990000 - 4. match and solved but not yet accept
+859.020000 - 2. abort without enough count
+888.970000 - 4. match and solved but not yet accept
+922.730000 - 7. does not match but not yet reject
+933.270000 - 4. match and solved but not yet accept
+936.510000 - 7. does not match but not yet reject
+938.990000 - 7. does not match but not yet reject
+960.000000 - 3. match and solved and accept
+1047.560000 - 1. abort with enough count
+1141.550000 - 1. abort with enough count
+1236.560000 - 1. abort with enough count
+1337.860000 - 4. match and solved but not yet accept
+1369.760000 - 4. match and solved but not yet accept
+1376.750000 - 4. match and solved but not yet accept
+1407.810000 - 2. abort without enough count
+1448.840000 - 2. abort without enough count
+1471.210000 - 3. match and solved and accept
+1724.560000 - 1. abort with enough count
+1817.560000 - 1. abort with enough count
+1898.010000 - 4. match and solved but not yet accept
+1910.410000 - 4. match and solved but not yet accept
+1916.310000 - 4. match and solved but not yet accept
+1918.380000 - 3. match and solved and accept
+1987.920000 - 4. match and solved but not yet accept
+2054.070000 - 7. does not match but not yet reject
+2065.470000 - 6. does not match and reject
+2068.720000 - 6. does not match and reject
+2073.220000 - 6. does not match and reject
+2106.550000 - 1. abort with enough count

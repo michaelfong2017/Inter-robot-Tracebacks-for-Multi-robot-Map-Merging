@@ -1,9 +1,0 @@
-Transform proposed at time 184.870000 with confidence 2.00371
-Transform proposed at time 184.870000 with confidence 2.05405
-Transform proposed at time 274.870000 with confidence 2.00445
-Transform proposed at time 329.870000 with confidence 2.11832
-Transform proposed at time 334.870000 with confidence 2.32506
-Transform proposed at time 367.690000 with confidence 2.09945
-Transform proposed at time 427.480000 with confidence 2.05575
-Transform proposed at time 427.480000 with confidence 2.25664
-Transform proposed at time 660.340000 with confidence 2.04156

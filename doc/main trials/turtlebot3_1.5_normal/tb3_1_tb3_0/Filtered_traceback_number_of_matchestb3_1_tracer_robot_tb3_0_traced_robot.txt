@@ -1,0 +1,12 @@
+Number of filtered matches at 780.310000 is 53
+Number of filtered matches at 792.560000 is 40
+Number of filtered matches at 841.640000 is 122
+Number of filtered matches at 853.090000 is 84
+Number of filtered matches at 868.500000 is 12
+Number of filtered matches at 882.440000 is 66
+Number of filtered matches at 893.000000 is 13
+Number of filtered matches at 918.750000 is 70
+Number of filtered matches at 923.120000 is 53
+Number of filtered matches at 926.700000 is 172
+Number of filtered matches at 942.570000 is 148
+Number of filtered matches at 1132.510000 is 71

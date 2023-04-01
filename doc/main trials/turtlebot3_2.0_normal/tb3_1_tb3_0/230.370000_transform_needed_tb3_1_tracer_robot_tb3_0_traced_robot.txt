@@ -1,0 +1,1 @@
+transform_needed in global coordinates (x, y, r) = (-1.34129, -0.222766, -0.871544)

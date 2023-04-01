@@ -1,0 +1,7 @@
+Number of filtered matches at 186.130000 is 5
+Number of filtered matches at 237.740000 is 82
+Number of filtered matches at 287.540000 is 22
+Number of filtered matches at 290.030000 is 8
+Number of filtered matches at 293.320000 is 20
+Number of filtered matches at 360.200000 is 70
+Number of filtered matches at 380.520000 is 37

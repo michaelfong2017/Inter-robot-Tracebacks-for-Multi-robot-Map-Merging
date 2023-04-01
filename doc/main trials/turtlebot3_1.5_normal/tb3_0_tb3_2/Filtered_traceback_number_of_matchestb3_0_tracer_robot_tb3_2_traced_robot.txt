@@ -1,0 +1,4 @@
+Number of filtered matches at 474.520000 is 79
+Number of filtered matches at 482.940000 is 29
+Number of filtered matches at 505.850000 is 136
+Number of filtered matches at 556.350000 is 124

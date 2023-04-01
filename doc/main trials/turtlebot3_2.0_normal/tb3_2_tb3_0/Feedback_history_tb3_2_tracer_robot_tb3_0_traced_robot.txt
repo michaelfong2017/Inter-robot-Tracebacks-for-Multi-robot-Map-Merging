@@ -1,0 +1,38 @@
+350.540000 - S1. reject since the goal is unreasonably far
+479.860000 - 6. does not match and reject
+513.140000 - 6. does not match and reject
+524.150000 - 6. does not match and reject
+565.550000 - 1. abort with enough count
+630.540000 - S1. reject since the goal is unreasonably far
+645.880000 - 4. match and solved but not yet accept
+649.180000 - 4. match and solved but not yet accept
+652.900000 - 4. match and solved but not yet accept
+657.880000 - 3. match and solved and accept
+696.550000 - 1. abort with enough count
+977.150000 - 4. match and solved but not yet accept
+979.730000 - 4. match and solved but not yet accept
+981.230000 - 7. does not match but not yet reject
+983.990000 - 4. match and solved but not yet accept
+986.820000 - 3. match and solved and accept
+1481.420000 - 4. match and solved but not yet accept
+1516.450000 - 2. abort without enough count
+1554.340000 - 4. match and solved but not yet accept
+1572.440000 - 4. match and solved but not yet accept
+1575.850000 - 3. match and solved and accept
+1603.020000 - 4. match and solved but not yet accept
+1614.530000 - 4. match and solved but not yet accept
+1619.040000 - 4. match and solved but not yet accept
+1650.070000 - 2. abort without enough count
+1687.610000 - 3. match and solved and accept
+1929.260000 - 4. match and solved but not yet accept
+1947.950000 - 4. match and solved but not yet accept
+1960.000000 - 4. match and solved but not yet accept
+1970.580000 - 3. match and solved and accept
+2144.970000 - 4. match and solved but not yet accept
+2157.860000 - 4. match and solved but not yet accept
+2167.660000 - 4. match and solved but not yet accept
+2175.770000 - 3. match and solved and accept
+2194.370000 - 4. match and solved but not yet accept
+2206.820000 - 4. match and solved but not yet accept
+2217.240000 - 4. match and solved but not yet accept
+2234.050000 - 3. match and solved and accept

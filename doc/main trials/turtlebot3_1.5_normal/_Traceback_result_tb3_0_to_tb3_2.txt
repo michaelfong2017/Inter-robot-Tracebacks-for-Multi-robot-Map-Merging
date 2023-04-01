@@ -1,0 +1,8 @@
+280.540000 - tracer robot is /tb3_0 and traced robot is /tb3_2 - abort
+430.510000 - tracer robot is /tb3_2 and traced robot is /tb3_0 - accept - (x, y, tx, ty, r) = (4.59625, 0.101281, -5.91388, 1.81095, -0.807398) (in meters)
+454.840000 - tracer robot is /tb3_0 and traced robot is /tb3_2 - reject
+456.010000 - tracer robot is /tb3_2 and traced robot is /tb3_0 - accept - (x, y, tx, ty, r) = (5.24388, -1.88637, -9.01648, -2.31025, -0.35127) (in meters)
+469.010000 - tracer robot is /tb3_2 and traced robot is /tb3_0 - accept - (x, y, tx, ty, r) = (5.52312, 0.701813, -5.45486, 1.74063, -0.825936) (in meters)
+556.770000 - tracer robot is /tb3_0 and traced robot is /tb3_2 - accept - (x, y, tx, ty, r) = (5.39605, 1.20535, -5.24705, 1.81048, -0.874808) (in meters)
+571.470000 - tracer robot is /tb3_2 and traced robot is /tb3_0 - abort
+592.520000 - tracer robot is /tb3_0 and traced robot is /tb3_2 - abort

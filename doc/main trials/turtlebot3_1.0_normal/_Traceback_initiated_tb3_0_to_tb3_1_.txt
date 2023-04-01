@@ -1,0 +1,13 @@
+113.530000 - Candidate loop closure - tracer robot is /tb3_0 and traced robot is /tb3_1
+113.540000 - Candidate loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0
+208.530000 - Optimized loop closure - tracer robot is /tb3_0 and traced robot is /tb3_1
+373.530000 - Optimized loop closure - tracer robot is /tb3_0 and traced robot is /tb3_1
+408.530000 - Optimized loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0
+413.530000 - Optimized loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0
+418.530000 - Optimized loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0
+423.530000 - Optimized loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0
+428.530000 - Optimized loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0
+433.530000 - Optimized loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0
+438.530000 - Optimized loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0
+443.530000 - Optimized loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0
+448.530000 - Optimized loop closure - tracer robot is /tb3_1 and traced robot is /tb3_0

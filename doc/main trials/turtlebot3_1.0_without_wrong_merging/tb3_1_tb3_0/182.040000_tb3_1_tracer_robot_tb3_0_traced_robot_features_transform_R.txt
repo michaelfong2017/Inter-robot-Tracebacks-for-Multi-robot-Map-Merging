@@ -1,0 +1,15 @@
+XYZ rotation is: [5.12663e-07, 1.59601e-06, -2.92599e-07]
+Rotation matrix C1MO (O to C1):
+1	2.926e-07	1.59601e-06
+-2.92599e-07	1	-5.12663e-07
+-1.59601e-06	5.12663e-07	1
+XYZ rotation is: [0, -0, 0]
+Rotation matrix C2MO (O to C2):
+1	0	0
+0	1	0
+0	0	1
+XYZ rotation is: [-5.12663e-07, -1.59601e-06, 2.926e-07]
+Rotation matrix R:
+1	-2.92599e-07	-1.59601e-06
+2.926e-07	1	5.12663e-07
+1.59601e-06	-5.12663e-07	1

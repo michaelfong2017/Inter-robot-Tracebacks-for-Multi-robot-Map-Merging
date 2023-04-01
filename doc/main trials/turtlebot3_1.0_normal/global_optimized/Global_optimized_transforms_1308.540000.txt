@@ -1,0 +1,12 @@
+Global optimized transform from /tb3_0 to /tb3_0 :
+1	0	0
+0	1	0
+0	0	1
+Global optimized transform from /tb3_0 to /tb3_1 :
+0.992481	-0.122402	-267.02
+0.122402	0.992481	-10.3234
+0	0	1
+Global optimized transform from /tb3_0 to /tb3_2 :
+0.765178	0.643819	-115.151
+-0.643819	0.765178	22.6186
+0	0	1

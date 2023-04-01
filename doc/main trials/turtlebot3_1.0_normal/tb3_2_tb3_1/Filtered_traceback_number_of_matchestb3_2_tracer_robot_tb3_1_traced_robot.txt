@@ -1,0 +1,4 @@
+Number of filtered matches at 306.380000 is 152
+Number of filtered matches at 320.390000 is 128
+Number of filtered matches at 322.590000 is 96
+Number of filtered matches at 326.090000 is 91

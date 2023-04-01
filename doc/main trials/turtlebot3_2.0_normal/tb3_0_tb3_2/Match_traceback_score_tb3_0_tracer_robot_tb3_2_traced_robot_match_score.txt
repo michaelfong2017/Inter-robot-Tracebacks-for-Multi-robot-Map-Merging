@@ -1,0 +1,20 @@
+Match at time 176.480000 with confidence 0.458015
+Match at time 334.860000 with confidence 1.09325
+Does not match at time 513.160000 with confidence 0.246305
+Does not match at time 525.650000 with confidence 0.340909
+Match at time 641.730000 with confidence 0.680934
+Match at time 646.340000 with confidence 0.461538
+Match at time 657.910000 with confidence 0.516304
+Match at time 667.170000 with confidence 0.659574
+Match at time 684.450000 with confidence 0.736196
+Match at time 689.750000 with confidence 0.904977
+Match at time 778.130000 with confidence 0.630915
+Match at time 834.820000 with confidence 0.451613
+Match at time 1513.880000 with confidence 1.46809
+Match at time 1517.570000 with confidence 1.58537
+Match at time 1530.280000 with confidence 1.18671
+Match at time 1534.520000 with confidence 1.18012
+Match at time 1949.410000 with confidence 1.16592
+Match at time 1966.150000 with confidence 1.09504
+Match at time 2015.250000 with confidence 1.20318
+Match at time 2059.690000 with confidence 1.33617

@@ -1,0 +1,12 @@
+Translation matrix C1MO (O to C1):
+-2.05697e-07
+1.22607e-07
+4.51202e-09
+Translation matrix C2MO (O to C2):
+2.52401
+-0.0181556
+3.50683
+Translation matrix t:
+2.52401
+-0.0181557
+3.50683
